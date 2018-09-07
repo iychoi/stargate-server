@@ -263,27 +263,6 @@ public class LocalFSKeyValueStoreDriver extends AbstractKeyValueStoreDriver {
         }
     }
     
-    public String getString(String store, String key) throws IOException {
-        if(store == null || store.isEmpty()) {
-            throw new IllegalArgumentException("store is null or empty");
-        }
-        
-        if(key == null || key.isEmpty()) {
-            throw new IllegalArgumentException("key is null or empty");
-        }
-        
-        File localFile = getKeyPath(store, key);
-        if(localFile.exists()) {
-            // json
-            FileInputStream is = new FileInputStream(localFile);
-            String str = IOUtils.readString(is);
-            is.close();
-            return str;
-        } else {
-            return null;
-        }
-    }
-    
     public void putBytes(String store, String key, byte[] value) throws IOException {
         if(store == null || store.isEmpty()) {
             throw new IllegalArgumentException("store is null or empty");
@@ -301,26 +280,6 @@ public class LocalFSKeyValueStoreDriver extends AbstractKeyValueStoreDriver {
         
         FileOutputStream os = new FileOutputStream(localFile);
         IOUtils.write(os, value);
-        os.close();
-    }
-
-    public void putString(String store, String key, String value) throws IOException {
-        if(store == null || store.isEmpty()) {
-            throw new IllegalArgumentException("store is null or empty");
-        }
-        
-        if(key == null || key.isEmpty()) {
-            throw new IllegalArgumentException("key is null or empty");
-        }
-        
-        File localFile = getKeyPath(store, key);
-        if(localFile.exists()) {
-            // delete first
-            localFile.delete();
-        }
-        
-        FileOutputStream os = new FileOutputStream(localFile);
-        IOUtils.writeString(os, value);
         os.close();
     }
     

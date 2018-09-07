@@ -52,10 +52,7 @@ public class HTTPUserInterfaceClient extends AbstractUserInterfaceClient {
     private long lastActiveTime;
     private boolean connected = false;
     
-    public HTTPUserInterfaceClient() {
-    }
-    
-    HTTPUserInterfaceClient(URI serviceURI, String username, String password) throws IOException {
+    public HTTPUserInterfaceClient(URI serviceURI, String username, String password) throws IOException {
         if(serviceURI == null) {
             throw new IllegalArgumentException("serviceURI is null");
         }

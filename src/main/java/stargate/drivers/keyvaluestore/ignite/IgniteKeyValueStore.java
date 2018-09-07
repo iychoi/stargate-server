@@ -34,8 +34,7 @@ import org.apache.ignite.cache.CacheWriteSynchronizationMode;
 import org.apache.ignite.configuration.CacheConfiguration;
 import stargate.commons.keyvaluestore.AbstractKeyValueStore;
 import stargate.commons.keyvaluestore.EnumKeyValueStoreProperty;
-import stargate.commons.utils.ClassUtils;
-import stargate.commons.utils.JsonSerializer;
+import stargate.commons.utils.ObjectSerializer;
 import stargate.drivers.ignite.IgniteDriver;
 
 /**
@@ -118,45 +117,18 @@ public class IgniteKeyValueStore extends AbstractKeyValueStore {
 
     @Override
     public Object get(String key) throws IOException {
-        if(this.valueClass == byte[].class) {
-            return this.store.get(key);
-        } else if(this.valueClass == String.class) {
-            byte[] bytes = this.store.get(key);
-            if(bytes == null) {
-                return null;
-            }
-            return new String(bytes);
-        } else {
-            // other complex classes
-            byte[] bytes = this.store.get(key);
-            if(bytes == null) {
-                return null;
-            }
-            String json = new String(bytes);
-            
-            // cast
-            try {
-                return ClassUtils.invokeCreateInstance(this.valueClass, json);
-            } catch (Exception ex) {
-                throw new IOException(ex);
-            }
+        byte[] bytes = this.store.get(key);
+        if(bytes == null) {
+            return null;
         }
+        
+        return ObjectSerializer.fromByteArray(bytes, this.valueClass);
     }
 
     @Override
     public void put(String key, Object value) throws IOException {
-        if(this.valueClass == byte[].class) {
-            byte[] valueBytes = (byte[]) value;
-            this.store.put(key, valueBytes);
-        } else if(this.valueClass == String.class) {
-            String valueString = (String) value;
-            this.store.put(key, valueString.getBytes());
-        } else {
-            // other complex classes
-            JsonSerializer serializer = new JsonSerializer();
-            String json = serializer.toJson(value);
-            this.store.put(key, json.getBytes());
-        }
+        byte[] valueBytes = ObjectSerializer.toByteArray(value);
+        this.store.put(key, valueBytes);
     }
 
     @Override

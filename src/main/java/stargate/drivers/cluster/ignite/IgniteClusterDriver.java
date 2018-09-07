@@ -16,11 +16,9 @@
 package stargate.drivers.cluster.ignite;
 
 import java.io.IOException;
-import java.util.ArrayList;
 import java.util.Collection;
 import java.util.HashSet;
 import java.util.Iterator;
-import java.util.List;
 import java.util.Set;
 import javax.cache.Cache;
 import org.apache.commons.logging.Log;
@@ -118,6 +116,7 @@ public class IgniteClusterDriver extends AbstractClusterDriver {
         
         if(this.nodes != null) {
             this.nodes.destroy();
+            this.nodes = null;
         }
         
         if(this.igniteDriver != null && this.igniteDriver.isStarted()) {
@@ -231,7 +230,7 @@ public class IgniteClusterDriver extends AbstractClusterDriver {
     }
 
     @Override
-    public synchronized String getLeaderNodeName() {
+    public synchronized String getLeaderNodeName() throws IOException {
         Ignite ignite = this.igniteDriver.getIgnite();
         IgniteCluster cluster = ignite.cluster();
         
@@ -241,5 +240,13 @@ public class IgniteClusterDriver extends AbstractClusterDriver {
         ClusterGroup oldestNode = cluster.forOldest();
         ClusterNode node = oldestNode.node();
         return node.id().toString();
+    }
+
+    @Override
+    public boolean isLeaderNode() throws IOException {
+        String leaderNodeName = getLeaderNodeName();
+        Node localNode = getLocalNode();
+        
+        return localNode.getName().equals(leaderNodeName);
     }
 }

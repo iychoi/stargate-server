@@ -23,8 +23,7 @@ import org.apache.commons.logging.Log;
 import org.apache.commons.logging.LogFactory;
 import stargate.commons.keyvaluestore.AbstractKeyValueStore;
 import stargate.commons.keyvaluestore.EnumKeyValueStoreProperty;
-import stargate.commons.utils.ClassUtils;
-import stargate.commons.utils.JsonSerializer;
+import stargate.commons.utils.ObjectSerializer;
 
 /**
  *
@@ -93,38 +92,17 @@ public class LocalFSKeyValueStore extends AbstractKeyValueStore {
 
     @Override
     public Object get(String key) throws IOException {
-        if(this.valueClass == byte[].class) {
-            return this.driver.getBytes(this.name, key);
-        } else if(this.valueClass == String.class) {
-            return this.driver.getString(this.name, key);
-        } else {
-            // other complex classes
-            String json = this.driver.getString(this.name, key);
-            if(json == null) {
-                return null;
-            }
-            
-            // cast
-            try {
-                return ClassUtils.invokeCreateInstance(this.valueClass, json);
-            } catch (Exception ex) {
-                throw new IOException(ex);
-            }
+        byte[] bytes = this.driver.getBytes(this.name, key);
+        if(bytes == null) {
+            return null;
         }
+        return ObjectSerializer.fromByteArray(bytes, this.valueClass);
     }
 
     @Override
     public void put(String key, Object value) throws IOException {
-        if(this.valueClass == byte[].class) {
-            this.driver.putBytes(this.name, key, (byte[]) value);
-        } else if(this.valueClass == String.class) {
-            this.driver.putString(this.name, key, (String) value);
-        } else {
-            // other complex classes
-            JsonSerializer serializer = new JsonSerializer();
-            String json = serializer.toJson(value);
-            this.driver.putString(this.name, key, json);
-        }
+        byte[] bytes = ObjectSerializer.toByteArray(value);
+        this.driver.putBytes(this.name, key, bytes);
     }
 
     @Override
@@ -156,7 +134,7 @@ public class LocalFSKeyValueStore extends AbstractKeyValueStore {
         Map<String, Object> map = new HashMap<String, Object>();
         Collection<String> keys = this.driver.listKeys(this.name);
         for(String key : keys) {
-            Object value = this.driver.getString(this.name, key);
+            Object value = get(key);
             map.put(key, value);
         }
         return map;

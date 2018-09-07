@@ -191,6 +191,17 @@ public class ClusterManager extends AbstractManager<AbstractClusterDriver> {
         return this.localCluster.getNode(leaderNodeName); 
     }
     
+    public synchronized boolean isLeaderNode() throws IOException {
+        if(!this.started) {
+            throw new IllegalStateException("Manager is not started");
+        }
+        
+        safeInitLocalCluster();
+        
+        AbstractClusterDriver driver = getDriver();
+        return driver.isLeaderNode();
+    }
+    
     public synchronized Node getLocalNode() throws IOException {
         if(!this.started) {
             throw new IllegalStateException("Manager is not started");

@@ -19,6 +19,9 @@ import java.io.IOException;
 import java.net.InetSocketAddress;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.concurrent.locks.Condition;
+import java.util.concurrent.locks.Lock;
+import java.util.concurrent.locks.ReentrantLock;
 import org.apache.commons.logging.Log;
 import org.apache.commons.logging.LogFactory;
 import org.apache.ignite.Ignite;
@@ -27,6 +30,9 @@ import org.apache.ignite.Ignition;
 import org.apache.ignite.configuration.DataRegionConfiguration;
 import org.apache.ignite.configuration.DataStorageConfiguration;
 import org.apache.ignite.configuration.IgniteConfiguration;
+import org.apache.ignite.internal.managers.discovery.IgniteDiscoverySpi;
+import org.apache.ignite.spi.collision.CollisionSpi;
+import org.apache.ignite.spi.collision.priorityqueue.PriorityQueueCollisionSpi;
 import org.apache.ignite.spi.discovery.tcp.TcpDiscoverySpi;
 import org.apache.ignite.spi.discovery.tcp.ipfinder.TcpDiscoveryIpFinder;
 import org.apache.ignite.spi.discovery.tcp.ipfinder.multicast.TcpDiscoveryMulticastIpFinder;
@@ -48,6 +54,8 @@ public class IgniteDriver {
     private int initCount = 0;
     private Ignite igniteInstance;
     private Thread activeCheckThread;
+    private Lock clusterActivationLock = new ReentrantLock();
+    private Condition clusterActivationCondition = this.clusterActivationLock.newCondition();
     private boolean checkActive = true;
     
     public static IgniteDriver getInstance() {
@@ -66,14 +74,34 @@ public class IgniteDriver {
         if(!this.initialized) {
             LOG.info("Initializing Ignite Master Driver");
             
-            IgniteConfiguration igniteConfig = getSingleMachineIgniteConfig();
+            IgniteConfiguration igniteConfig = new IgniteConfiguration();
+            
+            // discovery
+            IgniteDiscoverySpi discoveryConfig = getTCPMulticastIPFinderConfig();
+            igniteConfig.setDiscoverySpi(discoveryConfig);
+            
+            // datastore
+            DataStorageConfiguration dataStoreConfig = getDataStoreConfig();
+            igniteConfig.setDataStorageConfiguration(dataStoreConfig);
+            
+            // task ordering
+            CollisionSpi colConfig = getQueueConfig();
+            igniteConfig.setCollisionSpi(colConfig);
+            
             this.igniteInstance = Ignition.start(igniteConfig);
             
             IgniteCluster cluster = this.igniteInstance.cluster();
             boolean active = cluster.active();
-            if(!active) {
-                LOG.info("Activate Ignite cluster");
-                runChecker();
+            LOG.info("Stargate is waiting for activating Ignite cluster");
+            runChecker();
+
+            this.clusterActivationLock.lock();
+            try {
+                this.clusterActivationCondition.await();
+            } catch (InterruptedException ex) {
+                LOG.error("activation waiting is interrupted");
+            } finally {
+                this.clusterActivationLock.unlock();
             }
             
             this.initialized = true;
@@ -88,20 +116,28 @@ public class IgniteDriver {
             @Override
             public void run() {
                 try {
+                    // to make condition await
+                    Thread.sleep(1000);
+                    
                     while(checkActive) {
                         IgniteCluster cluster = igniteInstance.cluster();
                         boolean active = cluster.active();
                         if(active) {
-                            LOG.info("Ignite cluster is active!");
+                            LOG.info("Detected Ignite cluster is active!");
+                            clusterActivationLock.lock();
+                            try {
+                                clusterActivationCondition.signal();
+                            } finally {
+                                clusterActivationLock.unlock();
+                            }
                             break;
                         } else {
                             LOG.info("Ignite cluster is inactive!");
+                            Thread.sleep(1000);
                         }
-
-                        Thread.sleep(10000);
                     }
                 } catch (InterruptedException ex) {
-                    LOG.equals(ex);
+                    LOG.error(ex);
                 }
             }
         });
@@ -137,9 +173,7 @@ public class IgniteDriver {
         return this.initialized;
     }
     
-    private IgniteConfiguration getSingleMachineIgniteConfig() {
-        IgniteConfiguration igniteConfig = new IgniteConfiguration();
-        
+    private DataStorageConfiguration getDataStoreConfig() {
         // DATA STORAGE
         DataStorageConfiguration dsCfg = new DataStorageConfiguration();
         
@@ -156,8 +190,10 @@ public class IgniteDriver {
         dsCfg.setDataRegionConfigurations(volatileDataRegConf);
         dsCfg.setDefaultDataRegionConfiguration(persistentDataRegConf);
         
-        igniteConfig.setDataStorageConfiguration(dsCfg);
-        
+        return dsCfg;
+    }
+    
+    private IgniteDiscoverySpi getTCPMulticastIPFinderConfig() {
         // DISCOVERY SPI
         TcpDiscoverySpi discoSpi = new TcpDiscoverySpi();
         
@@ -172,12 +208,15 @@ public class IgniteDriver {
         tdif.registerAddresses(addresses);
         
         discoSpi.setIpFinder(tdif);
-        
-        igniteConfig.setDiscoverySpi(discoSpi);
-        
-        return igniteConfig;
+        return discoSpi;
     }
-
+    
+    private CollisionSpi getQueueConfig() {
+        // PRIORITY ORDERING
+        PriorityQueueCollisionSpi collisionSpi = new PriorityQueueCollisionSpi();
+        return collisionSpi;
+    }
+    
     public Ignite getIgnite() {
         return this.igniteInstance;
     }
