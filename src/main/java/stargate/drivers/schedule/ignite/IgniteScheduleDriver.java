@@ -16,19 +16,26 @@
 package stargate.drivers.schedule.ignite;
 
 import java.io.IOException;
+import java.util.ArrayList;
+import java.util.Collection;
+import java.util.List;
+import java.util.UUID;
+import java.util.logging.Level;
+import java.util.logging.Logger;
 import org.apache.commons.logging.Log;
 import org.apache.commons.logging.LogFactory;
 import org.apache.ignite.Ignite;
-import org.apache.ignite.IgniteQueue;
-import org.apache.ignite.cache.CacheAtomicityMode;
-import org.apache.ignite.configuration.CollectionConfiguration;
+import org.apache.ignite.IgniteCompute;
+import org.apache.ignite.cluster.ClusterGroup;
+import org.apache.ignite.lang.IgniteRunnable;
+import org.apache.ignite.resources.IgniteInstanceResource;
 import stargate.commons.driver.AbstractDriverConfig;
-import stargate.commons.manager.ManagerNotInstantiatedException;
 import stargate.commons.schedule.AbstractScheduleDriver;
 import stargate.commons.schedule.AbstractScheduleDriverConfig;
 import stargate.commons.schedule.Task;
+import stargate.commons.schedule.TaskRunnable;
+import stargate.commons.schedule.TaskSchedule;
 import stargate.drivers.ignite.IgniteDriver;
-import stargate.managers.cluster.ClusterManager;
 import stargate.managers.schedule.ScheduleManager;
 import stargate.service.StargateService;
 
@@ -40,13 +47,8 @@ public class IgniteScheduleDriver extends AbstractScheduleDriver {
 
     private static final Log LOG = LogFactory.getLog(IgniteScheduleDriver.class);
     
-    private static final String TASK_QUEUE = "TASK_QUEUE";
-    
     private IgniteScheduleDriverConfig config;
     private IgniteDriver igniteDriver;
-    private IgniteQueue<String> tasks;
-    private boolean dispatchTask = true;
-    private Thread taskDispatcherThread;
     
     public IgniteScheduleDriver(AbstractDriverConfig config) {
         if(config == null) {
@@ -92,20 +94,6 @@ public class IgniteScheduleDriver extends AbstractScheduleDriver {
 
     @Override
     public synchronized void uninit() throws IOException {
-        this.dispatchTask = false;
-        if(this.taskDispatcherThread != null) {
-            if(this.taskDispatcherThread.isAlive()) {
-                this.taskDispatcherThread.interrupt();
-            }
-            this.taskDispatcherThread = null;
-        }
-        
-        if(this.tasks != null) {
-            this.tasks.clear();
-            this.tasks.close();
-            this.tasks = null;
-        }
-        
         if(this.igniteDriver != null && this.igniteDriver.isStarted()) {
             this.igniteDriver.uninit();
         }
@@ -131,63 +119,103 @@ public class IgniteScheduleDriver extends AbstractScheduleDriver {
         return stargateService;
     }
     
-    private synchronized void safeInitTaskQueues() throws IOException {
-        if(this.tasks == null) {
-            Ignite ignite = this.igniteDriver.getIgnite();
-            CollectionConfiguration cc = new CollectionConfiguration();
-            cc.setAtomicityMode(CacheAtomicityMode.ATOMIC);
-            cc.setBackups(0);
-            cc.setCollocated(true);
-            
-            this.tasks = ignite.queue(TASK_QUEUE, 0, cc);
-        }
-    }
-    
     @Override
     public void scheduleTask(Task task) throws IOException {
-        safeInitTaskQueues();
-        
         if(task == null) {
             throw new IllegalArgumentException("task is null");
         }
 
-        this.tasks.put(task.toJson());
+        try {
+            // process task!
+            Ignite ignite = this.igniteDriver.getIgnite();
+            ClusterGroup group = parseTaskGroup(task.getNodeNames());
+            IgniteCompute compute = ignite.compute(group);
+            compute.broadcast(makeIgniteRunnable(task));
+        } catch (Exception ex) {
+            throw new IOException(ex);
+        }
     }
     
-    private synchronized void processTask(Task task) {
-        
-    }
-    
-    private void runTaskDispatcher() {
-        this.dispatchTask = true;
-        this.taskDispatcherThread = new Thread(new Runnable() {
-            @Override
-            public void run() {
-                try {
-                    while(dispatchTask) {
-                        try {
-                            StargateService stargateService = getStargateService();
-                            ClusterManager clusterManager = stargateService.getClusterManager();
-                            if(clusterManager.isLeaderNode()) {
-                                // only leader node dispatches tasks
-                                String taskJson = tasks.take();
-                                Task task = Task.createInstance(taskJson);
-                                
-                                processTask(task);
-                            }
-                        } catch (IOException ex) {
-                            LOG.error(ex);
-                        } catch (ManagerNotInstantiatedException ex) {
-                            LOG.error(ex);
-                        }
-                        
-                        Thread.sleep(1000);
-                    }
-                } catch (InterruptedException ex) {
-                    LOG.error(ex);
+    private ClusterGroup parseTaskGroup(Collection<String> nodeNames) {
+        boolean all = false;
+        if(nodeNames.isEmpty()) {
+            all = true;
+        } else {
+            for(String nodeName : nodeNames) {
+                if(nodeName.equals("*")) {
+                    all = true;
+                    break;
                 }
             }
-        });
-        this.taskDispatcherThread.start();
+        }
+        
+        Ignite ignite = this.igniteDriver.getIgnite();
+        ClusterGroup servers = ignite.cluster().forServers();
+        
+        if(all) {
+            return servers;
+        } else {
+            List<UUID> nodeIDs = new ArrayList<UUID>();
+            for(String nodeName : nodeNames) {
+                UUID uuid = UUID.fromString(nodeName);
+                nodeIDs.add(uuid);
+            }
+            
+            return servers.forNodeIds(nodeIDs);
+        }
+    }
+    
+    private IgniteRunnable makeIgniteRunnable(Task task) throws Exception {
+        TaskRunnable r = task.getRunnable();
+        IgniteRunnable igniteRunnable = null;
+        
+        boolean repeat = false;
+        long intervalMin = 0;
+        long delaySec = 0;
+        if(task instanceof TaskSchedule) {
+            TaskSchedule ts = (TaskSchedule) task;
+            delaySec = Math.max(ts.getDelay(), 1); // in sec
+            intervalMin = Math.max(ts.getInterval() / 60, 1); // in min
+            repeat = ts.isRepeat();
+        }
+        
+        if(repeat) {
+            // ignite does not support interval-based task scheduling.
+            // so we convert the interval-based schedule to a coarse cron style
+            String min = "*";
+            String hour = "*";
+            if(intervalMin <= 30) {
+                min = String.format("*/%d", intervalMin);
+                hour = "*";
+            } else if(intervalMin < 60*12) {
+                long intervalHour = Math.max(intervalMin / 60, 1);
+                min = "0";
+                hour = String.format("*/%d", intervalHour);
+            } else {
+                min = "0";
+                hour = "0";
+            }
+            
+            String extendedCronSyntax = String.format("{%d, %d} %s %s * * *", delaySec, 0, min, hour);
+            
+            igniteRunnable = new IgniteRunnable() {
+                @IgniteInstanceResource
+                Ignite ignite;
+                
+                @Override
+                public void run() {
+                    ignite.scheduler().scheduleLocal(r, extendedCronSyntax);
+                }
+            };
+        } else {
+            igniteRunnable = new IgniteRunnable() {
+                @Override
+                public void run() {
+                    r.run();
+                }
+            };
+        }
+        
+        return igniteRunnable;
     }
 }

@@ -18,10 +18,6 @@ package stargate.admin.cli;
 import java.io.IOException;
 import java.net.URI;
 import java.net.URISyntaxException;
-import org.apache.commons.logging.Log;
-import org.apache.commons.logging.LogFactory;
-import stargate.commons.cluster.Cluster;
-import stargate.commons.utils.JsonSerializer;
 import stargate.drivers.userinterface.http.HTTPUserInterfaceClient;
 import stargate.drivers.userinterface.http.HTTPUserInterfaceDriverConfig;
 
@@ -29,35 +25,31 @@ import stargate.drivers.userinterface.http.HTTPUserInterfaceDriverConfig;
  *
  * @author iychoi
  */
-public class ShowCluster {
-    private static final Log LOG = LogFactory.getLog(ShowCluster.class);
-    
-    public static void main(String[] args) {
-        try {
-            URI serviceURI = null;
-            if(args.length != 0) {
-                String serviceURIString = args[0];
-                serviceURI = new URI(serviceURIString);
+public class HTTPUIClient {
+    public static HTTPUserInterfaceClient getClient(String uri) throws IOException {
+        URI serviceURI = null;
+        if(uri != null && !uri.isEmpty()) {
+            try {
+                serviceURI = new URI(uri);
+            } catch (URISyntaxException ex) {
+                throw new IOException(ex);
             }
-            
+        }
+        
+        return getClient(serviceURI);
+    }
+    
+    public static HTTPUserInterfaceClient getClient(URI uri) throws IOException {
+        try {
+            URI serviceURI = uri;
             if(serviceURI == null) {
                 serviceURI = new URI(String.format("http://localhost:%d", HTTPUserInterfaceDriverConfig.DEFAULT_SERVICE_PORT));
             }
         
             HTTPUserInterfaceClient client = new HTTPUserInterfaceClient(serviceURI, null, null);
-            client.connect();
-            Cluster cluster = client.getCluster();
-            
-            JsonSerializer serializer = new JsonSerializer();
-            String json = serializer.formatPretty(cluster.toJson());
-            System.out.println(json);
-            
-            client.disconnect();
-            System.exit(0);
+            return client;
         } catch (URISyntaxException ex) {
-            ex.printStackTrace();
-        } catch (IOException ex) {
-            ex.printStackTrace();
+            throw new IOException(ex);
         }
     }
 }

@@ -42,6 +42,7 @@ import stargate.commons.recipe.Recipe;
 import stargate.commons.recipe.RecipeChunk;
 import stargate.commons.utils.DateTimeUtils;
 import stargate.managers.cluster.ClusterManager;
+import stargate.managers.dataexport.DataExportManager;
 import stargate.managers.datasource.DataSourceManager;
 import stargate.managers.keyvaluestore.KeyValueStoreManager;
 import stargate.service.StargateService;
@@ -271,6 +272,16 @@ public class RecipeManager extends AbstractManager<AbstractRecipeDriver> {
         return Collections.unmodifiableCollection(recipes);
     }
     
+    public synchronized Collection<String> getRecipeKeys() throws IOException {
+        if(!this.started) {
+            throw new IllegalStateException("Manager is not started");
+        }
+        
+        safeInitRecipeStore();
+        
+        return Collections.unmodifiableCollection(this.recipeStore.keys());
+    }
+    
     public synchronized Recipe getRecipe(String stargatePath) throws IOException {
         if(stargatePath == null || stargatePath.isEmpty()) {
             throw new IllegalArgumentException("stargatePath is null or empty");
@@ -351,11 +362,8 @@ public class RecipeManager extends AbstractManager<AbstractRecipeDriver> {
         
         Collection<String> keys = this.recipeStore.keys();
         for(String key : keys) {
-            Recipe entry = (Recipe) this.recipeStore.get(key);
-            if(entry != null) {
-                // this is to raise a recipe removal event
-                removeRecipe(entry);
-            }
+            // this is to raise a recipe removal event
+            removeRecipe(key);
         }
     }
     
@@ -481,6 +489,66 @@ public class RecipeManager extends AbstractManager<AbstractRecipeDriver> {
         }
     }
     
+    public synchronized void syncRecipes() throws IOException, ManagerNotInstantiatedException, RecipeManagerException {
+        if(!this.started) {
+            throw new IllegalStateException("Manager is not started");
+        }
+        
+        safeInitRecipeStore();
+        
+        StargateService stargateService = getStargateService();
+        DataExportManager dataExportManager = stargateService.getDataExportManager();
+        DataSourceManager dataSourceManager = stargateService.getDataSourceManager();
+        
+        // find missing recipes
+        Collection<String> recipeKeys = this.recipeStore.keys();
+        
+        Collection<DataExportEntry> dataExportEntries = dataExportManager.getDataExportEntries();
+        for(DataExportEntry entry : dataExportEntries) {
+            if(!recipeKeys.contains(entry.getStargatePath())) {
+                // recipe does not exist
+                Recipe recipe = createRecipe(entry);
+                addRecipe(recipe);
+            } else {
+                //check stale recipe
+                Recipe recipe = (Recipe) this.recipeStore.get(entry.getStargatePath());
+                if(recipe == null) {
+                    removeRecipe(entry.getStargatePath());
+                    continue;
+                }
+                
+                AbstractDataSourceDriver dataSourceDriver = dataSourceManager.getDriver(entry.getSourceURI());
+                
+                DataObjectMetadata recipeMetadata = recipe.getMetadata();
+                SourceFileMetadata sourceFileMetadata = dataSourceDriver.getMetadata(entry.getSourceURI());
+                if(recipeMetadata == null || sourceFileMetadata == null) {
+                    removeRecipe(entry.getStargatePath());
+                    continue;
+                }
+                
+                if(recipeMetadata.getLastModifiedTime() != sourceFileMetadata.getLastModifiedTime() ||
+                        recipeMetadata.getSize() != sourceFileMetadata.getFileSize()) {
+                    removeRecipe(entry.getStargatePath());
+                    Recipe newRecipe = createRecipe(entry);
+                    addRecipe(newRecipe);
+                }
+            }
+        }
+        
+        recipeKeys = this.recipeStore.keys();
+        
+        // remove broken recipes
+        List<String> brokenRecipeList = new ArrayList<String>();
+        brokenRecipeList.addAll(recipeKeys);
+        for(DataExportEntry entry : dataExportEntries) {
+            brokenRecipeList.remove(entry.getStargatePath());
+        }
+        
+        for(String key : brokenRecipeList) {
+            removeRecipe(key);
+        }
+    }
+    
     public synchronized long getLastUpdateTime() {
         return this.lastUpdateTime;
     }
@@ -489,15 +557,12 @@ public class RecipeManager extends AbstractManager<AbstractRecipeDriver> {
         this.lastUpdateTime = time;
     }
     
-    private DataObjectURI getDataObjectURI(Cluster cluster, String path) {
-        return new DataObjectURI(cluster.getName(), path);
-    }
-    
     public Recipe createRecipe(DataExportEntry entry) throws IOException {
         if(!this.started) {
             throw new IllegalStateException("Manager is not started");
         }
         
+        LOG.info(String.format("createRecipe - %s", entry.getStargatePath()));
         try {
             StargateService stargateService = getStargateService();
 
@@ -509,7 +574,7 @@ public class RecipeManager extends AbstractManager<AbstractRecipeDriver> {
             AbstractDataSourceDriver dataSourceDriver = dataSourceManager.getDriver(entry.getSourceURI());
             SourceFileMetadata sourceMetadata = dataSourceDriver.getMetadata(entry.getSourceURI());
 
-            DataObjectURI dataObjectURI = getDataObjectURI(cluster, entry.getStargatePath());
+            DataObjectURI dataObjectURI = new DataObjectURI(cluster.getName(), entry.getStargatePath());
             DataObjectMetadata objMetadata = new DataObjectMetadata(dataObjectURI, sourceMetadata.getFileSize(), sourceMetadata.isDirectory(), sourceMetadata.getLastModifiedTime());
 
             // create recipe

@@ -20,6 +20,8 @@ import java.util.ArrayList;
 import java.util.Collection;
 import java.util.Collections;
 import java.util.List;
+import java.util.Map;
+import java.util.Set;
 import org.apache.commons.logging.Log;
 import org.apache.commons.logging.LogFactory;
 import stargate.commons.datasource.DataExportEntry;
@@ -111,13 +113,23 @@ public class DataExportManager extends AbstractManager<NullDriver> {
         safeInitDataExportEntryStore();
         
         List<DataExportEntry> dataExportEntries = new ArrayList<DataExportEntry>();
-        Collection<String> keys = this.dataExportEntryStore.keys();
-        for(String key : keys) {
-            DataExportEntry entry = (DataExportEntry) this.dataExportEntryStore.get(key);
-            if(entry != null) {
-                dataExportEntries.add(entry);
+        Map<String, Object> dataExportEntryMap = this.dataExportEntryStore.toMap();
+        Set<Map.Entry<String, Object>> entrySet = dataExportEntryMap.entrySet();
+        for(Map.Entry<String, Object> entry : entrySet) {
+            DataExportEntry dataExportEntry = (DataExportEntry) entry.getValue();
+            if(dataExportEntry != null) {
+                dataExportEntries.add(dataExportEntry);
             }
         }
+        
+        // less efficient implementation
+        //Collection<String> keys = this.dataExportEntryStore.keys();
+        //for(String key : keys) {
+        //    DataExportEntry entry = (DataExportEntry) this.dataExportEntryStore.get(key);
+        //    if(entry != null) {
+        //        dataExportEntries.add(entry);
+        //    }
+        //}
         
         return Collections.unmodifiableCollection(dataExportEntries);
     }
@@ -159,11 +171,8 @@ public class DataExportManager extends AbstractManager<NullDriver> {
         
         Collection<String> keys = this.dataExportEntryStore.keys();
         for(String key : keys) {
-            DataExportEntry entry = (DataExportEntry) this.dataExportEntryStore.get(key);
-            if(entry != null) {
-                // this is to raise a entry removal event
-                removeDataExportEntry(entry);
-            }
+            // this is to raise a entry removal event
+            removeDataExportEntry(key);
         }
     }
     

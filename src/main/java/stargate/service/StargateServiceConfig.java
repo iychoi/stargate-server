@@ -30,8 +30,8 @@ import stargate.drivers.cluster.ignite.IgniteClusterDriver;
 import stargate.drivers.cluster.ignite.IgniteClusterDriverConfig;
 import stargate.drivers.datasource.localfs.LocalFSDataSourceDriver;
 import stargate.drivers.datasource.localfs.LocalFSDataSourceDriverConfig;
-import stargate.drivers.keyvaluestore.localfs.LocalFSKeyValueStoreDriver;
-import stargate.drivers.keyvaluestore.localfs.LocalFSKeyValueStoreDriverConfig;
+import stargate.drivers.keyvaluestore.ignite.IgniteKeyValueStoreDriver;
+import stargate.drivers.keyvaluestore.ignite.IgniteKeyValueStoreDriverConfig;
 import stargate.drivers.recipe.fixedsize.FixedSizeChunkRecipeDriver;
 import stargate.drivers.recipe.fixedsize.FixedSizeChunkRecipeDriverConfig;
 import stargate.drivers.schedule.ignite.IgniteScheduleDriver;
@@ -89,6 +89,7 @@ public class StargateServiceConfig extends AbstractImmutableConfig {
         this.transportManagerConfig = getDefaultTransportConfig();
         this.userInterfaceManagerConfig = getDefaultUserInterfaceConfig();
         this.scheduleManagerConfig = getDefaultScheduleConfig();
+        this.userConfig = new UserConfig();
     }
     
     @Override
@@ -286,13 +287,9 @@ public class StargateServiceConfig extends AbstractImmutableConfig {
     @JsonIgnore
     public ManagerConfig getDefaultKeyValueStoreConfig() {
         DriverInjection driverInjection = new DriverInjection();
-        driverInjection.setDriverClass(LocalFSKeyValueStoreDriver.class);
+        driverInjection.setDriverClass(IgniteKeyValueStoreDriver.class);
         
-        LocalFSKeyValueStoreDriverConfig driverConfiguration = new LocalFSKeyValueStoreDriverConfig();
-        
-        String workingDir = PathUtils.getWorkingDir();
-        File keyValueStoreRootDir = new File(workingDir, "kv_store");
-        driverConfiguration.setRootPath(keyValueStoreRootDir);
+        IgniteKeyValueStoreDriverConfig driverConfiguration = new IgniteKeyValueStoreDriverConfig();
         
         driverInjection.setDriverConfig(driverConfiguration);
         

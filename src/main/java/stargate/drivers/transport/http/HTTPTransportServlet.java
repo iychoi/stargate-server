@@ -25,7 +25,6 @@ import javax.ws.rs.GET;
 import javax.ws.rs.Path;
 import javax.ws.rs.PathParam;
 import javax.ws.rs.Produces;
-import javax.ws.rs.QueryParam;
 import javax.ws.rs.WebApplicationException;
 import javax.ws.rs.core.MediaType;
 import javax.ws.rs.core.Response;
@@ -41,6 +40,7 @@ import stargate.commons.manager.ManagerNotInstantiatedException;
 import stargate.commons.recipe.Recipe;
 import stargate.commons.restful.RestfulResponse;
 import stargate.commons.transport.AbstractTransportServer;
+import stargate.commons.utils.PathUtils;
 import stargate.managers.cluster.ClusterManager;
 import stargate.managers.volume.VolumeManager;
 import stargate.service.StargateService;
@@ -120,13 +120,13 @@ public class HTTPTransportServlet extends AbstractTransportServer {
     @Path(HTTPTransportRestfulConstants.GET_METADATA_PATH + "/{path:.*}")
     @Produces(MediaType.APPLICATION_JSON)
     public Response getDataObjectMetadataRestful(
-        @DefaultValue("") @QueryParam("path") String path) {
+        @DefaultValue("") @PathParam("path") String path) {
         if(path == null || path.isEmpty()) {
             throw new IllegalArgumentException("path is null or empty");
         }
         
         try {
-            DataObjectURI objectUri = new DataObjectURI(path);
+            DataObjectURI objectUri = new DataObjectURI("", PathUtils.concatPath("/", path));
             DataObjectMetadata objectMetadata = getDataObjectMetadata(objectUri);
             RestfulResponse<DataObjectMetadata> rres = new RestfulResponse<DataObjectMetadata>(objectMetadata);
             return Response.status(Response.Status.OK).entity(rres).build();
@@ -158,13 +158,13 @@ public class HTTPTransportServlet extends AbstractTransportServer {
     @Path(HTTPTransportRestfulConstants.GET_RECIPE_PATH + "/{path:.*}")
     @Produces(MediaType.APPLICATION_JSON)
     public Response getRecipeRestful(
-        @DefaultValue("") @QueryParam("path") String path) {
+        @DefaultValue("") @PathParam("path") String path) {
         if(path == null || path.isEmpty()) {
             throw new IllegalArgumentException("path is null or empty");
         }
         
         try {
-            DataObjectURI objectUri = new DataObjectURI(path);
+            DataObjectURI objectUri = new DataObjectURI("", PathUtils.concatPath("/", path));
             Recipe recipe = getRecipe(objectUri);
             RestfulResponse<Recipe> rres = new RestfulResponse<Recipe>(recipe);
             return Response.status(Response.Status.OK).entity(rres).build();
@@ -194,13 +194,13 @@ public class HTTPTransportServlet extends AbstractTransportServer {
     @Path(HTTPTransportRestfulConstants.LIST_METADATA_PATH + "/{path:.*}")
     @Produces(MediaType.APPLICATION_JSON)
     public Response listDataObjectMetadataRestful(
-            @DefaultValue("") @QueryParam("path") String path) {
+            @DefaultValue("") @PathParam("path") String path) {
         if(path == null || path.isEmpty()) {
             throw new IllegalArgumentException("path is null or empty");
         }
         
         try {
-            DataObjectURI objectUri = new DataObjectURI(path);
+            DataObjectURI objectUri = new DataObjectURI("", PathUtils.concatPath("/", path));
             Collection<DataObjectMetadata> objectMetadataList = listDataObjectMetadata(objectUri);
             RestfulResponse<Collection<DataObjectMetadata>> rres = new RestfulResponse<Collection<DataObjectMetadata>>(objectMetadataList);
             return Response.status(Response.Status.OK).entity(rres).build();
@@ -231,13 +231,13 @@ public class HTTPTransportServlet extends AbstractTransportServer {
     @Path(HTTPTransportRestfulConstants.GET_DIRECTORY_PATH + "/{path:.*}")
     @Produces(MediaType.APPLICATION_JSON)
     public Response getDirectoryRestful(
-            @DefaultValue("") @QueryParam("path") String path) {
+            @DefaultValue("") @PathParam("path") String path) {
         if(path == null || path.isEmpty()) {
             throw new IllegalArgumentException("path is null or empty");
         }
         
         try {
-            DataObjectURI objectUri = new DataObjectURI(path);
+            DataObjectURI objectUri = new DataObjectURI("", PathUtils.concatPath("/", path));
             Directory directory = getDirectory(objectUri);
             RestfulResponse<Directory> rres = new RestfulResponse<Directory>(directory);
             return Response.status(Response.Status.OK).entity(rres).build();

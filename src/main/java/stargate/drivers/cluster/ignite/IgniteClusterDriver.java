@@ -186,7 +186,7 @@ public class IgniteClusterDriver extends AbstractClusterDriver {
             TransportServiceInfo serviceInfo = transportManager.getServiceInfo();
             
             Node stargateNode = new Node(nodeName, clusterName, new NodeStatus(), serviceInfo, hostnames);
-            LOG.info(stargateNode.toJson());
+            //LOG.info(stargateNode.toJson());
             return stargateNode;
         } catch (ManagerNotInstantiatedException ex) {
             LOG.error(ex);

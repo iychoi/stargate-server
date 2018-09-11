@@ -20,6 +20,7 @@ import java.net.URI;
 import java.util.ArrayList;
 import stargate.service.StargateService;
 import java.util.Collection;
+import java.util.Collections;
 import java.util.List;
 import org.apache.commons.logging.Log;
 import org.apache.commons.logging.LogFactory;
@@ -127,5 +128,13 @@ public class DataSourceManager extends AbstractManager<AbstractDataSourceDriver>
             }
         }
         return null;
+    }
+
+    public Collection<String> getRegisteredSchemes() {
+        List<String> schemes = new ArrayList<String>();
+        for(AbstractDataSourceDriver driver : this.drivers) {
+            schemes.add(driver.getScheme());
+        }
+        return Collections.unmodifiableCollection(schemes);
     }
 }

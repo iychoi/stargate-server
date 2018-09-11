@@ -90,8 +90,6 @@ public class IgniteDriver {
             
             this.igniteInstance = Ignition.start(igniteConfig);
             
-            IgniteCluster cluster = this.igniteInstance.cluster();
-            boolean active = cluster.active();
             LOG.info("Stargate is waiting for activating Ignite cluster");
             runChecker();
 
@@ -118,6 +116,7 @@ public class IgniteDriver {
                 try {
                     // to make condition await
                     Thread.sleep(1000);
+                    boolean first = true;
                     
                     while(checkActive) {
                         IgniteCluster cluster = igniteInstance.cluster();
@@ -126,17 +125,21 @@ public class IgniteDriver {
                             LOG.info("Detected Ignite cluster is active!");
                             clusterActivationLock.lock();
                             try {
+                                LOG.info("Ignite cluster is active!");
                                 clusterActivationCondition.signal();
                             } finally {
                                 clusterActivationLock.unlock();
                             }
                             break;
                         } else {
-                            LOG.info("Ignite cluster is inactive!");
+                            if(first) {
+                                LOG.info("Ignite cluster is inactive!");
+                                first = false;
+                            }
                             Thread.sleep(1000);
                         }
                     }
-                } catch (InterruptedException ex) {
+                } catch (Exception ex) {
                     LOG.error(ex);
                 }
             }

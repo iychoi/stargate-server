@@ -157,7 +157,12 @@ public class IgniteKeyValueStore extends AbstractKeyValueStore {
         Iterator<Cache.Entry<String, byte[]>> iterator = this.store.iterator();
         while(iterator.hasNext()) {
             Cache.Entry<String, byte[]> entry = iterator.next();
-            map.put(entry.getKey(), entry.getValue());
+            if(entry.getValue() == null) {
+                map.put(entry.getKey(), null);
+            } else {
+                Object objValue = ObjectSerializer.fromByteArray(entry.getValue(), this.valueClass);
+                map.put(entry.getKey(), objValue);
+            }
         }
         return map;
     }

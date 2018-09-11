@@ -38,7 +38,7 @@ public class LocalFSKeyValueStore extends AbstractKeyValueStore {
     private Class valueClass;
     private EnumKeyValueStoreProperty property;
     
-    LocalFSKeyValueStore(LocalFSKeyValueStoreDriver dirver, String name, Class valueClass, EnumKeyValueStoreProperty property) {
+    LocalFSKeyValueStore(LocalFSKeyValueStoreDriver driver, String name, Class valueClass, EnumKeyValueStoreProperty property) {
         this.driver = driver;
         this.name = name;
         this.valueClass = valueClass;

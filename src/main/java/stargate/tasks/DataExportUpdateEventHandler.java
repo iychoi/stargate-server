@@ -34,7 +34,7 @@ public class DataExportUpdateEventHandler extends AbstractDataExportEventHandler
     
     private RecipeManager recipeManager;
     
-    DataExportUpdateEventHandler(RecipeManager recipeManager) {
+    public DataExportUpdateEventHandler(RecipeManager recipeManager) {
         if(recipeManager == null) {
             throw new IllegalArgumentException("recipeManager is null");
         }

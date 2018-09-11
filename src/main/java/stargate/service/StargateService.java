@@ -16,8 +16,6 @@
 package stargate.service;
 
 import java.io.IOException;
-import java.util.logging.Level;
-import java.util.logging.Logger;
 import org.apache.commons.logging.Log;
 import org.apache.commons.logging.LogFactory;
 import stargate.commons.manager.ManagerNotInstantiatedException;
@@ -29,10 +27,12 @@ import stargate.managers.datasource.DataSourceManager;
 import stargate.managers.keyvaluestore.KeyValueStoreManager;
 import stargate.managers.policy.PolicyManager;
 import stargate.managers.recipe.RecipeManager;
+import stargate.managers.recipe.RecipeManagerException;
 import stargate.managers.schedule.ScheduleManager;
 import stargate.managers.transport.TransportManager;
 import stargate.managers.userinterface.UserInterfaceManager;
 import stargate.managers.volume.VolumeManager;
+import stargate.tasks.DataExportUpdateEventHandler;
 
 /**
  *
@@ -57,6 +57,8 @@ public class StargateService extends AbstractService {
     private UserInterfaceManager userInterfaceManager;
     private PolicyManager policyManager;
     private VolumeManager volumeManager;
+    
+    private DataExportUpdateEventHandler dataExportUpdateEventHandler;
     
     public static StargateService getInstance(StargateServiceConfig config) throws ServiceNotStartedException {
         synchronized (KeyValueStoreManager.class) {
@@ -94,7 +96,7 @@ public class StargateService extends AbstractService {
             throw new IllegalStateException("Service is already started");
         }
         
-        LOG.info("Service is starting...");
+        LOG.info("Starting service...");
         
         // init managers
         LOG.info("Initializing managers");
@@ -127,7 +129,24 @@ public class StargateService extends AbstractService {
         this.volumeManager.start();
         LOG.info("Managers are started");
         
+        LOG.info("Registering event handlers");
+        this.dataExportUpdateEventHandler = new DataExportUpdateEventHandler(this.recipeManager);
+        this.dataExportManager.addDataExportEventHandler(dataExportUpdateEventHandler);
+        LOG.info("Event handlers are registered");
+        
+        LOG.info("Resynchronizing states");
+        try {
+            this.recipeManager.syncRecipes();
+        } catch (ManagerNotInstantiatedException ex) {
+            throw new IOException(ex);
+        } catch (RecipeManagerException ex) {
+            throw new IOException(ex);
+        }
+        LOG.info("States are resynchronized");
+        
         this.started = true;
+        
+        LOG.info("Service is started...");
     }
     
     @Override
@@ -135,6 +154,13 @@ public class StargateService extends AbstractService {
         if(!this.started) {
             throw new IllegalStateException("Service is already stopped");
         }
+        
+        LOG.info("Stopping service...");
+        
+        LOG.info("Unregistering event handlers");
+        this.dataExportManager.removeDataExportEventHandler(this.dataExportUpdateEventHandler);
+        this.dataExportUpdateEventHandler = null;
+        LOG.info("Event handlers are unregistered");
         
         LOG.info("Stopping managers");
         this.volumeManager.stop();
@@ -149,14 +175,18 @@ public class StargateService extends AbstractService {
         this.clusterManager.stop();
         LOG.info("Managers are stopped");
         
-        LOG.info("Service is stopped...");
-        
         this.started = false;
+        
+        LOG.info("Service is stopped...");
     }
     
     @Override
     public boolean isStarted() {
         return this.started;
+    }
+    
+    public StargateServiceConfig getConfig() {
+        return this.config;
     }
     
     public ClusterManager getClusterManager() throws ManagerNotInstantiatedException {

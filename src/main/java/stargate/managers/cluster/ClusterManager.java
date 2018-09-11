@@ -20,6 +20,8 @@ import java.util.ArrayList;
 import java.util.Collection;
 import java.util.Collections;
 import java.util.List;
+import java.util.Map;
+import java.util.Set;
 import org.apache.commons.logging.Log;
 import org.apache.commons.logging.LogFactory;
 import stargate.commons.cluster.AbstractClusterDriver;
@@ -250,13 +252,23 @@ public class ClusterManager extends AbstractManager<AbstractClusterDriver> {
         safeInitRemoteClusterStore();
         
         List<Cluster> remoteClusters = new ArrayList<Cluster>();
-        Collection<String> keys = this.remoteClusterStore.keys();
-        for(String key : keys) {
-            Cluster cluster = (Cluster) this.remoteClusterStore.get(key);
+        Map<String, Object> remoteClusterMap = this.remoteClusterStore.toMap();
+        Set<Map.Entry<String, Object>> entrySet = remoteClusterMap.entrySet();
+        for(Map.Entry<String, Object> entry : entrySet) {
+            Cluster cluster = (Cluster) entry.getValue();
             if(cluster != null) {
                 remoteClusters.add(cluster);
             }
         }
+        
+        // less efficient implementation
+        //Collection<String> keys = this.remoteClusterStore.keys();
+        //for(String key : keys) {
+        //    Cluster cluster = (Cluster) this.remoteClusterStore.get(key);
+        //    if(cluster != null) {
+        //        remoteClusters.add(cluster);
+        //    }
+        //}
         
         return Collections.unmodifiableCollection(remoteClusters);
     }
@@ -312,11 +324,8 @@ public class ClusterManager extends AbstractManager<AbstractClusterDriver> {
         
         Collection<String> keys = this.remoteClusterStore.keys();
         for(String key : keys) {
-            Cluster cluster = (Cluster) this.remoteClusterStore.get(key);
-            if(cluster != null) {
-                // this is to raise a cluster removal event
-                removeRemoteCluster(cluster);
-            }
+            // this is to raise a cluster removal event
+            removeRemoteCluster(key);
         }
     }
     

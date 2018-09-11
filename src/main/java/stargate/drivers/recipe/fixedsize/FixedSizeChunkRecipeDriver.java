@@ -141,7 +141,8 @@ public class FixedSizeChunkRecipeDriver extends AbstractRecipeDriver {
                     break;
                 }
             }
-            dis.close();
+            // do not close DigestInputStream because it closes inputstream that will be reused
+            //dis.close();
             
             if(chunkLength > 0) {
                 // create a new recipe chunk
