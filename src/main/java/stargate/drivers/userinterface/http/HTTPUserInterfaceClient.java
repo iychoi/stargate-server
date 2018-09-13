@@ -15,11 +15,11 @@
 */
 package stargate.drivers.userinterface.http;
 
-import com.sun.jersey.api.client.GenericType;
 import java.io.FileNotFoundException;
 import java.io.IOException;
 import java.io.InputStream;
 import java.net.URI;
+import java.util.Arrays;
 import java.util.Collection;
 import org.apache.commons.logging.Log;
 import org.apache.commons.logging.LogFactory;
@@ -29,10 +29,7 @@ import stargate.commons.dataobject.DataObjectMetadata;
 import stargate.commons.dataobject.DataObjectURI;
 import stargate.commons.datasource.DataExportEntry;
 import stargate.commons.recipe.Recipe;
-import stargate.commons.restful.AuthenticationException;
 import stargate.commons.restful.RestfulClient;
-import stargate.commons.restful.RestfulException;
-import stargate.commons.restful.RestfulResponse;
 import stargate.commons.userinterface.AbstractUserInterfaceClient;
 import stargate.commons.utils.DateTimeUtils;
 import stargate.commons.utils.PathUtils;
@@ -109,27 +106,30 @@ public class HTTPUserInterfaceClient extends AbstractUserInterfaceClient {
         return PathUtils.concatPath(api_path, path2);
     }
     
-    private String makeGetMetadataPath(String path) {
-        if(path == null || path.isEmpty()) {
-            throw new IllegalArgumentException("path is null or empty");
+    private String makeGetMetadataPath(DataObjectURI uri) {
+        if(uri == null) {
+            throw new IllegalArgumentException("uri is null");
         }
         
+        String path = PathUtils.concatPath(uri.getClusterName(), uri.getPath());
         return PathUtils.concatPath(HTTPUserInterfaceRestfulConstants.GET_METADATA_PATH, path);
     }
     
-    private String makeListMetadataPath(String path) {
-        if(path == null || path.isEmpty()) {
-            throw new IllegalArgumentException("path is null or empty");
+    private String makeListMetadataPath(DataObjectURI uri) {
+        if(uri == null) {
+            throw new IllegalArgumentException("uri is null");
         }
         
+        String path = PathUtils.concatPath(uri.getClusterName(), uri.getPath());
         return PathUtils.concatPath(HTTPUserInterfaceRestfulConstants.LIST_METADATAS_PATH, path);
     }
     
-    private String makeGetRecipePath(String path) {
-        if(path == null || path.isEmpty()) {
-            throw new IllegalArgumentException("path is null or empty");
+    private String makeGetRecipePath(DataObjectURI uri) {
+        if(uri == null) {
+            throw new IllegalArgumentException("uri is null");
         }
         
+        String path = PathUtils.concatPath(uri.getClusterName(), uri.getPath());
         return PathUtils.concatPath(HTTPUserInterfaceRestfulConstants.GET_RECIPE_PATH, path);
     }
     
@@ -161,22 +161,12 @@ public class HTTPUserInterfaceClient extends AbstractUserInterfaceClient {
             throw new IOException("Client is not connected");
         }
         
-        try {
-            // URL pattern = http://xxx.xxx.xxx.xxx/api/live
-            String url = makeAPIPath(HTTPUserInterfaceRestfulConstants.API_CHECK_LIVE_PATH);
-            RestfulResponse<Boolean> response = (RestfulResponse<Boolean>) this.restfulClient.get(url, new GenericType<RestfulResponse<Boolean>>(){});
-            
-            if(response.getException() != null) {
-                return false;
-            } else {
-                updateLastActivetime();
-                return response.getResponse().booleanValue();
-            }
-        } catch (RestfulException ex) {
-            throw new IOException(ex);
-        } catch (AuthenticationException ex) {
-            throw new IOException(ex);
-        }
+        // URL pattern = http://xxx.xxx.xxx.xxx/api/live
+        String url = makeAPIPath(HTTPUserInterfaceRestfulConstants.API_CHECK_LIVE_PATH);
+        Boolean live = (Boolean) this.restfulClient.get(url);
+
+        updateLastActivetime();
+        return live;
     }
     
     @Override
@@ -185,22 +175,12 @@ public class HTTPUserInterfaceClient extends AbstractUserInterfaceClient {
             throw new IOException("Client is not connected");
         }
         
-        try {
-            // URL pattern = http://xxx.xxx.xxx.xxx/api/svcconfig
-            String url = makeAPIPath(HTTPUserInterfaceRestfulConstants.API_GET_SERVICE_CONFIG_PATH);
-            RestfulResponse<StargateServiceConfig> response = (RestfulResponse<StargateServiceConfig>) this.restfulClient.get(url, new GenericType<RestfulResponse<StargateServiceConfig>>(){});
-            
-            if(response.getException() != null) {
-                throw new IOException(response.getException());
-            } else {
-                updateLastActivetime();
-                return response.getResponse();
-            }
-        } catch (RestfulException ex) {
-            throw new IOException(ex);
-        } catch (AuthenticationException ex) {
-            throw new IOException(ex);
-        }
+        // URL pattern = http://xxx.xxx.xxx.xxx/api/svcconfig
+        String url = makeAPIPath(HTTPUserInterfaceRestfulConstants.API_GET_SERVICE_CONFIG_PATH);
+        StargateServiceConfig config = (StargateServiceConfig) this.restfulClient.get(url);
+
+        updateLastActivetime();
+        return config;
     }
 
     @Override
@@ -209,22 +189,12 @@ public class HTTPUserInterfaceClient extends AbstractUserInterfaceClient {
             throw new IOException("Client is not connected");
         }
         
-        try {
-            // URL pattern = http://xxx.xxx.xxx.xxx/api/cluster
-            String url = makeAPIPath(HTTPUserInterfaceRestfulConstants.API_GET_CLUSTER_PATH);
-            RestfulResponse<Cluster> response = (RestfulResponse<Cluster>) this.restfulClient.get(url, new GenericType<RestfulResponse<Cluster>>(){});
-            
-            if(response.getException() != null) {
-                throw new IOException(response.getException());
-            } else {
-                updateLastActivetime();
-                return response.getResponse();
-            }
-        } catch (RestfulException ex) {
-            throw new IOException(ex);
-        } catch (AuthenticationException ex) {
-            throw new IOException(ex);
-        }
+        // URL pattern = http://xxx.xxx.xxx.xxx/api/cluster
+        String url = makeAPIPath(HTTPUserInterfaceRestfulConstants.API_GET_CLUSTER_PATH);
+        Cluster cluster = (Cluster) this.restfulClient.get(url);
+
+        updateLastActivetime();
+        return cluster;
     }
     
     @Override
@@ -237,22 +207,12 @@ public class HTTPUserInterfaceClient extends AbstractUserInterfaceClient {
             throw new IllegalArgumentException("name is null or empty");
         }
         
-        try {
-            // URL pattern = http://xxx.xxx.xxx.xxx/api/rcluster/clustername
-            String url = makeAPIPath(HTTPUserInterfaceRestfulConstants.API_GET_REMOTE_CLUSTER_PATH, name);
-            RestfulResponse<Cluster> response = (RestfulResponse<Cluster>) this.restfulClient.get(url, new GenericType<RestfulResponse<Cluster>>(){});
-            
-            if(response.getException() != null) {
-                throw new IOException(response.getException());
-            } else {
-                updateLastActivetime();
-                return response.getResponse();
-            }
-        } catch (RestfulException ex) {
-            throw new IOException(ex);
-        } catch (AuthenticationException ex) {
-            throw new IOException(ex);
-        }
+        // URL pattern = http://xxx.xxx.xxx.xxx/api/rcluster/clustername
+        String url = makeAPIPath(HTTPUserInterfaceRestfulConstants.API_GET_REMOTE_CLUSTER_PATH, name);
+        Cluster cluster = (Cluster) this.restfulClient.get(url);
+
+        updateLastActivetime();
+        return cluster;
     }
     
     @Override
@@ -261,22 +221,12 @@ public class HTTPUserInterfaceClient extends AbstractUserInterfaceClient {
             throw new IOException("Client is not connected");
         }
         
-        try {
-            // URL pattern = http://xxx.xxx.xxx.xxx/api/lrcluster
-            String url = makeAPIPath(HTTPUserInterfaceRestfulConstants.API_LIST_REMOTE_CLUSTERS_PATH);
-            RestfulResponse<Collection<String>> response = (RestfulResponse<Collection<String>>) this.restfulClient.get(url, new GenericType<RestfulResponse<Collection<String>>>(){});
-            
-            if(response.getException() != null) {
-                throw new IOException(response.getException());
-            } else {
-                updateLastActivetime();
-                return response.getResponse();
-            }
-        } catch (RestfulException ex) {
-            throw new IOException(ex);
-        } catch (AuthenticationException ex) {
-            throw new IOException(ex);
-        }
+        // URL pattern = http://xxx.xxx.xxx.xxx/api/lrcluster
+        String url = makeAPIPath(HTTPUserInterfaceRestfulConstants.API_LIST_REMOTE_CLUSTERS_PATH);
+        String[] clusters = (String[]) this.restfulClient.get(url);
+
+        updateLastActivetime();
+        return Arrays.asList(clusters);
     }
     
     @Override
@@ -285,22 +235,12 @@ public class HTTPUserInterfaceClient extends AbstractUserInterfaceClient {
             throw new IOException("Client is not connected");
         }
         
-        try {
-            // URL pattern = http://xxx.xxx.xxx.xxx/api/grclusters
-            String url = makeAPIPath(HTTPUserInterfaceRestfulConstants.API_GET_REMOTE_CLUSTERS_PATH);
-            RestfulResponse<Collection<Cluster>> response = (RestfulResponse<Collection<Cluster>>) this.restfulClient.get(url, new GenericType<RestfulResponse<Collection<Cluster>>>(){});
-            
-            if(response.getException() != null) {
-                throw new IOException(response.getException());
-            } else {
-                updateLastActivetime();
-                return response.getResponse();
-            }
-        } catch (RestfulException ex) {
-            throw new IOException(ex);
-        } catch (AuthenticationException ex) {
-            throw new IOException(ex);
-        }
+        // URL pattern = http://xxx.xxx.xxx.xxx/api/grclusters
+        String url = makeAPIPath(HTTPUserInterfaceRestfulConstants.API_GET_REMOTE_CLUSTERS_PATH);
+        Cluster[] clusters = (Cluster[]) this.restfulClient.get(url);
+
+        updateLastActivetime();
+        return Arrays.asList(clusters);
     }
     
     @Override
@@ -313,22 +253,12 @@ public class HTTPUserInterfaceClient extends AbstractUserInterfaceClient {
             throw new IllegalArgumentException("cluster is null");
         }
         
-        try {
-            // URL pattern = http://xxx.xxx.xxx.xxx/api/rcluster
-            // form param = object
-            String url = makeAPIPath(HTTPUserInterfaceRestfulConstants.API_ADD_REMOTE_CLUSTER_PATH);
-            RestfulResponse<Boolean> response = (RestfulResponse<Boolean>) this.restfulClient.put(url, cluster, new GenericType<RestfulResponse<Boolean>>(){});
-            
-            if(response.getException() != null) {
-                throw new IOException(response.getException());
-            } else {
-                updateLastActivetime();
-            }
-        } catch (RestfulException ex) {
-            throw new IOException(ex);
-        } catch (AuthenticationException ex) {
-            throw new IOException(ex);
-        }
+        // URL pattern = http://xxx.xxx.xxx.xxx/api/rcluster
+        // form param = object
+        String url = makeAPIPath(HTTPUserInterfaceRestfulConstants.API_ADD_REMOTE_CLUSTER_PATH);
+        Boolean result = (Boolean) this.restfulClient.put(url, cluster);
+
+        updateLastActivetime();
     }
 
     @Override
@@ -341,21 +271,11 @@ public class HTTPUserInterfaceClient extends AbstractUserInterfaceClient {
             throw new IllegalArgumentException("name is null or empty");
         }
         
-        try {
-            // URL pattern = http://xxx.xxx.xxx.xxx/api/rcluster/name
-            String url = makeAPIPath(HTTPUserInterfaceRestfulConstants.API_REMOVE_REMOTE_CLUSTER_PATH, name);
-            RestfulResponse<Boolean> response = (RestfulResponse<Boolean>) this.restfulClient.delete(url, new GenericType<RestfulResponse<Boolean>>(){});
-            
-            if(response.getException() != null) {
-                throw new IOException(response.getException());
-            } else {
-                updateLastActivetime();
-            }
-        } catch (RestfulException ex) {
-            throw new IOException(ex);
-        } catch (AuthenticationException ex) {
-            throw new IOException(ex);
-        }
+        // URL pattern = http://xxx.xxx.xxx.xxx/api/rcluster/name
+        String url = makeAPIPath(HTTPUserInterfaceRestfulConstants.API_REMOVE_REMOTE_CLUSTER_PATH, name);
+        Boolean response = (Boolean) this.restfulClient.delete(url);
+
+        updateLastActivetime();
     }
 
     @Override
@@ -368,26 +288,16 @@ public class HTTPUserInterfaceClient extends AbstractUserInterfaceClient {
             throw new IllegalArgumentException("uri is null");
         }
         
-        try {
-            // URL pattern = http://xxx.xxx.xxx.xxx/metadata/path/to/resource
-            String url = makeGetMetadataPath(uri.getPath());
-            RestfulResponse<DataObjectMetadata> response = (RestfulResponse<DataObjectMetadata>) this.restfulClient.get(url, new GenericType<RestfulResponse<DataObjectMetadata>>(){});
-            
-            if(response.getException() != null) {
-                throw new IOException(response.getException());
-            } else {
-                updateLastActivetime();
-                return response.getResponse();
-            }
-        } catch (RestfulException ex) {
-            throw new IOException(ex);
-        } catch (AuthenticationException ex) {
-            throw new IOException(ex);
-        }
+        // URL pattern = http://xxx.xxx.xxx.xxx/metadata/path/to/resource
+        String url = makeGetMetadataPath(uri);
+        DataObjectMetadata metadata = (DataObjectMetadata) this.restfulClient.get(url);
+
+        updateLastActivetime();
+        return metadata;
     }
     
     @Override
-    public Collection<DataObjectMetadata> listDataObjectMetadatas(DataObjectURI uri) throws FileNotFoundException, IOException {
+    public Collection<DataObjectMetadata> listDataObjectMetadata(DataObjectURI uri) throws FileNotFoundException, IOException {
         if(!this.connected) {
             throw new IOException("Client is not connected");
         }
@@ -396,22 +306,12 @@ public class HTTPUserInterfaceClient extends AbstractUserInterfaceClient {
             throw new IllegalArgumentException("uri is null");
         }
         
-        try {
-            // URL pattern = http://xxx.xxx.xxx.xxx/lmetadata/path/to/resource
-            String url = makeListMetadataPath(uri.getPath());
-            RestfulResponse<Collection<DataObjectMetadata>> response = (RestfulResponse<Collection<DataObjectMetadata>>) this.restfulClient.get(url, new GenericType<RestfulResponse<Collection<DataObjectMetadata>>>(){});
-            
-            if(response.getException() != null) {
-                throw new IOException(response.getException());
-            } else {
-                updateLastActivetime();
-                return response.getResponse();
-            }
-        } catch (RestfulException ex) {
-            throw new IOException(ex);
-        } catch (AuthenticationException ex) {
-            throw new IOException(ex);
-        }
+        // URL pattern = http://xxx.xxx.xxx.xxx/lmetadata/path/to/resource
+        String url = makeListMetadataPath(uri);
+        DataObjectMetadata[] metadataList = (DataObjectMetadata[]) this.restfulClient.get(url);
+
+        updateLastActivetime();
+        return Arrays.asList(metadataList);
     }
     
     @Override
@@ -424,22 +324,12 @@ public class HTTPUserInterfaceClient extends AbstractUserInterfaceClient {
             throw new IllegalArgumentException("uri is null");
         }
         
-        try {
-            // URL pattern = http://xxx.xxx.xxx.xxx/recipe/path/to/resource
-            String url = makeGetRecipePath(uri.getPath());
-            RestfulResponse<Recipe> response = (RestfulResponse<Recipe>) this.restfulClient.get(url, new GenericType<RestfulResponse<Recipe>>(){});
-            
-            if(response.getException() != null) {
-                throw new IOException(response.getException());
-            } else {
-                updateLastActivetime();
-                return response.getResponse();
-            }
-        } catch (RestfulException ex) {
-            throw new IOException(ex);
-        } catch (AuthenticationException ex) {
-            throw new IOException(ex);
-        }
+        // URL pattern = http://xxx.xxx.xxx.xxx/recipe/path/to/resource
+        String url = makeGetRecipePath(uri);
+        Recipe recipe = (Recipe) this.restfulClient.get(url);
+
+        updateLastActivetime();
+        return recipe;
     }
     
     @Override
@@ -448,22 +338,12 @@ public class HTTPUserInterfaceClient extends AbstractUserInterfaceClient {
             throw new IOException("Client is not connected");
         }
         
-        try {
-            // URL pattern = http://xxx.xxx.xxx.xxx/api/lrecipe
-            String url = makeAPIPath(HTTPUserInterfaceRestfulConstants.API_LIST_RECIPES_PATH);
-            RestfulResponse<Collection<String>> response = (RestfulResponse<Collection<String>>) this.restfulClient.get(url, new GenericType<RestfulResponse<Collection<String>>>(){});
-            
-            if(response.getException() != null) {
-                throw new IOException(response.getException());
-            } else {
-                updateLastActivetime();
-                return response.getResponse();
-            }
-        } catch (RestfulException ex) {
-            throw new IOException(ex);
-        } catch (AuthenticationException ex) {
-            throw new IOException(ex);
-        }
+        // URL pattern = http://xxx.xxx.xxx.xxx/api/lrecipe
+        String url = makeAPIPath(HTTPUserInterfaceRestfulConstants.API_LIST_RECIPES_PATH);
+        String[] recipes = (String[]) this.restfulClient.get(url);
+
+        updateLastActivetime();
+        return Arrays.asList(recipes);
     }
     
     @Override
@@ -476,21 +356,11 @@ public class HTTPUserInterfaceClient extends AbstractUserInterfaceClient {
             throw new IllegalArgumentException("uri is null");
         }
         
-        try {
-            // URL pattern = http://xxx.xxx.xxx.xxx/api/recipe/path/to/file
-            String url = makeAPIPath(HTTPUserInterfaceRestfulConstants.API_REMOVE_RECIPE_PATH, uri.getPath());
-            RestfulResponse<Boolean> response = (RestfulResponse<Boolean>) this.restfulClient.delete(url, new GenericType<RestfulResponse<Boolean>>(){});
-            
-            if(response.getException() != null) {
-                throw new IOException(response.getException());
-            } else {
-                updateLastActivetime();
-            }
-        } catch (RestfulException ex) {
-            throw new IOException(ex);
-        } catch (AuthenticationException ex) {
-            throw new IOException(ex);
-        }
+        // URL pattern = http://xxx.xxx.xxx.xxx/api/recipe/path/to/file
+        String url = makeAPIPath(HTTPUserInterfaceRestfulConstants.API_REMOVE_RECIPE_PATH, uri.getPath());
+        Boolean result = (Boolean) this.restfulClient.delete(url);
+
+        updateLastActivetime();
     }
     
     @Override
@@ -499,21 +369,11 @@ public class HTTPUserInterfaceClient extends AbstractUserInterfaceClient {
             throw new IOException("Client is not connected");
         }
         
-        try {
-            // URL pattern = http://xxx.xxx.xxx.xxx/api/srecipes
-            String url = makeAPIPath(HTTPUserInterfaceRestfulConstants.API_SYNC_RECIPES_PATH);
-            RestfulResponse<Boolean> response = (RestfulResponse<Boolean>) this.restfulClient.post(url, null, new GenericType<RestfulResponse<Boolean>>(){});
-            
-            if(response.getException() != null) {
-                throw new IOException(response.getException());
-            } else {
-                updateLastActivetime();
-            }
-        } catch (RestfulException ex) {
-            throw new IOException(ex);
-        } catch (AuthenticationException ex) {
-            throw new IOException(ex);
-        }
+        // URL pattern = http://xxx.xxx.xxx.xxx/api/srecipes
+        String url = makeAPIPath(HTTPUserInterfaceRestfulConstants.API_SYNC_RECIPES_PATH);
+        Boolean response = (Boolean) this.restfulClient.post(url, null);
+
+        updateLastActivetime();
     }
 
     @Override
@@ -526,18 +386,12 @@ public class HTTPUserInterfaceClient extends AbstractUserInterfaceClient {
             throw new IllegalArgumentException("hash is null or empty");
         }
         
-        try {
-            // URL pattern = http://xxx.xxx.xxx.xxx/data/hash
-            String url = makeGetDataChunkPath(hash);
-            InputStream is = this.restfulClient.download(url);
-            
-            updateLastActivetime();
-            return is;
-        } catch (RestfulException ex) {
-            throw new IOException(ex);
-        } catch (AuthenticationException ex) {
-            throw new IOException(ex);
-        }
+        // URL pattern = http://xxx.xxx.xxx.xxx/data/hash
+        String url = makeGetDataChunkPath(hash);
+        InputStream is = this.restfulClient.download(url);
+
+        updateLastActivetime();
+        return is;
     }
 
     @Override
@@ -554,22 +408,12 @@ public class HTTPUserInterfaceClient extends AbstractUserInterfaceClient {
             throw new IllegalArgumentException("hash is null or empty");
         }
         
-        try {
-            // URL pattern = http://xxx.xxx.xxx.xxx/api/prefetch/hash
-            String url = makeAPIPath(HTTPUserInterfaceRestfulConstants.API_SCHEDULE_PREFETCH_PATH, uri.getPath() + "/" + hash);
-            RestfulResponse<Boolean> response = (RestfulResponse<Boolean>) this.restfulClient.get(url, new GenericType<RestfulResponse<Boolean>>(){});
-            
-            if(response.getException() != null) {
-                throw new IOException(response.getException());
-            } else {
-                updateLastActivetime();
-                return response.getResponse();
-            }
-        } catch (RestfulException ex) {
-            throw new IOException(ex);
-        } catch (AuthenticationException ex) {
-            throw new IOException(ex);
-        }
+        // URL pattern = http://xxx.xxx.xxx.xxx/api/prefetch/hash
+        String url = makeAPIPath(HTTPUserInterfaceRestfulConstants.API_SCHEDULE_PREFETCH_PATH, uri.getPath() + "/" + hash);
+        Boolean result = (Boolean) this.restfulClient.get(url);
+
+        updateLastActivetime();
+        return result;
     }
 
     @Override
@@ -582,22 +426,12 @@ public class HTTPUserInterfaceClient extends AbstractUserInterfaceClient {
             throw new IllegalArgumentException("uri is null");
         }
         
-        try {
-            // URL pattern = http://xxx.xxx.xxx.xxx/api/export/path/to/file
-            String url = makeAPIPath(HTTPUserInterfaceRestfulConstants.API_GET_DATA_EXPORT_ENTRY_PATH, uri.getPath());
-            RestfulResponse<DataExportEntry> response = (RestfulResponse<DataExportEntry>) this.restfulClient.get(url, new GenericType<RestfulResponse<DataExportEntry>>(){});
-            
-            if(response.getException() != null) {
-                throw new IOException(response.getException());
-            } else {
-                updateLastActivetime();
-                return response.getResponse();
-            }
-        } catch (RestfulException ex) {
-            throw new IOException(ex);
-        } catch (AuthenticationException ex) {
-            throw new IOException(ex);
-        }
+        // URL pattern = http://xxx.xxx.xxx.xxx/api/export/path/to/file
+        String url = makeAPIPath(HTTPUserInterfaceRestfulConstants.API_GET_DATA_EXPORT_ENTRY_PATH, uri.getPath());
+        DataExportEntry entry = (DataExportEntry) this.restfulClient.get(url);
+
+        updateLastActivetime();
+        return entry;
     }
     
     @Override
@@ -606,22 +440,12 @@ public class HTTPUserInterfaceClient extends AbstractUserInterfaceClient {
             throw new IOException("Client is not connected");
         }
         
-        try {
-            // URL pattern = http://xxx.xxx.xxx.xxx/api/lexport
-            String url = makeAPIPath(HTTPUserInterfaceRestfulConstants.API_LIST_DATA_EXPORT_ENTRIES_PATH);
-            RestfulResponse<Collection<String>> response = (RestfulResponse<Collection<String>>) this.restfulClient.get(url, new GenericType<RestfulResponse<Collection<String>>>(){});
-            
-            if(response.getException() != null) {
-                throw new IOException(response.getException());
-            } else {
-                updateLastActivetime();
-                return response.getResponse();
-            }
-        } catch (RestfulException ex) {
-            throw new IOException(ex);
-        } catch (AuthenticationException ex) {
-            throw new IOException(ex);
-        }
+        // URL pattern = http://xxx.xxx.xxx.xxx/api/lexport
+        String url = makeAPIPath(HTTPUserInterfaceRestfulConstants.API_LIST_DATA_EXPORT_ENTRIES_PATH);
+        String[] entries = (String[]) this.restfulClient.get(url);
+
+        updateLastActivetime();
+        return Arrays.asList(entries);
     }
 
     @Override
@@ -630,22 +454,12 @@ public class HTTPUserInterfaceClient extends AbstractUserInterfaceClient {
             throw new IOException("Client is not connected");
         }
         
-        try {
-            // URL pattern = http://xxx.xxx.xxx.xxx/api/exports
-            String url = makeAPIPath(HTTPUserInterfaceRestfulConstants.API_GET_DATA_EXPORT_ENTRIES_PATH);
-            RestfulResponse<Collection<DataExportEntry>> response = (RestfulResponse<Collection<DataExportEntry>>) this.restfulClient.get(url, new GenericType<RestfulResponse<Collection<DataExportEntry>>>(){});
-            
-            if(response.getException() != null) {
-                throw new IOException(response.getException());
-            } else {
-                updateLastActivetime();
-                return response.getResponse();
-            }
-        } catch (RestfulException ex) {
-            throw new IOException(ex);
-        } catch (AuthenticationException ex) {
-            throw new IOException(ex);
-        }
+        // URL pattern = http://xxx.xxx.xxx.xxx/api/exports
+        String url = makeAPIPath(HTTPUserInterfaceRestfulConstants.API_GET_DATA_EXPORT_ENTRIES_PATH);
+        DataExportEntry[] entries = (DataExportEntry[]) this.restfulClient.get(url);
+
+        updateLastActivetime();
+        return Arrays.asList(entries);
     }
 
     @Override
@@ -658,22 +472,12 @@ public class HTTPUserInterfaceClient extends AbstractUserInterfaceClient {
             throw new IllegalArgumentException("entry is null");
         }
         
-        try {
-            // URL pattern = http://xxx.xxx.xxx.xxx/api/exports
-            // form param = object
-            String url = makeAPIPath(HTTPUserInterfaceRestfulConstants.API_ADD_DATA_EXPORT_ENTRY_PATH);
-            RestfulResponse<Boolean> response = (RestfulResponse<Boolean>) this.restfulClient.put(url, entry, new GenericType<RestfulResponse<Boolean>>(){});
-            
-            if(response.getException() != null) {
-                throw new IOException(response.getException());
-            } else {
-                updateLastActivetime();
-            }
-        } catch (RestfulException ex) {
-            throw new IOException(ex);
-        } catch (AuthenticationException ex) {
-            throw new IOException(ex);
-        }
+        // URL pattern = http://xxx.xxx.xxx.xxx/api/exports
+        // form param = object
+        String url = makeAPIPath(HTTPUserInterfaceRestfulConstants.API_ADD_DATA_EXPORT_ENTRY_PATH);
+        Boolean result = (Boolean) this.restfulClient.put(url, entry);
+
+        updateLastActivetime();
     }
 
     @Override
@@ -686,21 +490,11 @@ public class HTTPUserInterfaceClient extends AbstractUserInterfaceClient {
             throw new IllegalArgumentException("uri is null");
         }
         
-        try {
-            // URL pattern = http://xxx.xxx.xxx.xxx/api/export/path/to/file
-            String url = makeAPIPath(HTTPUserInterfaceRestfulConstants.API_REMOVE_DATA_EXPORT_ENTRY_PATH, uri.getPath());
-            RestfulResponse<Boolean> response = (RestfulResponse<Boolean>) this.restfulClient.delete(url, new GenericType<RestfulResponse<Boolean>>(){});
-            
-            if(response.getException() != null) {
-                throw new IOException(response.getException());
-            } else {
-                updateLastActivetime();
-            }
-        } catch (RestfulException ex) {
-            throw new IOException(ex);
-        } catch (AuthenticationException ex) {
-            throw new IOException(ex);
-        }
+        // URL pattern = http://xxx.xxx.xxx.xxx/api/export/path/to/file
+        String url = makeAPIPath(HTTPUserInterfaceRestfulConstants.API_REMOVE_DATA_EXPORT_ENTRY_PATH, uri.getPath());
+        Boolean result = (Boolean) this.restfulClient.delete(url);
+
+        updateLastActivetime();
     }
     
     @Override
@@ -709,21 +503,11 @@ public class HTTPUserInterfaceClient extends AbstractUserInterfaceClient {
             throw new IOException("Client is not connected");
         }
         
-        try {
-            // URL pattern = http://xxx.xxx.xxx.xxx/api/lsources
-            String url = makeAPIPath(HTTPUserInterfaceRestfulConstants.API_LIST_DATA_SOURCES_PATH);
-            RestfulResponse<Collection<String>> response = (RestfulResponse<Collection<String>>) this.restfulClient.get(url, new GenericType<RestfulResponse<Collection<String>>>(){});
-            
-            if(response.getException() != null) {
-                throw new IOException(response.getException());
-            } else {
-                updateLastActivetime();
-                return response.getResponse();
-            }
-        } catch (RestfulException ex) {
-            throw new IOException(ex);
-        } catch (AuthenticationException ex) {
-            throw new IOException(ex);
-        }
+        // URL pattern = http://xxx.xxx.xxx.xxx/api/lsources
+        String url = makeAPIPath(HTTPUserInterfaceRestfulConstants.API_LIST_DATA_SOURCES_PATH);
+        String[] sources = (String[]) this.restfulClient.get(url);
+
+        updateLastActivetime();
+        return Arrays.asList(sources);
     }
 }

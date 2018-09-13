@@ -23,6 +23,7 @@ import stargate.commons.recipe.Recipe;
 import stargate.managers.dataexport.AbstractDataExportEventHandler;
 import stargate.managers.dataexport.DataExportManager;
 import stargate.managers.recipe.RecipeManager;
+import stargate.managers.volume.VolumeManager;
 
 /**
  *
@@ -33,13 +34,19 @@ public class DataExportUpdateEventHandler extends AbstractDataExportEventHandler
     private static final Log LOG = LogFactory.getLog(DataExportUpdateEventHandler.class);
     
     private RecipeManager recipeManager;
+    private VolumeManager volumeManager;
     
-    public DataExportUpdateEventHandler(RecipeManager recipeManager) {
+    public DataExportUpdateEventHandler(RecipeManager recipeManager, VolumeManager volumeManager) {
         if(recipeManager == null) {
             throw new IllegalArgumentException("recipeManager is null");
         }
         
+        if(volumeManager == null) {
+            throw new IllegalArgumentException("volumeManager is null");
+        }
+        
         this.recipeManager = recipeManager;
+        this.volumeManager = volumeManager;
     }
     
     @Override
@@ -48,6 +55,7 @@ public class DataExportUpdateEventHandler extends AbstractDataExportEventHandler
             // generate recipe
             Recipe recipe = this.recipeManager.createRecipe(entry);
             this.recipeManager.addRecipe(recipe);
+            this.volumeManager.buildLocalDirectoryHierarchy();
         } catch (Exception ex) {
             LOG.error(String.format("Exception occurred while creating a recipe from a data export entry - %s", entry.getSourceURI().toASCIIString()), ex);
         }
@@ -58,6 +66,7 @@ public class DataExportUpdateEventHandler extends AbstractDataExportEventHandler
         String stargatePath = entry.getStargatePath();
         try {
             this.recipeManager.removeRecipe(stargatePath);
+            this.volumeManager.buildLocalDirectoryHierarchy();
         } catch (IOException ex) {
             LOG.error(String.format("Exception occurred while removing a recipe - %s", stargatePath), ex);
         }
@@ -69,6 +78,7 @@ public class DataExportUpdateEventHandler extends AbstractDataExportEventHandler
             // regenerate recipe
             Recipe recipe = this.recipeManager.createRecipe(entry);
             this.recipeManager.updateRecipe(recipe);
+            this.volumeManager.buildLocalDirectoryHierarchy();
         } catch (Exception ex) {
             LOG.error(String.format("Exception occurred while creating a recipe from a data export entry - %s", entry.getSourceURI().toASCIIString()), ex);
         }

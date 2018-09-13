@@ -15,13 +15,18 @@
 */
 package stargate.admin.cli;
 
+import java.io.File;
+import java.io.FileOutputStream;
 import java.io.IOException;
+import java.io.InputStream;
 import java.net.URI;
 import java.util.Collection;
 import org.apache.commons.logging.Log;
 import org.apache.commons.logging.LogFactory;
+import stargate.commons.dataobject.DataObjectMetadata;
 import stargate.commons.dataobject.DataObjectURI;
 import stargate.commons.recipe.Recipe;
+import stargate.commons.recipe.RecipeChunk;
 import stargate.commons.utils.DateTimeUtils;
 import stargate.commons.utils.JsonSerializer;
 import stargate.commons.utils.PathUtils;
@@ -35,10 +40,9 @@ public class FileSystem {
     private static final Log LOG = LogFactory.getLog(FileSystem.class);
 
     private enum COMMAND_LV1 {
-        CMD_LV1_SHOW("show"),
-        CMD_LV1_LIST("list"),
-        CMD_LV1_REMOVE("remove"),
-        CMD_LV1_SYNC("sync"),
+        CMD_LV1_LIST("ls"),
+        CMD_LV1_RECIPE("recipe"),
+        CMD_LV1_GET("get"),
         CMD_LV1_UNKNOWN("unknown");
         
         private String value;
@@ -55,6 +59,10 @@ public class FileSystem {
             }
             return CMD_LV1_UNKNOWN;
         }
+        
+        public String getValue() {
+            return this.value;
+        }
     }
     
     public static void main(String[] args) {
@@ -69,21 +77,24 @@ public class FileSystem {
                 COMMAND_LV1 cmd = COMMAND_LV1.fromString(cmd_lv1);
 
                 switch(cmd) {
-                    case CMD_LV1_SHOW:
-                        if(positionalArgs.length >= 2) {
-                            process_recipe_get(parser.getServiceURI(), positionalArgs[1]);
-                        }
-                        break;
                     case CMD_LV1_LIST:
-                        process_recipe_list(parser.getServiceURI());
-                        break;
-                    case CMD_LV1_REMOVE:
                         if(positionalArgs.length >= 2) {
-                            process_recipe_remove(parser.getServiceURI(), positionalArgs[1]);
+                            process_fs_list(parser.getServiceURI(), positionalArgs[1]);
                         }
                         break;
-                    case CMD_LV1_SYNC:
-                        process_recipe_sync(parser.getServiceURI());
+                    case CMD_LV1_RECIPE:
+                        if(positionalArgs.length >= 2) {
+                            process_fs_recipe(parser.getServiceURI(), positionalArgs[1]);
+                        }
+                        break;
+                    case CMD_LV1_GET:
+                        if(positionalArgs.length >= 2) {
+                            String targetPath = ".";
+                            if(positionalArgs.length >= 3) {
+                                targetPath = positionalArgs[2];
+                            }
+                            process_fs_get(parser.getServiceURI(), positionalArgs[1], targetPath);
+                        }
                         break;
                     case CMD_LV1_UNKNOWN:
                         throw new UnsupportedOperationException(String.format("Unknown command - %s", cmd_lv1));
@@ -91,19 +102,59 @@ public class FileSystem {
                         throw new UnsupportedOperationException(String.format("Unknown command - %s", cmd_lv1));
 
                 }
+            } else {
+                StringBuilder sb = new StringBuilder();
+                for(COMMAND_LV1 cmd : COMMAND_LV1.values()) {
+                    if(cmd != COMMAND_LV1.CMD_LV1_UNKNOWN) {
+                        if(sb.length() != 0) {
+                            sb.append(" ");
+                        }
+                        sb.append(cmd.getValue());
+                    }
+                }
+                System.out.println(String.format("Available commands - %s", sb.toString()));
             }
         } catch(UnsupportedOperationException ex) {
             System.err.println(ex.getMessage());
         }
     }
     
-    private static void process_recipe_get(URI serviceURI, String stargatePath) {
+    private static String formatDataObjectMetadata(DataObjectMetadata metadata) {
+        DataObjectURI uri = metadata.getURI();
+        long lastModifiedTime = metadata.getLastModifiedTime();
+        long size = metadata.getSize();
+        String path = uri.toString();
+        return String.format("%s\t%d\t%s", path, size, DateTimeUtils.getDateTimeString(lastModifiedTime));
+    }
+    
+    private static void process_fs_list(URI serviceURI, String stargatePath) {
         try {
-            String concatPath = PathUtils.concatPath("/", stargatePath);
-            
             HTTPUserInterfaceClient client = HTTPUIClient.getClient(serviceURI);
             client.connect();
-            DataObjectURI uri = new DataObjectURI("", concatPath);
+            DataObjectURI uri = new DataObjectURI(stargatePath);
+            Collection<DataObjectMetadata> listDataObjectMetadatas = client.listDataObjectMetadata(uri);
+            if(listDataObjectMetadatas == null || listDataObjectMetadatas.isEmpty()) {
+                System.out.println("<EMPTY!>");
+            } else {
+                for(DataObjectMetadata metadata : listDataObjectMetadatas) {
+                    System.out.println(formatDataObjectMetadata(metadata));
+                }
+            }
+            String dateTimeString = DateTimeUtils.getDateTimeString(client.getLastActiveTime());
+            System.out.println(String.format("<Request processed %s>", dateTimeString));
+            client.disconnect();
+            System.exit(0);
+        } catch (IOException ex) {
+            ex.printStackTrace();
+            System.exit(1);
+        }
+    }
+
+    private static void process_fs_recipe(URI serviceURI, String stargatePath) {
+        try {
+            HTTPUserInterfaceClient client = HTTPUIClient.getClient(serviceURI);
+            client.connect();
+            DataObjectURI uri = new DataObjectURI(stargatePath);
             Recipe recipe = client.getRecipe(uri);
             if(recipe == null) {
                 System.out.println("<ENTRY DOES NOT EXIST!>");
@@ -122,51 +173,37 @@ public class FileSystem {
         }
     }
 
-    private static void process_recipe_list(URI serviceURI) {
+    private static void process_fs_get(URI serviceURI, String stargatePath, String targetPath) {
         try {
             HTTPUserInterfaceClient client = HTTPUIClient.getClient(serviceURI);
             client.connect();
-            Collection<String> recipes = client.listRecipes();
-            if(recipes == null || recipes.isEmpty()) {
-                System.out.println("<EMPTY!>");
+            DataObjectURI uri = new DataObjectURI(stargatePath);
+            LOG.debug("Downloading a recipe");
+            Recipe recipe = client.getRecipe(uri);
+            if(recipe == null) {
+                System.out.println("<ENTRY DOES NOT EXIST!>");
             } else {
-                for(String entry : recipes) {
-                    System.out.println(entry);
+                File f = (new File(targetPath)).getAbsoluteFile();
+                if(f.isDirectory()) {
+                    f = new File(f, PathUtils.getFileName(stargatePath));
                 }
+
+                FileOutputStream fos = new FileOutputStream(f);
+                int bufferlen = 1024*4;
+                byte[] buffer = new byte[bufferlen];
+                Collection<RecipeChunk> chunks = recipe.getChunks();
+                for(RecipeChunk chunk : chunks) {
+                    String hash = chunk.getHashString();
+                    LOG.debug(String.format("Downloading a chunk for a hash %s", hash));
+                    InputStream is = client.getDataChunk(hash);
+                    int readLen = 0;
+                    while((readLen = is.read(buffer, 0, bufferlen)) > 0) {
+                        fos.write(buffer, 0, readLen);
+                    }
+                    is.close();
+                }
+                fos.close();
             }
-            String dateTimeString = DateTimeUtils.getDateTimeString(client.getLastActiveTime());
-            System.out.println(String.format("<Request processed %s>", dateTimeString));
-            client.disconnect();
-            System.exit(0);
-        } catch (IOException ex) {
-            ex.printStackTrace();
-            System.exit(1);
-        }
-    }
-
-    private static void process_recipe_remove(URI serviceURI, String stargatePath) {
-        try {
-            String concatPath = PathUtils.concatPath("/", stargatePath);
-            
-            HTTPUserInterfaceClient client = HTTPUIClient.getClient(serviceURI);
-            client.connect();
-            DataObjectURI uri = new DataObjectURI("", concatPath);
-            client.removeRecipe(uri);
-            String dateTimeString = DateTimeUtils.getDateTimeString(client.getLastActiveTime());
-            System.out.println(String.format("<Request processed %s>", dateTimeString));
-            client.disconnect();
-            System.exit(0);
-        } catch (IOException ex) {
-            ex.printStackTrace();
-            System.exit(1);
-        }
-    }
-
-    private static void process_recipe_sync(URI serviceURI) {
-        try {
-            HTTPUserInterfaceClient client = HTTPUIClient.getClient(serviceURI);
-            client.connect();
-            client.syncRecipes();
             String dateTimeString = DateTimeUtils.getDateTimeString(client.getLastActiveTime());
             System.out.println(String.format("<Request processed %s>", dateTimeString));
             client.disconnect();

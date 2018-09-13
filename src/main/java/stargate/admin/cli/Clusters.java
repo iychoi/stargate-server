@@ -52,29 +52,61 @@ public class Clusters {
             }
             return CMD_LV1_UNKNOWN;
         }
+        
+        public String getValue() {
+            return this.value;
+        }
     }
     
-    private enum COMMAND_LV2 {
-        CMD_LV2_SHOW("show"),
-        CMD_LV2_LIST("list"),
-        CMD_LV2_ADD("add"),
-        CMD_LV2_REMOVE("remove"),
-        CMD_LV2_SYNC("sync"),
-        CMD_LV2_UNKNOWN("unknown");
+    private enum COMMAND_LV2_LOCAL_CLUSTER {
+        CMD_LV2_LOCAL_CLUSTER_SHOW("show"),
+        CMD_LV2_LOCAL_CLUSTER_UNKNOWN("unknown");
         
         private String value;
         
-        COMMAND_LV2(String value) {
+        COMMAND_LV2_LOCAL_CLUSTER(String value) {
             this.value = value;
         }
         
-        public static COMMAND_LV2 fromString(String value) {
-            for(COMMAND_LV2 v : COMMAND_LV2.values()) {
+        public static COMMAND_LV2_LOCAL_CLUSTER fromString(String value) {
+            for(COMMAND_LV2_LOCAL_CLUSTER v : COMMAND_LV2_LOCAL_CLUSTER.values()) {
                 if(value.equalsIgnoreCase(v.value)) {
                     return v;
                 }
             }
-            return CMD_LV2_UNKNOWN;
+            return CMD_LV2_LOCAL_CLUSTER_UNKNOWN;
+        }
+        
+        public String getValue() {
+            return this.value;
+        }
+    }
+    
+    private enum COMMAND_LV2_REMOTE_CLUSTER {
+        CMD_LV2_REMOTE_CLUSTER_SHOW("show"),
+        CMD_LV2_REMOTE_CLUSTER_LIST("list"),
+        CMD_LV2_REMOTE_CLUSTER_ADD("add"),
+        CMD_LV2_REMOTE_CLUSTER_REMOVE("remove"),
+        CMD_LV2_REMOTE_CLUSTER_SYNC("sync"),
+        CMD_LV2_REMOTE_CLUSTER_UNKNOWN("unknown");
+        
+        private String value;
+        
+        COMMAND_LV2_REMOTE_CLUSTER(String value) {
+            this.value = value;
+        }
+        
+        public static COMMAND_LV2_REMOTE_CLUSTER fromString(String value) {
+            for(COMMAND_LV2_REMOTE_CLUSTER v : COMMAND_LV2_REMOTE_CLUSTER.values()) {
+                if(value.equalsIgnoreCase(v.value)) {
+                    return v;
+                }
+            }
+            return CMD_LV2_REMOTE_CLUSTER_UNKNOWN;
+        }
+        
+        public String getValue() {
+            return this.value;
         }
     }
     
@@ -102,6 +134,17 @@ public class Clusters {
                         throw new UnsupportedOperationException(String.format("Unknown command - %s", cmd_lv1));
 
                 }
+            } else {
+                StringBuilder sb = new StringBuilder();
+                for(COMMAND_LV1 cmd : COMMAND_LV1.values()) {
+                    if(cmd != COMMAND_LV1.CMD_LV1_UNKNOWN) {
+                        if(sb.length() != 0) {
+                            sb.append(" ");
+                        }
+                        sb.append(cmd.getValue());
+                    }
+                }
+                System.out.println(String.format("Available commands - %s", sb.toString()));
             }
         } catch(Exception ex) {
             System.err.println(ex.getMessage());
@@ -112,25 +155,28 @@ public class Clusters {
         String[] positionalArgs = parser.getPositionalArgs();
         if(positionalArgs.length >= 2) {
             String cmd_lv2 = positionalArgs[1];
-            COMMAND_LV2 cmd = COMMAND_LV2.fromString(cmd_lv2);
+            COMMAND_LV2_LOCAL_CLUSTER cmd = COMMAND_LV2_LOCAL_CLUSTER.fromString(cmd_lv2);
             
             switch(cmd) {
-                case CMD_LV2_SHOW:
+                case CMD_LV2_LOCAL_CLUSTER_SHOW:
                     process_local_cluster_show(parser.getServiceURI());
                     break;
-                case CMD_LV2_LIST:
-                    throw new UnsupportedOperationException("Command is not supported");
-                case CMD_LV2_ADD:
-                    throw new UnsupportedOperationException("Command is not supported");
-                case CMD_LV2_REMOVE:
-                    throw new UnsupportedOperationException("Command is not supported");
-                case CMD_LV2_SYNC:
-                    throw new UnsupportedOperationException("Command is not supported");
-                case CMD_LV2_UNKNOWN:
+                case CMD_LV2_LOCAL_CLUSTER_UNKNOWN:
                     throw new UnsupportedOperationException(String.format("Unknown command - %s", cmd_lv2));
                 default:
                     throw new UnsupportedOperationException(String.format("Unknown command - %s", cmd_lv2));
             }
+        } else {
+            StringBuilder sb = new StringBuilder();
+            for(COMMAND_LV2_LOCAL_CLUSTER cmd : COMMAND_LV2_LOCAL_CLUSTER.values()) {
+                if(cmd != COMMAND_LV2_LOCAL_CLUSTER.CMD_LV2_LOCAL_CLUSTER_UNKNOWN) {
+                    if(sb.length() != 0) {
+                        sb.append(" ");
+                    }
+                    sb.append(cmd.getValue());
+                }
+            }
+            System.out.println(String.format("Available commands - %s", sb.toString()));
         }
     }
     
@@ -138,34 +184,45 @@ public class Clusters {
         String[] positionalArgs = parser.getPositionalArgs();
         if(positionalArgs.length >= 2) {
             String cmd_lv2 = positionalArgs[1];
-            COMMAND_LV2 cmd = COMMAND_LV2.fromString(cmd_lv2);
+            COMMAND_LV2_REMOTE_CLUSTER cmd = COMMAND_LV2_REMOTE_CLUSTER.fromString(cmd_lv2);
             
             switch(cmd) {
-                case CMD_LV2_SHOW:
+                case CMD_LV2_REMOTE_CLUSTER_SHOW:
                     if(positionalArgs.length >= 3) {
                         process_remote_clusters_show(parser.getServiceURI(), positionalArgs[1]);
                     }
                     break;
-                case CMD_LV2_LIST:
+                case CMD_LV2_REMOTE_CLUSTER_LIST:
                     process_remote_clusters_list(parser.getServiceURI());
                     break;
-                case CMD_LV2_ADD:
+                case CMD_LV2_REMOTE_CLUSTER_ADD:
                     if(positionalArgs.length >= 3) {
                         process_remote_clusters_add(parser.getServiceURI(), positionalArgs[1]);
                     }
                     break;
-                case CMD_LV2_REMOVE:
+                case CMD_LV2_REMOTE_CLUSTER_REMOVE:
                     if(positionalArgs.length >= 3) {
                         process_remote_clusters_remove(parser.getServiceURI(), positionalArgs[1]);
                     }
                     break;
-                case CMD_LV2_SYNC:
+                case CMD_LV2_REMOTE_CLUSTER_SYNC:
                     throw new UnsupportedOperationException("Not supported yet.");
-                case CMD_LV2_UNKNOWN:
+                case CMD_LV2_REMOTE_CLUSTER_UNKNOWN:
                     throw new UnsupportedOperationException(String.format("Unknown command - %s", cmd_lv2));
                 default:
                     throw new UnsupportedOperationException(String.format("Unknown command - %s", cmd_lv2));
             }
+        } else {
+            StringBuilder sb = new StringBuilder();
+            for(COMMAND_LV2_REMOTE_CLUSTER cmd : COMMAND_LV2_REMOTE_CLUSTER.values()) {
+                if(cmd != COMMAND_LV2_REMOTE_CLUSTER.CMD_LV2_REMOTE_CLUSTER_UNKNOWN) {
+                    if(sb.length() != 0) {
+                        sb.append(" ");
+                    }
+                    sb.append(cmd.getValue());
+                }
+            }
+            System.out.println(String.format("Available commands - %s", sb.toString()));
         }
     }
     

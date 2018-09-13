@@ -56,6 +56,10 @@ public class DataExports {
             }
             return CMD_LV1_UNKNOWN;
         }
+        
+        public String getValue() {
+            return this.value;
+        }
     }
     
     public static void main(String[] args) {
@@ -94,6 +98,17 @@ public class DataExports {
                         throw new UnsupportedOperationException(String.format("Unknown command - %s", cmd_lv1));
 
                 }
+            } else {
+                StringBuilder sb = new StringBuilder();
+                for(COMMAND_LV1 cmd : COMMAND_LV1.values()) {
+                    if(cmd != COMMAND_LV1.CMD_LV1_UNKNOWN) {
+                        if(sb.length() != 0) {
+                            sb.append(" ");
+                        }
+                        sb.append(cmd.getValue());
+                    }
+                }
+                System.out.println(String.format("Available commands - %s", sb.toString()));
             }
         } catch(UnsupportedOperationException ex) {
             System.err.println(ex.getMessage());

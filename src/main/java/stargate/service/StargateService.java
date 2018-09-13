@@ -130,13 +130,14 @@ public class StargateService extends AbstractService {
         LOG.info("Managers are started");
         
         LOG.info("Registering event handlers");
-        this.dataExportUpdateEventHandler = new DataExportUpdateEventHandler(this.recipeManager);
+        this.dataExportUpdateEventHandler = new DataExportUpdateEventHandler(this.recipeManager, this.volumeManager);
         this.dataExportManager.addDataExportEventHandler(dataExportUpdateEventHandler);
         LOG.info("Event handlers are registered");
         
         LOG.info("Resynchronizing states");
         try {
             this.recipeManager.syncRecipes();
+            this.volumeManager.buildLocalDirectoryHierarchy();
         } catch (ManagerNotInstantiatedException ex) {
             throw new IOException(ex);
         } catch (RecipeManagerException ex) {

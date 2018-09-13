@@ -96,10 +96,10 @@ public class HTTPUserInterfaceServlet extends AbstractUserInterfaceServer {
     public Response isLiveRestful() {
         try {
             boolean live = isLive();
-            RestfulResponse<Boolean> rres = new RestfulResponse<Boolean>(live);
+            RestfulResponse rres = new RestfulResponse(live);
             return Response.status(Response.Status.OK).entity(rres).build();
         } catch(Exception ex) {
-            RestfulResponse<Boolean> rres = new RestfulResponse<Boolean>(ex);
+            RestfulResponse rres = new RestfulResponse(ex);
             return Response.status(Response.Status.INTERNAL_SERVER_ERROR).entity(rres).build();
         }
     }
@@ -115,10 +115,10 @@ public class HTTPUserInterfaceServlet extends AbstractUserInterfaceServer {
     public Response getServiceConfigRestful() {
         try {
             StargateServiceConfig config = (StargateServiceConfig) getServiceConfig();
-            RestfulResponse<StargateServiceConfig> rres = new RestfulResponse<StargateServiceConfig>(config);
+            RestfulResponse rres = new RestfulResponse(config);
             return Response.status(Response.Status.OK).entity(rres).build();
         } catch(Exception ex) {
-            RestfulResponse<StargateServiceConfig> rres = new RestfulResponse<StargateServiceConfig>(ex);
+            RestfulResponse rres = new RestfulResponse(ex);
             return Response.status(Response.Status.INTERNAL_SERVER_ERROR).entity(rres).build();
         }
     }
@@ -135,10 +135,10 @@ public class HTTPUserInterfaceServlet extends AbstractUserInterfaceServer {
     public Response getClusterRestful() {
         try {
             Cluster cluster = getCluster();
-            RestfulResponse<Cluster> rres = new RestfulResponse<Cluster>(cluster);
+            RestfulResponse rres = new RestfulResponse(cluster);
             return Response.status(Response.Status.OK).entity(rres).build();
         } catch(Exception ex) {
-            RestfulResponse<Cluster> rres = new RestfulResponse<Cluster>(ex);
+            RestfulResponse rres = new RestfulResponse(ex);
             return Response.status(Response.Status.INTERNAL_SERVER_ERROR).entity(rres).build();
         }
     }
@@ -166,10 +166,10 @@ public class HTTPUserInterfaceServlet extends AbstractUserInterfaceServer {
         
         try {
             Cluster remoteCluster = getRemoteCluster(path);
-            RestfulResponse<Cluster> rres = new RestfulResponse<Cluster>(remoteCluster);
+            RestfulResponse rres = new RestfulResponse(remoteCluster);
             return Response.status(Response.Status.OK).entity(rres).build();
         } catch(Exception ex) {
-            RestfulResponse<Cluster> rres = new RestfulResponse<Cluster>(ex);
+            RestfulResponse rres = new RestfulResponse(ex);
             return Response.status(Response.Status.INTERNAL_SERVER_ERROR).entity(rres).build();
         }
     }
@@ -196,10 +196,10 @@ public class HTTPUserInterfaceServlet extends AbstractUserInterfaceServer {
     public Response listRemoteClustersRestful() {
         try {
             Collection<String> remoteClusters = listRemoteClusters();
-            RestfulResponse<Collection<String>> rres = new RestfulResponse<Collection<String>>(remoteClusters);
+            RestfulResponse rres = new RestfulResponse(remoteClusters.toArray(new String[0]));
             return Response.status(Response.Status.OK).entity(rres).build();
         } catch(Exception ex) {
-            RestfulResponse<Collection<String>> rres = new RestfulResponse<Collection<String>>(ex);
+            RestfulResponse rres = new RestfulResponse(ex);
             return Response.status(Response.Status.INTERNAL_SERVER_ERROR).entity(rres).build();
         }
     }
@@ -222,10 +222,10 @@ public class HTTPUserInterfaceServlet extends AbstractUserInterfaceServer {
     public Response getRemoteClustersRestful() {
         try {
             Collection<Cluster> remoteClusters = getRemoteClusters();
-            RestfulResponse<Collection<Cluster>> rres = new RestfulResponse<Collection<Cluster>>(remoteClusters);
+            RestfulResponse rres = new RestfulResponse(remoteClusters.toArray(new Cluster[0]));
             return Response.status(Response.Status.OK).entity(rres).build();
         } catch(Exception ex) {
-            RestfulResponse<Collection<Cluster>> rres = new RestfulResponse<Collection<Cluster>>(ex);
+            RestfulResponse rres = new RestfulResponse(ex);
             return Response.status(Response.Status.INTERNAL_SERVER_ERROR).entity(rres).build();
         }
     }
@@ -250,10 +250,10 @@ public class HTTPUserInterfaceServlet extends AbstractUserInterfaceServer {
         try {
             addRemoteCluster(cluster);
             
-            RestfulResponse<Boolean> rres = new RestfulResponse<Boolean>(true);
+            RestfulResponse rres = new RestfulResponse(true);
             return Response.status(Response.Status.OK).entity(rres).build();
         } catch(Exception ex) {
-            RestfulResponse<Boolean> rres = new RestfulResponse<Boolean>(ex);
+            RestfulResponse rres = new RestfulResponse(ex);
             return Response.status(Response.Status.INTERNAL_SERVER_ERROR).entity(rres).build();
         }
     }
@@ -284,10 +284,10 @@ public class HTTPUserInterfaceServlet extends AbstractUserInterfaceServer {
         
         try {
             removeRemoteCluster(path);
-            RestfulResponse<Boolean> rres = new RestfulResponse<Boolean>(true);
+            RestfulResponse rres = new RestfulResponse(true);
             return Response.status(Response.Status.OK).entity(rres).build();
         } catch(Exception ex) {
-            RestfulResponse<Boolean> rres = new RestfulResponse<Boolean>(ex);
+            RestfulResponse rres = new RestfulResponse(ex);
             return Response.status(Response.Status.INTERNAL_SERVER_ERROR).entity(rres).build();
         }
     }
@@ -314,14 +314,14 @@ public class HTTPUserInterfaceServlet extends AbstractUserInterfaceServer {
         }
         
         try {
-            DataObjectURI objectUri = new DataObjectURI("", PathUtils.concatPath("/", path));
+            DataObjectURI objectUri = new DataObjectURI(path);
             DataObjectMetadata objectMetadata = getDataObjectMetadata(objectUri);
-            RestfulResponse<DataObjectMetadata> rres = new RestfulResponse<DataObjectMetadata>(objectMetadata);
+            RestfulResponse rres = new RestfulResponse(objectMetadata);
             return Response.status(Response.Status.OK).entity(rres).build();
         } catch(FileNotFoundException ex) {
             return Response.status(Response.Status.NOT_FOUND).entity(ex.toString()).build();
         } catch(Exception ex) {
-            RestfulResponse<DataObjectMetadata> rres = new RestfulResponse<DataObjectMetadata>(ex);
+            RestfulResponse rres = new RestfulResponse(ex);
             return Response.status(Response.Status.INTERNAL_SERVER_ERROR).entity(rres).build();
         }
     }
@@ -342,6 +342,51 @@ public class HTTPUserInterfaceServlet extends AbstractUserInterfaceServer {
         }
     }
     
+    
+    @GET
+    @Path(HTTPUserInterfaceRestfulConstants.LIST_METADATAS_PATH + "/{path:.*}")
+    @Produces(MediaType.APPLICATION_JSON)
+    public Response listDataObjectMetadataRestful(
+            @DefaultValue("") @PathParam("path") String path) {
+        //if(path == null || path.isEmpty()) {
+        //    throw new IllegalArgumentException("path is null or empty");
+        //}
+        
+        String new_path = path;
+        if(path == null || path.isEmpty()) {
+            // this is the case when cluster + path is "/"
+            // e.g. sgfs:///
+            new_path = "/";
+        }
+        
+        try {
+            DataObjectURI objectUri = new DataObjectURI(new_path);
+            Collection<DataObjectMetadata> objectMetadataList = listDataObjectMetadata(objectUri);        
+            RestfulResponse rres = new RestfulResponse(objectMetadataList.toArray(new DataObjectMetadata[0]));
+            return Response.status(Response.Status.OK).entity(rres).build();
+        } catch(Exception ex) {
+            RestfulResponse rres = new RestfulResponse(ex);
+            return Response.status(Response.Status.INTERNAL_SERVER_ERROR).entity(rres).build();
+        }
+    }
+
+    @Override
+    public Collection<DataObjectMetadata> listDataObjectMetadata(DataObjectURI uri) throws IOException {
+        if(uri == null) {
+            throw new IllegalArgumentException("uri is null");
+        }
+        
+        try {
+            StargateService service = getStargateService();
+            VolumeManager volumeManager = service.getVolumeManager();
+            Directory directory = volumeManager.getDirectory(uri);
+            return directory.getEntries();
+        } catch (ManagerNotInstantiatedException ex) {
+            LOG.error(ex);
+            throw new IOException(ex);
+        }
+    }
+    
     @GET
     @Path(HTTPUserInterfaceRestfulConstants.GET_RECIPE_PATH + "/{path:.*}")
     @Produces(MediaType.APPLICATION_JSON)
@@ -352,12 +397,12 @@ public class HTTPUserInterfaceServlet extends AbstractUserInterfaceServer {
         }
         
         try {
-            DataObjectURI objectUri = new DataObjectURI("", PathUtils.concatPath("/", path));
+            DataObjectURI objectUri = new DataObjectURI(path);
             Recipe recipe = getRecipe(objectUri);
-            RestfulResponse<Recipe> rres = new RestfulResponse<Recipe>(recipe);
+            RestfulResponse rres = new RestfulResponse(recipe);
             return Response.status(Response.Status.OK).entity(rres).build();
         } catch(Exception ex) {
-            RestfulResponse<Recipe> rres = new RestfulResponse<Recipe>(ex);
+            RestfulResponse rres = new RestfulResponse(ex);
             return Response.status(Response.Status.INTERNAL_SERVER_ERROR).entity(rres).build();
         }
     }
@@ -384,10 +429,10 @@ public class HTTPUserInterfaceServlet extends AbstractUserInterfaceServer {
     public Response listRecipesRestful() {
         try {
             Collection<String> recipes = listRecipes();
-            RestfulResponse<Collection<String>> rres = new RestfulResponse<Collection<String>>(recipes);
+            RestfulResponse rres = new RestfulResponse(recipes.toArray(new String[0]));
             return Response.status(Response.Status.OK).entity(rres).build();
         } catch(Exception ex) {
-            RestfulResponse<Collection<String>> rres = new RestfulResponse<Collection<String>>(ex);
+            RestfulResponse rres = new RestfulResponse(ex);
             return Response.status(Response.Status.INTERNAL_SERVER_ERROR).entity(rres).build();
         }
     }
@@ -416,10 +461,10 @@ public class HTTPUserInterfaceServlet extends AbstractUserInterfaceServer {
         try {
             DataObjectURI objectUri = new DataObjectURI("", PathUtils.concatPath("/", path));
             removeRecipe(objectUri);
-            RestfulResponse<Boolean> rres = new RestfulResponse<Boolean>(true);
+            RestfulResponse rres = new RestfulResponse(true);
             return Response.status(Response.Status.OK).entity(rres).build();
         } catch(Exception ex) {
-            RestfulResponse<Boolean> rres = new RestfulResponse<Boolean>(ex);
+            RestfulResponse rres = new RestfulResponse(ex);
             return Response.status(Response.Status.INTERNAL_SERVER_ERROR).entity(rres).build();
         }
     }
@@ -442,10 +487,10 @@ public class HTTPUserInterfaceServlet extends AbstractUserInterfaceServer {
     public Response syncRecipesRestful() {
         try {
             syncRecipes();
-            RestfulResponse<Boolean> rres = new RestfulResponse<Boolean>(true);
+            RestfulResponse rres = new RestfulResponse(true);
             return Response.status(Response.Status.OK).entity(rres).build();
         } catch(Exception ex) {
-            RestfulResponse<Boolean> rres = new RestfulResponse<Boolean>(ex);
+            RestfulResponse rres = new RestfulResponse(ex);
             return Response.status(Response.Status.INTERNAL_SERVER_ERROR).entity(rres).build();
         }
     }
@@ -460,43 +505,6 @@ public class HTTPUserInterfaceServlet extends AbstractUserInterfaceServer {
             LOG.error(ex);
             throw new IOException(ex);
         } catch (RecipeManagerException ex) {
-            LOG.error(ex);
-            throw new IOException(ex);
-        }
-    }
-    
-    @GET
-    @Path(HTTPUserInterfaceRestfulConstants.LIST_METADATAS_PATH + "/{path:.*}")
-    @Produces(MediaType.APPLICATION_JSON)
-    public Response listDataObjectMetadataRestful(
-            @DefaultValue("") @PathParam("path") String path) {
-        if(path == null || path.isEmpty()) {
-            throw new IllegalArgumentException("path is null or empty");
-        }
-        
-        try {
-            DataObjectURI objectUri = new DataObjectURI("", PathUtils.concatPath("/", path));
-            Collection<DataObjectMetadata> objectMetadataList = listDataObjectMetadatas(objectUri);        
-            RestfulResponse<Collection<DataObjectMetadata>> rres = new RestfulResponse<Collection<DataObjectMetadata>>(objectMetadataList);
-            return Response.status(Response.Status.OK).entity(rres).build();
-        } catch(Exception ex) {
-            RestfulResponse<Collection<DataObjectMetadata>> rres = new RestfulResponse<Collection<DataObjectMetadata>>(ex);
-            return Response.status(Response.Status.INTERNAL_SERVER_ERROR).entity(rres).build();
-        }
-    }
-
-    @Override
-    public Collection<DataObjectMetadata> listDataObjectMetadatas(DataObjectURI uri) throws IOException {
-        if(uri == null) {
-            throw new IllegalArgumentException("uri is null");
-        }
-        
-        try {
-            StargateService service = getStargateService();
-            VolumeManager volumeManager = service.getVolumeManager();
-            Directory directory = volumeManager.getDirectory(uri);
-            return directory.getEntries();
-        } catch (ManagerNotInstantiatedException ex) {
             LOG.error(ex);
             throw new IOException(ex);
         }
@@ -575,10 +583,10 @@ public class HTTPUserInterfaceServlet extends AbstractUserInterfaceServer {
         try {
             DataObjectURI objectUri = new DataObjectURI("", PathUtils.concatPath("/", path));
             boolean prefetch = schedulePrefetch(objectUri, hash);
-            RestfulResponse<Boolean> rres = new RestfulResponse<Boolean>(prefetch);
+            RestfulResponse rres = new RestfulResponse(prefetch);
             return Response.status(Response.Status.OK).entity(rres).build();
         } catch(Exception ex) {
-            RestfulResponse<Boolean> rres = new RestfulResponse<Boolean>(ex);
+            RestfulResponse rres = new RestfulResponse(ex);
             return Response.status(Response.Status.INTERNAL_SERVER_ERROR).entity(rres).build();
         }
     }
@@ -615,10 +623,10 @@ public class HTTPUserInterfaceServlet extends AbstractUserInterfaceServer {
         try {
             DataObjectURI objectUri = new DataObjectURI("", PathUtils.concatPath("/", path));
             DataExportEntry mapping = getDataExportEntry(objectUri);    
-            RestfulResponse<DataExportEntry> rres = new RestfulResponse<DataExportEntry>(mapping);
+            RestfulResponse rres = new RestfulResponse(mapping);
             return Response.status(Response.Status.OK).entity(rres).build();
         } catch(Exception ex) {
-            RestfulResponse<DataExportEntry> rres = new RestfulResponse<DataExportEntry>(ex);
+            RestfulResponse rres = new RestfulResponse(ex);
             return Response.status(Response.Status.INTERNAL_SERVER_ERROR).entity(rres).build();
         }
     }
@@ -645,10 +653,10 @@ public class HTTPUserInterfaceServlet extends AbstractUserInterfaceServer {
     public Response listDataExportEntriesRestful() {
         try {
             Collection<String> dataExportEntries = listDataExportEntries();    
-            RestfulResponse<Collection<String>> rres = new RestfulResponse<Collection<String>>(dataExportEntries);
+            RestfulResponse rres = new RestfulResponse(dataExportEntries.toArray(new String[0]));
             return Response.status(Response.Status.OK).entity(rres).build();
         } catch(Exception ex) {
-            RestfulResponse<Collection<String>> rres = new RestfulResponse<Collection<String>>(ex);
+            RestfulResponse rres = new RestfulResponse(ex);
             return Response.status(Response.Status.INTERNAL_SERVER_ERROR).entity(rres).build();
         }
     }
@@ -679,10 +687,10 @@ public class HTTPUserInterfaceServlet extends AbstractUserInterfaceServer {
     public Response getDataExportEntriesRestful() {
         try {
             Collection<DataExportEntry> dataExportEntries = getDataExportEntries();    
-            RestfulResponse<Collection<DataExportEntry>> rres = new RestfulResponse<Collection<DataExportEntry>>(dataExportEntries);
+            RestfulResponse rres = new RestfulResponse(dataExportEntries.toArray(new DataExportEntry[0]));
             return Response.status(Response.Status.OK).entity(rres).build();
         } catch(Exception ex) {
-            RestfulResponse<Collection<DataExportEntry>> rres = new RestfulResponse<Collection<DataExportEntry>>(ex);
+            RestfulResponse rres = new RestfulResponse(ex);
             return Response.status(Response.Status.INTERNAL_SERVER_ERROR).entity(rres).build();
         }
     }
@@ -707,10 +715,10 @@ public class HTTPUserInterfaceServlet extends AbstractUserInterfaceServer {
         try {
             addDataExportEntry(entry);
             
-            RestfulResponse<Boolean> rres = new RestfulResponse<Boolean>(true);
+            RestfulResponse rres = new RestfulResponse(true);
             return Response.status(Response.Status.OK).entity(rres).build();
         } catch(Exception ex) {
-            RestfulResponse<Boolean> rres = new RestfulResponse<Boolean>(ex);
+            RestfulResponse rres = new RestfulResponse(ex);
             return Response.status(Response.Status.INTERNAL_SERVER_ERROR).entity(rres).build();
         }
     }
@@ -742,10 +750,10 @@ public class HTTPUserInterfaceServlet extends AbstractUserInterfaceServer {
         try {
             DataObjectURI objectUri = new DataObjectURI("", PathUtils.concatPath("/", path));
             removeDataExportEntry(objectUri);
-            RestfulResponse<Boolean> rres = new RestfulResponse<Boolean>(true);
+            RestfulResponse rres = new RestfulResponse(true);
             return Response.status(Response.Status.OK).entity(rres).build();
         } catch(Exception ex) {
-            RestfulResponse<Boolean> rres = new RestfulResponse<Boolean>(ex);
+            RestfulResponse rres = new RestfulResponse(ex);
             return Response.status(Response.Status.INTERNAL_SERVER_ERROR).entity(rres).build();
         }
     }
@@ -768,10 +776,10 @@ public class HTTPUserInterfaceServlet extends AbstractUserInterfaceServer {
     public Response listDataSourcesRestful() {
         try {
             Collection<String> dataSources = listDataSources();    
-            RestfulResponse<Collection<String>> rres = new RestfulResponse<Collection<String>>(dataSources);
+            RestfulResponse rres = new RestfulResponse(dataSources.toArray(new String[0]));
             return Response.status(Response.Status.OK).entity(rres).build();
         } catch(Exception ex) {
-            RestfulResponse<Collection<String>> rres = new RestfulResponse<Collection<String>>(ex);
+            RestfulResponse rres = new RestfulResponse(ex);
             return Response.status(Response.Status.INTERNAL_SERVER_ERROR).entity(rres).build();
         }
     }

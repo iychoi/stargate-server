@@ -150,26 +150,7 @@ public class VolumeManager extends AbstractManager<NullDriver> {
         }
     }
     
-    public synchronized void buildLocalDirectoryHierarchy() throws IOException {
-        try {
-            StargateService stargateService = getStargateService();
-            RecipeManager recipeManager = stargateService.getRecipeManager();
-            
-            Collection<Recipe> recipes = recipeManager.getRecipes();
-            List<DataObjectMetadata> metadatas = new ArrayList<DataObjectMetadata>();
-            for(Recipe recipe : recipes) {
-                DataObjectMetadata metadata = recipe.getMetadata();
-                metadatas.add(metadata);
-            }
-            
-            buildLocalDirectoryHierarchy(metadatas);
-        } catch (ManagerNotInstantiatedException ex) {
-            LOG.info(ex);
-            throw new IOException(ex);
-        }
-    }
-    
-    public synchronized void buildLocalDirectoryHierarchy(Collection<DataObjectMetadata> metadatas) throws IOException {
+    private void buildLocalDirectoryHierarchy(Collection<DataObjectMetadata> metadatas) throws IOException {
         if(metadatas == null) {
             throw new IllegalArgumentException("metadatas is null or empty");
         }
@@ -234,12 +215,31 @@ public class VolumeManager extends AbstractManager<NullDriver> {
         }
     }
     
+    public synchronized void buildLocalDirectoryHierarchy() throws IOException {
+        try {
+            StargateService stargateService = getStargateService();
+            RecipeManager recipeManager = stargateService.getRecipeManager();
+            
+            Collection<Recipe> recipes = recipeManager.getRecipes();
+            List<DataObjectMetadata> metadatas = new ArrayList<DataObjectMetadata>();
+            for(Recipe recipe : recipes) {
+                DataObjectMetadata metadata = recipe.getMetadata();
+                metadatas.add(metadata);
+            }
+            
+            buildLocalDirectoryHierarchy(metadatas);
+        } catch (ManagerNotInstantiatedException ex) {
+            LOG.info(ex);
+            throw new IOException(ex);
+        }
+    }
+    
     private boolean isLocalCluster(String clusterName) throws IOException {
         if(clusterName == null || clusterName.isEmpty()) {
             throw new IllegalArgumentException("clusterName is null or empty");
         }
         
-        if(clusterName.equalsIgnoreCase("localhost")) {
+        if(clusterName.equalsIgnoreCase("local")) {
             return true;
         } else {
             try {
@@ -272,25 +272,25 @@ public class VolumeManager extends AbstractManager<NullDriver> {
         return false;
     }
     
-    private DataObjectURI makeAbsolutePath(DataObjectURI path) throws IOException {
-        if(path.isRoot()) {
-            return path;
+    private DataObjectURI makeAbsolutePath(DataObjectURI uri) throws IOException {
+        if(uri.isRoot()) {
+            return uri;
         }
         
-        String clusterName = path.getClusterName();
-        if(clusterName == null || clusterName.isEmpty() || clusterName.equalsIgnoreCase("localhost")) {
+        String clusterName = uri.getClusterName();
+        if(clusterName == null || clusterName.isEmpty() || clusterName.equalsIgnoreCase("local")) {
             try {
                 StargateService stargateService = getStargateService();
                 ClusterManager clusterManager = stargateService.getClusterManager();
                 Cluster localCluster = clusterManager.getLocalCluster();
-                return new DataObjectURI(localCluster.getName(), path.getPath());
+                return new DataObjectURI(localCluster.getName(), uri.getPath());
             } catch (ManagerNotInstantiatedException ex) {
-                LOG.info(ex);
+                LOG.error(ex);
                 throw new IOException(ex);
             }
         }
         
-        return path;
+        return uri;
     }
     
     public synchronized Directory getDirectory(DataObjectURI uri) throws IOException, FileNotFoundException {
@@ -528,7 +528,7 @@ public class VolumeManager extends AbstractManager<NullDriver> {
             if(sourcecMetadata == null || !sourcecMetadata.exist()) {
                 throw new IOException(String.format("cannot find a source file (%s)", sourceURI.toASCIIString()));
             }
-            return dataSourceDriver.openFile(sourcecMetadata.getURI());
+            return dataSourceDriver.openFile(sourcecMetadata.getURI(), chunk.getOffset(), chunk.getLength());
         } catch (ManagerNotInstantiatedException ex) {
             LOG.info(ex);
             throw new IOException(ex);

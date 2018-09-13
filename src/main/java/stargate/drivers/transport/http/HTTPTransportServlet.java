@@ -40,7 +40,6 @@ import stargate.commons.manager.ManagerNotInstantiatedException;
 import stargate.commons.recipe.Recipe;
 import stargate.commons.restful.RestfulResponse;
 import stargate.commons.transport.AbstractTransportServer;
-import stargate.commons.utils.PathUtils;
 import stargate.managers.cluster.ClusterManager;
 import stargate.managers.volume.VolumeManager;
 import stargate.service.StargateService;
@@ -78,10 +77,10 @@ public class HTTPTransportServlet extends AbstractTransportServer {
     @Produces(MediaType.APPLICATION_JSON)
     public Response isLiveRestful() {
         try {
-            RestfulResponse<Boolean> rres = new RestfulResponse<Boolean>(isLive());
+            RestfulResponse rres = new RestfulResponse(isLive());
             return Response.status(Response.Status.OK).entity(rres).build();
         } catch(Exception ex) {
-            RestfulResponse<Boolean> rres = new RestfulResponse<Boolean>(ex);
+            RestfulResponse rres = new RestfulResponse(ex);
             return Response.status(Response.Status.INTERNAL_SERVER_ERROR).entity(rres).build();
         }
     }
@@ -96,10 +95,11 @@ public class HTTPTransportServlet extends AbstractTransportServer {
     @Produces(MediaType.APPLICATION_JSON)
     public Response getClusterRestful() {
         try {
-            RestfulResponse<Cluster> rres = new RestfulResponse<Cluster>(getCluster());
+            Cluster cluster = getCluster();
+            RestfulResponse rres = new RestfulResponse(cluster);
             return Response.status(Response.Status.OK).entity(rres).build();
         } catch(Exception ex) {
-            RestfulResponse<Cluster> rres = new RestfulResponse<Cluster>(ex);
+            RestfulResponse rres = new RestfulResponse(ex);
             return Response.status(Response.Status.INTERNAL_SERVER_ERROR).entity(rres).build();
         }
     }
@@ -126,14 +126,14 @@ public class HTTPTransportServlet extends AbstractTransportServer {
         }
         
         try {
-            DataObjectURI objectUri = new DataObjectURI("", PathUtils.concatPath("/", path));
+            DataObjectURI objectUri = new DataObjectURI(path);
             DataObjectMetadata objectMetadata = getDataObjectMetadata(objectUri);
-            RestfulResponse<DataObjectMetadata> rres = new RestfulResponse<DataObjectMetadata>(objectMetadata);
+            RestfulResponse rres = new RestfulResponse(objectMetadata);
             return Response.status(Response.Status.OK).entity(rres).build();
         } catch(FileNotFoundException ex) {
             return Response.status(Response.Status.NOT_FOUND).entity(ex.toString()).build();
         } catch(Exception ex) {
-            RestfulResponse<DataObjectMetadata> rres = new RestfulResponse<DataObjectMetadata>(ex);
+            RestfulResponse rres = new RestfulResponse(ex);
             return Response.status(Response.Status.INTERNAL_SERVER_ERROR).entity(rres).build();
         }
     }
@@ -155,57 +155,28 @@ public class HTTPTransportServlet extends AbstractTransportServer {
     }
     
     @GET
-    @Path(HTTPTransportRestfulConstants.GET_RECIPE_PATH + "/{path:.*}")
-    @Produces(MediaType.APPLICATION_JSON)
-    public Response getRecipeRestful(
-        @DefaultValue("") @PathParam("path") String path) {
-        if(path == null || path.isEmpty()) {
-            throw new IllegalArgumentException("path is null or empty");
-        }
-        
-        try {
-            DataObjectURI objectUri = new DataObjectURI("", PathUtils.concatPath("/", path));
-            Recipe recipe = getRecipe(objectUri);
-            RestfulResponse<Recipe> rres = new RestfulResponse<Recipe>(recipe);
-            return Response.status(Response.Status.OK).entity(rres).build();
-        } catch(Exception ex) {
-            RestfulResponse<Recipe> rres = new RestfulResponse<Recipe>(ex);
-            return Response.status(Response.Status.INTERNAL_SERVER_ERROR).entity(rres).build();
-        }
-    }
-    
-    @Override
-    public Recipe getRecipe(DataObjectURI uri) throws IOException {
-        if(uri == null) {
-            throw new IllegalArgumentException("uri is null");
-        }
-        
-        try {
-            StargateService service = getStargateService();
-            VolumeManager volumeManager = service.getVolumeManager();
-            return volumeManager.getRecipe(uri);
-        } catch (ManagerNotInstantiatedException ex) {
-            LOG.error(ex);
-            throw new IOException(ex);
-        }
-    }
-    
-    @GET
     @Path(HTTPTransportRestfulConstants.LIST_METADATA_PATH + "/{path:.*}")
     @Produces(MediaType.APPLICATION_JSON)
     public Response listDataObjectMetadataRestful(
             @DefaultValue("") @PathParam("path") String path) {
+        //if(path == null || path.isEmpty()) {
+        //    throw new IllegalArgumentException("path is null or empty");
+        //}
+        
+        String new_path = path;
         if(path == null || path.isEmpty()) {
-            throw new IllegalArgumentException("path is null or empty");
+            // this is the case when cluster + path is "/"
+            // e.g. sgfs:///
+            new_path = "/";
         }
         
         try {
-            DataObjectURI objectUri = new DataObjectURI("", PathUtils.concatPath("/", path));
+            DataObjectURI objectUri = new DataObjectURI(new_path);
             Collection<DataObjectMetadata> objectMetadataList = listDataObjectMetadata(objectUri);
-            RestfulResponse<Collection<DataObjectMetadata>> rres = new RestfulResponse<Collection<DataObjectMetadata>>(objectMetadataList);
+            RestfulResponse rres = new RestfulResponse(objectMetadataList.toArray(new DataObjectMetadata[0]));
             return Response.status(Response.Status.OK).entity(rres).build();
         } catch(Exception ex) {
-            RestfulResponse<Collection<DataObjectMetadata>> rres = new RestfulResponse<Collection<DataObjectMetadata>>(ex);
+            RestfulResponse rres = new RestfulResponse(ex);
             return Response.status(Response.Status.INTERNAL_SERVER_ERROR).entity(rres).build();
         }
     }
@@ -228,21 +199,64 @@ public class HTTPTransportServlet extends AbstractTransportServer {
     }
     
     @GET
-    @Path(HTTPTransportRestfulConstants.GET_DIRECTORY_PATH + "/{path:.*}")
+    @Path(HTTPTransportRestfulConstants.GET_RECIPE_PATH + "/{path:.*}")
     @Produces(MediaType.APPLICATION_JSON)
-    public Response getDirectoryRestful(
-            @DefaultValue("") @PathParam("path") String path) {
+    public Response getRecipeRestful(
+        @DefaultValue("") @PathParam("path") String path) {
         if(path == null || path.isEmpty()) {
             throw new IllegalArgumentException("path is null or empty");
         }
         
         try {
-            DataObjectURI objectUri = new DataObjectURI("", PathUtils.concatPath("/", path));
-            Directory directory = getDirectory(objectUri);
-            RestfulResponse<Directory> rres = new RestfulResponse<Directory>(directory);
+            DataObjectURI objectUri = new DataObjectURI(path);
+            Recipe recipe = getRecipe(objectUri);
+            RestfulResponse rres = new RestfulResponse(recipe);
             return Response.status(Response.Status.OK).entity(rres).build();
         } catch(Exception ex) {
-            RestfulResponse<Directory> rres = new RestfulResponse<Directory>(ex);
+            RestfulResponse rres = new RestfulResponse(ex);
+            return Response.status(Response.Status.INTERNAL_SERVER_ERROR).entity(rres).build();
+        }
+    }
+    
+    @Override
+    public Recipe getRecipe(DataObjectURI uri) throws IOException {
+        if(uri == null) {
+            throw new IllegalArgumentException("uri is null");
+        }
+        
+        try {
+            StargateService service = getStargateService();
+            VolumeManager volumeManager = service.getVolumeManager();
+            return volumeManager.getRecipe(uri);
+        } catch (ManagerNotInstantiatedException ex) {
+            LOG.error(ex);
+            throw new IOException(ex);
+        }
+    }
+    
+    @GET
+    @Path(HTTPTransportRestfulConstants.GET_DIRECTORY_PATH + "/{path:.*}")
+    @Produces(MediaType.APPLICATION_JSON)
+    public Response getDirectoryRestful(
+            @DefaultValue("") @PathParam("path") String path) {
+        //if(path == null || path.isEmpty()) {
+        //    throw new IllegalArgumentException("path is null or empty");
+        //}
+        
+        String new_path = path;
+        if(path == null || path.isEmpty()) {
+            // this is the case when cluster + path is "/"
+            // e.g. sgfs:///
+            new_path = "/";
+        }
+        
+        try {
+            DataObjectURI objectUri = new DataObjectURI(new_path);
+            Directory directory = getDirectory(objectUri);
+            RestfulResponse rres = new RestfulResponse(directory);
+            return Response.status(Response.Status.OK).entity(rres).build();
+        } catch(Exception ex) {
+            RestfulResponse rres = new RestfulResponse(ex);
             return Response.status(Response.Status.INTERNAL_SERVER_ERROR).entity(rres).build();
         }
     }
