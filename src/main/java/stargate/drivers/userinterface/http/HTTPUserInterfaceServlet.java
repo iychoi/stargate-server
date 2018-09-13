@@ -93,7 +93,7 @@ public class HTTPUserInterfaceServlet extends AbstractUserInterfaceServer {
     @GET
     @Path(HTTPUserInterfaceRestfulConstants.API_PATH + "/" + HTTPUserInterfaceRestfulConstants.API_CHECK_LIVE_PATH)
     @Produces(MediaType.APPLICATION_JSON)
-    public Response isLiveRestful() {
+    public Response isLiveRestful() throws IOException {
         try {
             boolean live = isLive();
             RestfulResponse rres = new RestfulResponse(live);
@@ -112,7 +112,7 @@ public class HTTPUserInterfaceServlet extends AbstractUserInterfaceServer {
     @GET
     @Path(HTTPUserInterfaceRestfulConstants.API_PATH + "/" + HTTPUserInterfaceRestfulConstants.API_GET_SERVICE_CONFIG_PATH)
     @Produces(MediaType.APPLICATION_JSON)
-    public Response getServiceConfigRestful() {
+    public Response getServiceConfigRestful() throws IOException {
         try {
             StargateServiceConfig config = (StargateServiceConfig) getServiceConfig();
             RestfulResponse rres = new RestfulResponse(config);
@@ -132,7 +132,7 @@ public class HTTPUserInterfaceServlet extends AbstractUserInterfaceServer {
     @GET
     @Path(HTTPUserInterfaceRestfulConstants.API_PATH + "/" + HTTPUserInterfaceRestfulConstants.API_GET_CLUSTER_PATH)
     @Produces(MediaType.APPLICATION_JSON)
-    public Response getClusterRestful() {
+    public Response getClusterRestful() throws IOException {
         try {
             Cluster cluster = getCluster();
             RestfulResponse rres = new RestfulResponse(cluster);
@@ -159,7 +159,7 @@ public class HTTPUserInterfaceServlet extends AbstractUserInterfaceServer {
     @Path(HTTPUserInterfaceRestfulConstants.API_PATH + "/" + HTTPUserInterfaceRestfulConstants.API_GET_REMOTE_CLUSTER_PATH + "/{path:.*}")
     @Produces(MediaType.APPLICATION_JSON)
     public Response getRemoteClusterRestful(
-        @DefaultValue("") @PathParam("path") String path) {
+        @DefaultValue("") @PathParam("path") String path) throws IOException {
         if(path == null || path.isEmpty()) {
             throw new IllegalArgumentException("path is null or empty");
         }
@@ -193,7 +193,7 @@ public class HTTPUserInterfaceServlet extends AbstractUserInterfaceServer {
     @GET
     @Path(HTTPUserInterfaceRestfulConstants.API_PATH + "/" + HTTPUserInterfaceRestfulConstants.API_LIST_REMOTE_CLUSTERS_PATH)
     @Produces(MediaType.APPLICATION_JSON)
-    public Response listRemoteClustersRestful() {
+    public Response listRemoteClustersRestful() throws IOException {
         try {
             Collection<String> remoteClusters = listRemoteClusters();
             RestfulResponse rres = new RestfulResponse(remoteClusters.toArray(new String[0]));
@@ -219,7 +219,7 @@ public class HTTPUserInterfaceServlet extends AbstractUserInterfaceServer {
     @GET
     @Path(HTTPUserInterfaceRestfulConstants.API_PATH + "/" + HTTPUserInterfaceRestfulConstants.API_GET_REMOTE_CLUSTERS_PATH)
     @Produces(MediaType.APPLICATION_JSON)
-    public Response getRemoteClustersRestful() {
+    public Response getRemoteClustersRestful() throws IOException {
         try {
             Collection<Cluster> remoteClusters = getRemoteClusters();
             RestfulResponse rres = new RestfulResponse(remoteClusters.toArray(new Cluster[0]));
@@ -246,7 +246,7 @@ public class HTTPUserInterfaceServlet extends AbstractUserInterfaceServer {
     @Path(HTTPUserInterfaceRestfulConstants.API_PATH + "/" + HTTPUserInterfaceRestfulConstants.API_ADD_REMOTE_CLUSTER_PATH)
     @Produces(MediaType.APPLICATION_JSON)
     @Consumes(MediaType.APPLICATION_JSON)
-    public Response addRemoteClusterRestful(Cluster cluster) {
+    public Response addRemoteClusterRestful(Cluster cluster) throws IOException {
         try {
             addRemoteCluster(cluster);
             
@@ -277,7 +277,7 @@ public class HTTPUserInterfaceServlet extends AbstractUserInterfaceServer {
     @Path(HTTPUserInterfaceRestfulConstants.API_PATH + "/" + HTTPUserInterfaceRestfulConstants.API_REMOVE_REMOTE_CLUSTER_PATH + "/{path: .*}")
     @Produces(MediaType.APPLICATION_JSON)
     public Response removeRemoteClusterRestful(
-            @DefaultValue("") @PathParam("path") String path) {
+            @DefaultValue("") @PathParam("path") String path) throws IOException {
         if(path == null || path.isEmpty()) {
             throw new IllegalArgumentException("path is null or empty");
         }
@@ -308,18 +308,26 @@ public class HTTPUserInterfaceServlet extends AbstractUserInterfaceServer {
     @Path(HTTPUserInterfaceRestfulConstants.GET_METADATA_PATH + "/{path:.*}")
     @Produces(MediaType.APPLICATION_JSON)
     public Response getDataObjectMetadataRestful(
-        @DefaultValue("") @PathParam("path") String path) {
+        @DefaultValue("") @PathParam("path") String path) throws IOException {
+        //if(path == null || path.isEmpty()) {
+        //    throw new IllegalArgumentException("path is null or empty");
+        //}
+        
+        String new_path = path;
         if(path == null || path.isEmpty()) {
-            throw new IllegalArgumentException("path is null or empty");
+            // this is the case when cluster + path is "/"
+            // e.g. sgfs:///
+            new_path = "/";
         }
         
         try {
-            DataObjectURI objectUri = new DataObjectURI(path);
+            DataObjectURI objectUri = new DataObjectURI(new_path);
             DataObjectMetadata objectMetadata = getDataObjectMetadata(objectUri);
             RestfulResponse rres = new RestfulResponse(objectMetadata);
             return Response.status(Response.Status.OK).entity(rres).build();
         } catch(FileNotFoundException ex) {
-            return Response.status(Response.Status.NOT_FOUND).entity(ex.toString()).build();
+            RestfulResponse rres = new RestfulResponse(ex);
+            return Response.status(Response.Status.NOT_FOUND).entity(rres).build();
         } catch(Exception ex) {
             RestfulResponse rres = new RestfulResponse(ex);
             return Response.status(Response.Status.INTERNAL_SERVER_ERROR).entity(rres).build();
@@ -347,7 +355,7 @@ public class HTTPUserInterfaceServlet extends AbstractUserInterfaceServer {
     @Path(HTTPUserInterfaceRestfulConstants.LIST_METADATAS_PATH + "/{path:.*}")
     @Produces(MediaType.APPLICATION_JSON)
     public Response listDataObjectMetadataRestful(
-            @DefaultValue("") @PathParam("path") String path) {
+            @DefaultValue("") @PathParam("path") String path) throws IOException {
         //if(path == null || path.isEmpty()) {
         //    throw new IllegalArgumentException("path is null or empty");
         //}
@@ -391,7 +399,7 @@ public class HTTPUserInterfaceServlet extends AbstractUserInterfaceServer {
     @Path(HTTPUserInterfaceRestfulConstants.GET_RECIPE_PATH + "/{path:.*}")
     @Produces(MediaType.APPLICATION_JSON)
     public Response getRecipeRestful(
-        @DefaultValue("") @PathParam("path") String path) {
+        @DefaultValue("") @PathParam("path") String path) throws IOException {
         if(path == null || path.isEmpty()) {
             throw new IllegalArgumentException("path is null or empty");
         }
@@ -426,7 +434,7 @@ public class HTTPUserInterfaceServlet extends AbstractUserInterfaceServer {
     @GET
     @Path(HTTPUserInterfaceRestfulConstants.API_PATH + "/" + HTTPUserInterfaceRestfulConstants.API_LIST_RECIPES_PATH)
     @Produces(MediaType.APPLICATION_JSON)
-    public Response listRecipesRestful() {
+    public Response listRecipesRestful() throws IOException {
         try {
             Collection<String> recipes = listRecipes();
             RestfulResponse rres = new RestfulResponse(recipes.toArray(new String[0]));
@@ -453,7 +461,7 @@ public class HTTPUserInterfaceServlet extends AbstractUserInterfaceServer {
     @Path(HTTPUserInterfaceRestfulConstants.API_PATH + "/" + HTTPUserInterfaceRestfulConstants.API_REMOVE_RECIPE_PATH + "/{path: .*}")
     @Produces(MediaType.APPLICATION_JSON)
     public Response removeRecipeRestful(
-            @DefaultValue("") @PathParam("path") String path) {
+            @DefaultValue("") @PathParam("path") String path) throws IOException {
         if(path == null || path.isEmpty()) {
             throw new IllegalArgumentException("path is null or empty");
         }
@@ -484,7 +492,7 @@ public class HTTPUserInterfaceServlet extends AbstractUserInterfaceServer {
     @POST
     @Path(HTTPUserInterfaceRestfulConstants.API_PATH + "/" + HTTPUserInterfaceRestfulConstants.API_SYNC_RECIPES_PATH)
     @Produces(MediaType.APPLICATION_JSON)
-    public Response syncRecipesRestful() {
+    public Response syncRecipesRestful() throws IOException {
         try {
             syncRecipes();
             RestfulResponse rres = new RestfulResponse(true);
@@ -571,7 +579,7 @@ public class HTTPUserInterfaceServlet extends AbstractUserInterfaceServer {
     @Produces(MediaType.APPLICATION_JSON)
     public Response schedulePrefetchRestful(
         @DefaultValue("") @PathParam("path") String path,
-        @DefaultValue("") @PathParam("hash") String hash) {
+        @DefaultValue("") @PathParam("hash") String hash) throws IOException {
         if(path == null || path.isEmpty()) {
             throw new IllegalArgumentException("path is null or empty");
         }
@@ -615,7 +623,7 @@ public class HTTPUserInterfaceServlet extends AbstractUserInterfaceServer {
     @Path(HTTPUserInterfaceRestfulConstants.API_PATH + "/" + HTTPUserInterfaceRestfulConstants.API_GET_DATA_EXPORT_ENTRY_PATH + "/{path:.*}")
     @Produces(MediaType.APPLICATION_JSON)
     public Response getDataExportEntryRestful(
-            @DefaultValue("") @PathParam("path") String path) {
+            @DefaultValue("") @PathParam("path") String path) throws IOException {
         if(path == null || path.isEmpty()) {
             throw new IllegalArgumentException("path is null or empty");
         }
@@ -650,7 +658,7 @@ public class HTTPUserInterfaceServlet extends AbstractUserInterfaceServer {
     @GET
     @Path(HTTPUserInterfaceRestfulConstants.API_PATH + "/" + HTTPUserInterfaceRestfulConstants.API_LIST_DATA_EXPORT_ENTRIES_PATH)
     @Produces(MediaType.APPLICATION_JSON)
-    public Response listDataExportEntriesRestful() {
+    public Response listDataExportEntriesRestful() throws IOException {
         try {
             Collection<String> dataExportEntries = listDataExportEntries();    
             RestfulResponse rres = new RestfulResponse(dataExportEntries.toArray(new String[0]));
@@ -684,7 +692,7 @@ public class HTTPUserInterfaceServlet extends AbstractUserInterfaceServer {
     @GET
     @Path(HTTPUserInterfaceRestfulConstants.API_PATH + "/" + HTTPUserInterfaceRestfulConstants.API_GET_DATA_EXPORT_ENTRIES_PATH)
     @Produces(MediaType.APPLICATION_JSON)
-    public Response getDataExportEntriesRestful() {
+    public Response getDataExportEntriesRestful() throws IOException {
         try {
             Collection<DataExportEntry> dataExportEntries = getDataExportEntries();    
             RestfulResponse rres = new RestfulResponse(dataExportEntries.toArray(new DataExportEntry[0]));
@@ -711,7 +719,7 @@ public class HTTPUserInterfaceServlet extends AbstractUserInterfaceServer {
     @Path(HTTPUserInterfaceRestfulConstants.API_PATH + "/" + HTTPUserInterfaceRestfulConstants.API_ADD_DATA_EXPORT_ENTRY_PATH)
     @Produces(MediaType.APPLICATION_JSON)
     @Consumes(MediaType.APPLICATION_JSON)
-    public Response addDataExportEntryRestful(DataExportEntry entry) {
+    public Response addDataExportEntryRestful(DataExportEntry entry) throws IOException {
         try {
             addDataExportEntry(entry);
             
@@ -742,7 +750,7 @@ public class HTTPUserInterfaceServlet extends AbstractUserInterfaceServer {
     @Path(HTTPUserInterfaceRestfulConstants.API_PATH + "/" + HTTPUserInterfaceRestfulConstants.API_REMOVE_DATA_EXPORT_ENTRY_PATH + "/{path: .*}")
     @Produces(MediaType.APPLICATION_JSON)
     public Response removeDataExportEntryRestful(
-            @DefaultValue("") @PathParam("path") String path) {
+            @DefaultValue("") @PathParam("path") String path) throws IOException {
         if(path == null || path.isEmpty()) {
             throw new IllegalArgumentException("path is null or empty");
         }
@@ -773,7 +781,7 @@ public class HTTPUserInterfaceServlet extends AbstractUserInterfaceServer {
     @GET
     @Path(HTTPUserInterfaceRestfulConstants.API_PATH + "/" + HTTPUserInterfaceRestfulConstants.API_LIST_DATA_SOURCES_PATH)
     @Produces(MediaType.APPLICATION_JSON)
-    public Response listDataSourcesRestful() {
+    public Response listDataSourcesRestful() throws IOException {
         try {
             Collection<String> dataSources = listDataSources();    
             RestfulResponse rres = new RestfulResponse(dataSources.toArray(new String[0]));

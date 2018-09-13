@@ -114,7 +114,6 @@ public class Clusters {
         try {
             CommandParser parser = new CommandParser();
             parser.parse(args);
-            parser.setLoggerLevel(LOG);
             
             String[] positionalArgs = parser.getPositionalArgs();
             if(positionalArgs.length >= 1) {

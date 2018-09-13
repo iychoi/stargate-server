@@ -16,6 +16,7 @@
 package stargate.admin.cli;
 
 import java.io.File;
+import java.io.FileNotFoundException;
 import java.io.FileOutputStream;
 import java.io.IOException;
 import java.io.InputStream;
@@ -38,7 +39,7 @@ import stargate.drivers.userinterface.http.HTTPUserInterfaceClient;
  */
 public class FileSystem {
     private static final Log LOG = LogFactory.getLog(FileSystem.class);
-
+    
     private enum COMMAND_LV1 {
         CMD_LV1_LIST("ls"),
         CMD_LV1_RECIPE("recipe"),
@@ -69,7 +70,6 @@ public class FileSystem {
         try {
             CommandParser parser = new CommandParser();
             parser.parse(args);
-            parser.setLoggerLevel(LOG);
             
             String[] positionalArgs = parser.getPositionalArgs();
             if(positionalArgs.length != 0) {
@@ -128,17 +128,29 @@ public class FileSystem {
     }
     
     private static void process_fs_list(URI serviceURI, String stargatePath) {
+        DataObjectURI uri = new DataObjectURI(stargatePath);
+        
         try {
             HTTPUserInterfaceClient client = HTTPUIClient.getClient(serviceURI);
             client.connect();
-            DataObjectURI uri = new DataObjectURI(stargatePath);
-            Collection<DataObjectMetadata> listDataObjectMetadatas = client.listDataObjectMetadata(uri);
-            if(listDataObjectMetadatas == null || listDataObjectMetadatas.isEmpty()) {
-                System.out.println("<EMPTY!>");
-            } else {
-                for(DataObjectMetadata metadata : listDataObjectMetadatas) {
+            try {
+                DataObjectMetadata metadata = client.getDataObjectMetadata(uri);
+                if(metadata == null) {
+                    System.out.println(String.format("<%s not exist!>", uri.toString()));
+                } else if(!metadata.isDirectory()) {
                     System.out.println(formatDataObjectMetadata(metadata));
+                } else {
+                    Collection<DataObjectMetadata> listDataObjectMetadatas = client.listDataObjectMetadata(uri);
+                    if(listDataObjectMetadatas == null || listDataObjectMetadatas.isEmpty()) {
+                        System.out.println("<EMPTY!>");
+                    } else {
+                        for(DataObjectMetadata m : listDataObjectMetadatas) {
+                            System.out.println(formatDataObjectMetadata(m));
+                        }
+                    }
                 }
+            } catch (FileNotFoundException ex) {
+                System.out.println(String.format("<%s not exist!>", uri.toString()));
             }
             String dateTimeString = DateTimeUtils.getDateTimeString(client.getLastActiveTime());
             System.out.println(String.format("<Request processed %s>", dateTimeString));
@@ -151,17 +163,29 @@ public class FileSystem {
     }
 
     private static void process_fs_recipe(URI serviceURI, String stargatePath) {
+        DataObjectURI uri = new DataObjectURI(stargatePath);
+        
         try {
             HTTPUserInterfaceClient client = HTTPUIClient.getClient(serviceURI);
             client.connect();
-            DataObjectURI uri = new DataObjectURI(stargatePath);
-            Recipe recipe = client.getRecipe(uri);
-            if(recipe == null) {
-                System.out.println("<ENTRY DOES NOT EXIST!>");
-            } else {
-                JsonSerializer serializer = new JsonSerializer();
-                String json = serializer.formatPretty(recipe.toJson());
-                System.out.println(json);
+            try {
+                DataObjectMetadata metadata = client.getDataObjectMetadata(uri);
+                if(metadata == null) {
+                    System.out.println(String.format("<%s not exist!>", uri.toString()));
+                } else if(metadata.isDirectory()) {
+                    System.out.println(String.format("<%s is a directory!>", uri.toString()));
+                } else {
+                    Recipe recipe = client.getRecipe(uri);
+                    if(recipe == null) {
+                        System.out.println("<ENTRY DOES NOT EXIST!>");
+                    } else {
+                        JsonSerializer serializer = new JsonSerializer();
+                        String json = serializer.formatPretty(recipe.toJson());
+                        System.out.println(json);
+                    }
+                }
+            } catch (FileNotFoundException ex) {
+                System.out.println(String.format("<%s not exist!>", uri.toString()));
             }
             String dateTimeString = DateTimeUtils.getDateTimeString(client.getLastActiveTime());
             System.out.println(String.format("<Request processed %s>", dateTimeString));
@@ -174,35 +198,47 @@ public class FileSystem {
     }
 
     private static void process_fs_get(URI serviceURI, String stargatePath, String targetPath) {
+        DataObjectURI uri = new DataObjectURI(stargatePath);
+        
         try {
             HTTPUserInterfaceClient client = HTTPUIClient.getClient(serviceURI);
             client.connect();
-            DataObjectURI uri = new DataObjectURI(stargatePath);
-            LOG.debug("Downloading a recipe");
-            Recipe recipe = client.getRecipe(uri);
-            if(recipe == null) {
-                System.out.println("<ENTRY DOES NOT EXIST!>");
-            } else {
-                File f = (new File(targetPath)).getAbsoluteFile();
-                if(f.isDirectory()) {
-                    f = new File(f, PathUtils.getFileName(stargatePath));
-                }
+            try {
+                DataObjectMetadata metadata = client.getDataObjectMetadata(uri);
+                if(metadata == null) {
+                    System.out.println(String.format("<%s not exist!>", uri.toString()));
+                } else if(metadata.isDirectory()) {
+                    System.out.println(String.format("<%s is a directory!>", uri.toString()));
+                } else {
+                    LOG.debug("Downloading a recipe");
+                    Recipe recipe = client.getRecipe(uri);
+                    if(recipe == null) {
+                        System.out.println("<Recipe does not exist!>");
+                    } else {
+                        File f = (new File(targetPath)).getAbsoluteFile();
+                        if(f.isDirectory()) {
+                            f = new File(f, PathUtils.getFileName(stargatePath));
+                        }
 
-                FileOutputStream fos = new FileOutputStream(f);
-                int bufferlen = 1024*4;
-                byte[] buffer = new byte[bufferlen];
-                Collection<RecipeChunk> chunks = recipe.getChunks();
-                for(RecipeChunk chunk : chunks) {
-                    String hash = chunk.getHashString();
-                    LOG.debug(String.format("Downloading a chunk for a hash %s", hash));
-                    InputStream is = client.getDataChunk(hash);
-                    int readLen = 0;
-                    while((readLen = is.read(buffer, 0, bufferlen)) > 0) {
-                        fos.write(buffer, 0, readLen);
+                        FileOutputStream fos = new FileOutputStream(f);
+                        int bufferlen = 1024*4;
+                        byte[] buffer = new byte[bufferlen];
+                        Collection<RecipeChunk> chunks = recipe.getChunks();
+                        for(RecipeChunk chunk : chunks) {
+                            String hash = chunk.getHashString();
+                            LOG.debug(String.format("Downloading a chunk for a hash %s", hash));
+                            InputStream is = client.getDataChunk(hash);
+                            int readLen = 0;
+                            while((readLen = is.read(buffer, 0, bufferlen)) > 0) {
+                                fos.write(buffer, 0, readLen);
+                            }
+                            is.close();
+                        }
+                        fos.close();
                     }
-                    is.close();
                 }
-                fos.close();
+            } catch (FileNotFoundException ex) {
+                System.out.println(String.format("<%s not exist!>", uri.toString()));
             }
             String dateTimeString = DateTimeUtils.getDateTimeString(client.getLastActiveTime());
             System.out.println(String.format("<Request processed %s>", dateTimeString));

@@ -75,7 +75,7 @@ public class HTTPTransportServlet extends AbstractTransportServer {
     @GET
     @Path(HTTPTransportRestfulConstants.API_PATH + "/" + HTTPTransportRestfulConstants.API_CHECK_LIVE_PATH)
     @Produces(MediaType.APPLICATION_JSON)
-    public Response isLiveRestful() {
+    public Response isLiveRestful() throws IOException {
         try {
             RestfulResponse rres = new RestfulResponse(isLive());
             return Response.status(Response.Status.OK).entity(rres).build();
@@ -93,7 +93,7 @@ public class HTTPTransportServlet extends AbstractTransportServer {
     @GET
     @Path(HTTPTransportRestfulConstants.API_PATH + "/" + HTTPTransportRestfulConstants.API_GET_CLUSTER_PATH)
     @Produces(MediaType.APPLICATION_JSON)
-    public Response getClusterRestful() {
+    public Response getClusterRestful() throws IOException {
         try {
             Cluster cluster = getCluster();
             RestfulResponse rres = new RestfulResponse(cluster);
@@ -120,18 +120,26 @@ public class HTTPTransportServlet extends AbstractTransportServer {
     @Path(HTTPTransportRestfulConstants.GET_METADATA_PATH + "/{path:.*}")
     @Produces(MediaType.APPLICATION_JSON)
     public Response getDataObjectMetadataRestful(
-        @DefaultValue("") @PathParam("path") String path) {
+        @DefaultValue("") @PathParam("path") String path) throws IOException {
+        //if(path == null || path.isEmpty()) {
+        //    throw new IllegalArgumentException("path is null or empty");
+        //}
+        
+        String new_path = path;
         if(path == null || path.isEmpty()) {
-            throw new IllegalArgumentException("path is null or empty");
+            // this is the case when cluster + path is "/"
+            // e.g. sgfs:///
+            new_path = "/";
         }
         
         try {
-            DataObjectURI objectUri = new DataObjectURI(path);
+            DataObjectURI objectUri = new DataObjectURI(new_path);
             DataObjectMetadata objectMetadata = getDataObjectMetadata(objectUri);
             RestfulResponse rres = new RestfulResponse(objectMetadata);
             return Response.status(Response.Status.OK).entity(rres).build();
         } catch(FileNotFoundException ex) {
-            return Response.status(Response.Status.NOT_FOUND).entity(ex.toString()).build();
+            RestfulResponse rres = new RestfulResponse(ex);
+            return Response.status(Response.Status.NOT_FOUND).entity(rres).build();
         } catch(Exception ex) {
             RestfulResponse rres = new RestfulResponse(ex);
             return Response.status(Response.Status.INTERNAL_SERVER_ERROR).entity(rres).build();
@@ -158,7 +166,7 @@ public class HTTPTransportServlet extends AbstractTransportServer {
     @Path(HTTPTransportRestfulConstants.LIST_METADATA_PATH + "/{path:.*}")
     @Produces(MediaType.APPLICATION_JSON)
     public Response listDataObjectMetadataRestful(
-            @DefaultValue("") @PathParam("path") String path) {
+            @DefaultValue("") @PathParam("path") String path) throws IOException {
         //if(path == null || path.isEmpty()) {
         //    throw new IllegalArgumentException("path is null or empty");
         //}
@@ -202,7 +210,7 @@ public class HTTPTransportServlet extends AbstractTransportServer {
     @Path(HTTPTransportRestfulConstants.GET_RECIPE_PATH + "/{path:.*}")
     @Produces(MediaType.APPLICATION_JSON)
     public Response getRecipeRestful(
-        @DefaultValue("") @PathParam("path") String path) {
+        @DefaultValue("") @PathParam("path") String path) throws IOException {
         if(path == null || path.isEmpty()) {
             throw new IllegalArgumentException("path is null or empty");
         }
@@ -238,7 +246,7 @@ public class HTTPTransportServlet extends AbstractTransportServer {
     @Path(HTTPTransportRestfulConstants.GET_DIRECTORY_PATH + "/{path:.*}")
     @Produces(MediaType.APPLICATION_JSON)
     public Response getDirectoryRestful(
-            @DefaultValue("") @PathParam("path") String path) {
+            @DefaultValue("") @PathParam("path") String path) throws IOException {
         //if(path == null || path.isEmpty()) {
         //    throw new IllegalArgumentException("path is null or empty");
         //}

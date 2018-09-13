@@ -59,7 +59,6 @@ public class Service {
         try {
             CommandParser parser = new CommandParser();
             parser.parse(args);
-            parser.setLoggerLevel(LOG);
             
             String[] positionalArgs = parser.getPositionalArgs();
             if(positionalArgs.length != 0) {
@@ -74,7 +73,6 @@ public class Service {
                         throw new UnsupportedOperationException(String.format("Unknown command - %s", cmd_lv1));
                     default:
                         throw new UnsupportedOperationException(String.format("Unknown command - %s", cmd_lv1));
-
                 }
             } else {
                 StringBuilder sb = new StringBuilder();

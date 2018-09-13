@@ -156,7 +156,7 @@ public class TransportManager extends AbstractManager<AbstractTransportDriver> {
     public TransportServiceInfo getServiceInfo() throws IOException {
         AbstractTransportDriver driver = getDriver();
         URI serviceURI = driver.getServiceURI();
-        return new TransportServiceInfo(driver.getClass().getCanonicalName(), serviceURI);
+        return new TransportServiceInfo(driver.getClass().getName(), serviceURI);
     }
     
     private synchronized void safeInitBlockCacheStore() throws IOException {

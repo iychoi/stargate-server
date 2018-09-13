@@ -19,9 +19,6 @@ import java.net.URI;
 import java.net.URISyntaxException;
 import java.util.ArrayList;
 import java.util.List;
-import org.apache.commons.logging.Log;
-import org.apache.commons.logging.impl.Jdk14Logger;
-import org.apache.commons.logging.impl.Log4JLogger;
 
 /**
  *
@@ -70,21 +67,5 @@ public class CommandParser {
     
     public String[] getPositionalArgs() {
         return this.positionalArgs.toArray(new String[0]);
-    }
-    
-    public void setLoggerLevel(Log l) {
-        if (l instanceof Log4JLogger) {
-            if(this.debug) {
-                ((Log4JLogger) l).getLogger().setLevel(org.apache.log4j.Level.DEBUG);
-            } else {
-                ((Log4JLogger) l).getLogger().setLevel(org.apache.log4j.Level.INFO);
-            }
-        } else if (l instanceof Jdk14Logger) {
-            if(this.debug) {
-                ((Jdk14Logger) l).getLogger().setLevel(java.util.logging.Level.ALL);
-            } else {
-                ((Jdk14Logger) l).getLogger().setLevel(java.util.logging.Level.INFO);
-            }
-        }
     }
 }
