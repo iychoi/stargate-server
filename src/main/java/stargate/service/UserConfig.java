@@ -47,8 +47,7 @@ public class UserConfig extends AbstractImmutableConfig {
             throw new IllegalArgumentException("file is null");
         }
 
-        JsonSerializer serializer = new JsonSerializer();
-        return (UserConfig) serializer.fromJsonFile(file, UserConfig.class);
+        return (UserConfig) JsonSerializer.fromJsonFile(file, UserConfig.class);
     }
     
     public static UserConfig createInstance(String json) throws IOException {
@@ -56,8 +55,7 @@ public class UserConfig extends AbstractImmutableConfig {
             throw new IllegalArgumentException("json is null or empty");
         }
         
-        JsonSerializer serializer = new JsonSerializer();
-        return (UserConfig) serializer.fromJson(json, UserConfig.class);
+        return (UserConfig) JsonSerializer.fromJson(json, UserConfig.class);
     }
     
     public UserConfig() {

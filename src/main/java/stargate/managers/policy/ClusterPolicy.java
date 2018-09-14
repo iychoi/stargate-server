@@ -52,8 +52,7 @@ public class ClusterPolicy extends AbstractPolicy {
             throw new IllegalArgumentException("file is null");
         }
         
-        JsonSerializer serializer = new JsonSerializer();
-        return (ClusterPolicy) serializer.fromJsonFile(file, ClusterPolicy.class);
+        return (ClusterPolicy) JsonSerializer.fromJsonFile(file, ClusterPolicy.class);
     }
     
     public static ClusterPolicy createInstance(String json) throws IOException {
@@ -61,8 +60,7 @@ public class ClusterPolicy extends AbstractPolicy {
             throw new IllegalArgumentException("json is null or empty");
         }
         
-        JsonSerializer serializer = new JsonSerializer();
-        return (ClusterPolicy) serializer.fromJson(json, ClusterPolicy.class);
+        return (ClusterPolicy) JsonSerializer.fromJson(json, ClusterPolicy.class);
     }
     
     ClusterPolicy() {

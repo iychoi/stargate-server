@@ -35,8 +35,7 @@ public class IgniteScheduleDriverConfig extends AbstractScheduleDriverConfig {
             throw new IllegalArgumentException("file is null");
         }
 
-        JsonSerializer serializer = new JsonSerializer();
-        return (IgniteScheduleDriverConfig) serializer.fromJsonFile(file, IgniteScheduleDriverConfig.class);
+        return (IgniteScheduleDriverConfig) JsonSerializer.fromJsonFile(file, IgniteScheduleDriverConfig.class);
     }
     
     public static IgniteScheduleDriverConfig createInstance(String json) throws IOException {
@@ -44,8 +43,7 @@ public class IgniteScheduleDriverConfig extends AbstractScheduleDriverConfig {
             throw new IllegalArgumentException("json is null or empty");
         }
         
-        JsonSerializer serializer = new JsonSerializer();
-        return (IgniteScheduleDriverConfig) serializer.fromJson(json, IgniteScheduleDriverConfig.class);
+        return (IgniteScheduleDriverConfig) JsonSerializer.fromJson(json, IgniteScheduleDriverConfig.class);
     }
     
     public IgniteScheduleDriverConfig() {

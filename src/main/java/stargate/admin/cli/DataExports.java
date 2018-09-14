@@ -125,8 +125,7 @@ public class DataExports {
             if(dataExportEntry == null || dataExportEntry.isEmpty()) {
                 System.out.println("<ENTRY DOES NOT EXIST!>");
             } else {
-                JsonSerializer serializer = new JsonSerializer();
-                String json = serializer.formatPretty(dataExportEntry.toJson());
+                String json = JsonSerializer.formatPretty(dataExportEntry.toJson());
                 System.out.println(json);
             }
             String dateTimeString = DateTimeUtils.getDateTimeString(client.getLastActiveTime());
@@ -147,9 +146,8 @@ public class DataExports {
             if(dataExportEntries == null || dataExportEntries.isEmpty()) {
                 System.out.println("<EMPTY!>");
             } else {
-                JsonSerializer serializer = new JsonSerializer();
                 for(DataExportEntry entry : dataExportEntries) {
-                    String json = serializer.formatPretty(entry.toJson());
+                    String json = JsonSerializer.formatPretty(entry.toJson());
                     System.out.println(json);
                 }
             }

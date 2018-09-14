@@ -55,6 +55,31 @@ public class HTTPTransportServlet extends AbstractTransportServer {
 
     private static HTTPTransportDriver driver = null;
     
+    public class StreamingOutputData implements StreamingOutput {
+
+        private static final int BUFFER_SIZE = 8*1024; // 8k
+        private InputStream is;
+        private byte[] buffer;
+        
+        StreamingOutputData(InputStream is) {
+            this.is = is;
+            this.buffer = new byte[BUFFER_SIZE];
+        }
+        
+        @Override
+        public void write(OutputStream out) throws IOException, WebApplicationException {
+            try {
+                int read = 0;
+                while ((read = this.is.read(this.buffer)) > 0) {
+                    out.write(this.buffer, 0, read);
+                }
+                this.is.close();
+            } catch (Exception ex) {
+                throw new WebApplicationException(ex);
+            }
+        }
+    }
+    
     static void setDriver(HTTPTransportDriver driver) {
         HTTPTransportServlet.driver = driver;
     }
@@ -286,7 +311,7 @@ public class HTTPTransportServlet extends AbstractTransportServer {
     }
     
     @GET
-    @Path(HTTPTransportRestfulConstants.GET_DATA_CHUNK_PATH + "/{hash:.*}")
+    @Path(HTTPTransportRestfulConstants.GET_DATA_CHUNK_PATH + "/{hash:\\w*}")
     @Produces(MediaType.APPLICATION_OCTET_STREAM)
     public Response getDataChunkRestful(
             @DefaultValue("") @PathParam("hash") String hash) throws Exception {
@@ -300,25 +325,7 @@ public class HTTPTransportServlet extends AbstractTransportServer {
                 return Response.status(Response.Status.NOT_FOUND).build();
             }
             
-            StreamingOutput stream = new StreamingOutput() {
-                @Override
-                public void write(OutputStream out) throws IOException, WebApplicationException {
-                    try {
-                        int buffersize = 100 * 1024;
-                        byte[] buffer = new byte[buffersize];
-
-                        int read = 0;
-                        while ((read = is.read(buffer)) > 0) {
-                            out.write(buffer, 0, read);
-                        }
-                        is.close();
-
-                    } catch (Exception ex) {
-                        throw new WebApplicationException(ex);
-                    }
-                }
-            };
-
+            StreamingOutputData stream = new StreamingOutputData(is);
             return Response.ok(stream).header("content-disposition", "attachment; filename = " + hash).build();
         } catch (Exception ex) {
             return Response.status(Response.Status.INTERNAL_SERVER_ERROR).build();
@@ -327,6 +334,42 @@ public class HTTPTransportServlet extends AbstractTransportServer {
 
     @Override
     public InputStream getDataChunk(String hash) throws IOException {
+        return getDataChunk(DataObjectURI.WILDCARD_LOCAL_CLUSTER_NAME, hash);
+    }
+    
+    @GET
+    @Path(HTTPTransportRestfulConstants.GET_DATA_CHUNK_PATH + "/{cluster:.*}/{hash:\\w+}")
+    @Produces(MediaType.APPLICATION_OCTET_STREAM)
+    public Response getDataChunkRestful(
+            @DefaultValue("") @PathParam("cluster") String cluster,
+            @DefaultValue("") @PathParam("hash") String hash) throws Exception {
+        if(cluster == null || cluster.isEmpty()) {
+            throw new IllegalArgumentException("cluster is null or empty");
+        }
+        
+        if(hash == null || hash.isEmpty()) {
+            throw new IllegalArgumentException("hash is null or empty");
+        }
+        
+        try {
+            final InputStream is = getDataChunk(cluster, hash);
+            if(is == null) {
+                return Response.status(Response.Status.NOT_FOUND).build();
+            }
+            
+            StreamingOutputData stream = new StreamingOutputData(is);
+            return Response.ok(stream).header("content-disposition", "attachment; filename = " + hash).build();
+        } catch (Exception ex) {
+            return Response.status(Response.Status.INTERNAL_SERVER_ERROR).build();
+        }
+    }
+
+    @Override
+    public InputStream getDataChunk(String clusterName, String hash) throws IOException {
+        if(clusterName == null || clusterName.isEmpty()) {
+            throw new IllegalArgumentException("clusterName is null or empty");
+        }
+        
         if(hash == null || hash.isEmpty()) {
             throw new IllegalArgumentException("hash is null or empty");
         }
@@ -334,7 +377,7 @@ public class HTTPTransportServlet extends AbstractTransportServer {
         try {
             StargateService service = getStargateService();
             VolumeManager volumeManager = service.getVolumeManager();
-            return volumeManager.getDataChunk(hash);
+            return volumeManager.getDataChunk(clusterName, hash);
         } catch (ManagerNotInstantiatedException ex) {
             LOG.error(ex);
             throw new IOException(ex);

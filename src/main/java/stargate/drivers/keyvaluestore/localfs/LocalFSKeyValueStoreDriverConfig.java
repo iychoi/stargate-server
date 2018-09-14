@@ -39,8 +39,7 @@ public class LocalFSKeyValueStoreDriverConfig extends AbstractKeyValueStoreDrive
             throw new IllegalArgumentException("file is null");
         }
 
-        JsonSerializer serializer = new JsonSerializer();
-        return (LocalFSKeyValueStoreDriverConfig) serializer.fromJsonFile(file, LocalFSKeyValueStoreDriverConfig.class);
+        return (LocalFSKeyValueStoreDriverConfig) JsonSerializer.fromJsonFile(file, LocalFSKeyValueStoreDriverConfig.class);
     }
     
     public static LocalFSKeyValueStoreDriverConfig createInstance(String json) throws IOException {
@@ -48,8 +47,7 @@ public class LocalFSKeyValueStoreDriverConfig extends AbstractKeyValueStoreDrive
             throw new IllegalArgumentException("json is null or empty");
         }
         
-        JsonSerializer serializer = new JsonSerializer();
-        return (LocalFSKeyValueStoreDriverConfig) serializer.fromJson(json, LocalFSKeyValueStoreDriverConfig.class);
+        return (LocalFSKeyValueStoreDriverConfig) JsonSerializer.fromJson(json, LocalFSKeyValueStoreDriverConfig.class);
     }
     
     public LocalFSKeyValueStoreDriverConfig() {

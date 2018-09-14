@@ -42,8 +42,7 @@ public class FixedSizeChunkRecipeDriverConfig extends AbstractRecipeDriverConfig
             throw new IllegalArgumentException("file is null");
         }
 
-        JsonSerializer serializer = new JsonSerializer();
-        return (FixedSizeChunkRecipeDriverConfig) serializer.fromJsonFile(file, FixedSizeChunkRecipeDriverConfig.class);
+        return (FixedSizeChunkRecipeDriverConfig) JsonSerializer.fromJsonFile(file, FixedSizeChunkRecipeDriverConfig.class);
     }
     
     public static FixedSizeChunkRecipeDriverConfig createInstance(String json) throws IOException {
@@ -51,8 +50,7 @@ public class FixedSizeChunkRecipeDriverConfig extends AbstractRecipeDriverConfig
             throw new IllegalArgumentException("json is null or empty");
         }
         
-        JsonSerializer serializer = new JsonSerializer();
-        return (FixedSizeChunkRecipeDriverConfig) serializer.fromJson(json, FixedSizeChunkRecipeDriverConfig.class);
+        return (FixedSizeChunkRecipeDriverConfig) JsonSerializer.fromJson(json, FixedSizeChunkRecipeDriverConfig.class);
     }
     
     public FixedSizeChunkRecipeDriverConfig() {

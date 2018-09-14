@@ -179,8 +179,7 @@ public class FileSystem {
                     if(recipe == null) {
                         System.out.println("<ENTRY DOES NOT EXIST!>");
                     } else {
-                        JsonSerializer serializer = new JsonSerializer();
-                        String json = serializer.formatPretty(recipe.toJson());
+                        String json = JsonSerializer.formatPretty(recipe.toJson());
                         System.out.println(json);
                     }
                 }
@@ -227,7 +226,7 @@ public class FileSystem {
                         for(RecipeChunk chunk : chunks) {
                             String hash = chunk.getHashString();
                             LOG.debug(String.format("Downloading a chunk for a hash %s", hash));
-                            InputStream is = client.getDataChunk(hash);
+                            InputStream is = client.getDataChunk(uri.getClusterName(), hash);
                             int readLen = 0;
                             while((readLen = is.read(buffer, 0, bufferlen)) > 0) {
                                 fos.write(buffer, 0, readLen);

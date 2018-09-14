@@ -43,8 +43,7 @@ public class HDFSDataSourceDriverConfig extends AbstractDataSourceDriverConfig {
             throw new IllegalArgumentException("file is null");
         }
 
-        JsonSerializer serializer = new JsonSerializer();
-        return (HDFSDataSourceDriverConfig) serializer.fromJsonFile(file, HDFSDataSourceDriverConfig.class);
+        return (HDFSDataSourceDriverConfig) JsonSerializer.fromJsonFile(file, HDFSDataSourceDriverConfig.class);
     }
     
     public static HDFSDataSourceDriverConfig createInstance(String json) throws IOException {
@@ -52,8 +51,7 @@ public class HDFSDataSourceDriverConfig extends AbstractDataSourceDriverConfig {
             throw new IllegalArgumentException("json is null or empty");
         }
         
-        JsonSerializer serializer = new JsonSerializer();
-        return (HDFSDataSourceDriverConfig) serializer.fromJson(json, HDFSDataSourceDriverConfig.class);
+        return (HDFSDataSourceDriverConfig) JsonSerializer.fromJson(json, HDFSDataSourceDriverConfig.class);
     }
     
     public HDFSDataSourceDriverConfig() {

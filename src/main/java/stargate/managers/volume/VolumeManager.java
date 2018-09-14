@@ -63,6 +63,9 @@ public class VolumeManager extends AbstractManager<NullDriver> {
     private AbstractKeyValueStore localVolumeStore; // <String, Directory>
     protected long lastUpdateTime;
     
+    private Directory rootDirectoryCache = null;
+    private long lastUpdateTimeRootDirectoryCache = 0;
+    
     private static final String VOLUME_STORE = "volume";
     
     public static VolumeManager getInstance(StargateService service) throws ManagerNotInstantiatedException {
@@ -118,20 +121,88 @@ public class VolumeManager extends AbstractManager<NullDriver> {
         }
     }
     
-    private Directory getRootDirectory() throws IOException {
+    private boolean isLocalCluster(String clusterName) throws IOException {
+        if(clusterName == null || clusterName.isEmpty()) {
+            throw new IllegalArgumentException("clusterName is null or empty");
+        }
+        
+        if(clusterName.equalsIgnoreCase(DataObjectURI.WILDCARD_LOCAL_CLUSTER_NAME)) {
+            return true;
+        } else {
+            try {
+                StargateService stargateService = getStargateService();
+                ClusterManager clusterManager = stargateService.getClusterManager();
+                String localClusterName = clusterManager.getLocalClusterName();
+                if(clusterName.equals(localClusterName)) {
+                    return true;
+                }
+                return false;
+            } catch (ManagerNotInstantiatedException ex) {
+                LOG.info(ex);
+                return false;
+            }
+        }
+    }
+    
+    private boolean isLocalDataObject(DataObjectURI uri) throws IOException {
+        if(uri == null) {
+            throw new IllegalArgumentException("uri is null");
+        }
+        
+        DataObjectURI absPath = makeAbsolutePath(uri);
+        
+        if(absPath.isRoot()) {
+            return true;
+        } else if(isLocalCluster(absPath.getClusterName())) {
+            return true;
+        }
+        return false;
+    }
+    
+    private DataObjectURI makeAbsolutePath(DataObjectURI uri) throws IOException {
+        if(uri.isRoot()) {
+            return uri;
+        }
+        
+        String clusterName = uri.getClusterName();
+        if(clusterName == null || clusterName.isEmpty() || clusterName.equalsIgnoreCase(DataObjectURI.WILDCARD_LOCAL_CLUSTER_NAME)) {
+            try {
+                StargateService stargateService = getStargateService();
+                ClusterManager clusterManager = stargateService.getClusterManager();
+                Cluster localCluster = clusterManager.getLocalCluster();
+                return new DataObjectURI(localCluster.getName(), uri.getPath());
+            } catch (ManagerNotInstantiatedException ex) {
+                LOG.error(ex);
+                throw new IOException(ex);
+            }
+        }
+        
+        return uri;
+    }
+    
+    private synchronized Directory getRootDirectory() throws IOException {
         // don't need to put into the store
+        // we cache root directory because it may take long time
         try {
             StargateService stargateService = getStargateService();
             ClusterManager clusterManager = stargateService.getClusterManager();
             
             long updateTime = clusterManager.getLastUpdateTime();
             
+            if(this.lastUpdateTimeRootDirectoryCache != updateTime) {
+                // something changed -> create a new directory
+                this.rootDirectoryCache = null;
+            }
+            
+            if(this.rootDirectoryCache != null) {
+                return this.rootDirectoryCache;
+            }
+            
             DataObjectURI rootDataObjectURI = new DataObjectURI("", "/");
             Directory rootDirectory = new Directory(rootDataObjectURI, updateTime);
             
             String localClusterName = clusterManager.getLocalClusterName();
             Collection<String> remoteClusterNames = clusterManager.getRemoteClusterNames();
-            
             
             DataObjectURI localClusterDataObjectPath = new DataObjectURI(localClusterName, "/");
             DataObjectMetadata localClusterMetdata = new DataObjectMetadata(localClusterDataObjectPath, Directory.DIRECTORY_METADATA_SIZE, true, updateTime);
@@ -143,6 +214,9 @@ public class VolumeManager extends AbstractManager<NullDriver> {
                 rootDirectory.addEntry(remoteClusterMetdata);
             }
             
+            this.rootDirectoryCache = rootDirectory;
+            this.lastUpdateTimeRootDirectoryCache = updateTime;
+            this.lastUpdateTime = DateTimeUtils.getTimestamp();
             return rootDirectory;
         } catch (ManagerNotInstantiatedException ex) {
             LOG.info(ex);
@@ -215,6 +289,7 @@ public class VolumeManager extends AbstractManager<NullDriver> {
         }
     }
     
+    //TODO: Need to rework for better efficiency
     public synchronized void buildLocalDirectoryHierarchy() throws IOException {
         try {
             StargateService stargateService = getStargateService();
@@ -234,130 +309,49 @@ public class VolumeManager extends AbstractManager<NullDriver> {
         }
     }
     
-    private boolean isLocalCluster(String clusterName) throws IOException {
-        if(clusterName == null || clusterName.isEmpty()) {
-            throw new IllegalArgumentException("clusterName is null or empty");
+    private Directory getLocalDirectory(DataObjectURI uri) throws IOException, FileNotFoundException {
+        Directory dir = (Directory) this.localVolumeStore.get(uri.getPath());
+        if(dir == null) {
+            throw new FileNotFoundException(String.format("cannot find a directory (%s)", uri.getPath()));
         }
-        
-        if(clusterName.equalsIgnoreCase("local")) {
-            return true;
-        } else {
-            try {
-                StargateService stargateService = getStargateService();
-                ClusterManager clusterManager = stargateService.getClusterManager();
-                String localClusterName = clusterManager.getLocalClusterName();
-                if(clusterName.equals(localClusterName)) {
-                    return true;
-                }
-                return false;
-            } catch (ManagerNotInstantiatedException ex) {
-                LOG.info(ex);
-                return false;
+
+        return dir;
+    }
+    
+    private Directory getRemoteDirectory(DataObjectURI uri) throws IOException, FileNotFoundException {
+        try {
+            StargateService stargateService = getStargateService();
+            TransportManager transportManager = stargateService.getTransportManager();
+            Directory directory = transportManager.getDirectory(uri);
+            if(directory == null) {
+                throw new FileNotFoundException(String.format("cannot find a remote directory (%s)", uri.toString()));
             }
+            return directory;
+        } catch (ManagerNotInstantiatedException ex) {
+            LOG.info(ex);
+            throw new IOException(ex);
         }
     }
     
-    private boolean isLocalDataObject(DataObjectURI uri) throws IOException {
-        if(uri == null) {
-            throw new IllegalArgumentException("uri is null");
-        }
-        
-        DataObjectURI absPath = makeAbsolutePath(uri);
-        
-        if(absPath.isRoot()) {
-            return true;
-        } else if(isLocalCluster(absPath.getClusterName())) {
-            return true;
-        }
-        return false;
-    }
-    
-    private DataObjectURI makeAbsolutePath(DataObjectURI uri) throws IOException {
-        if(uri.isRoot()) {
-            return uri;
-        }
-        
-        String clusterName = uri.getClusterName();
-        if(clusterName == null || clusterName.isEmpty() || clusterName.equalsIgnoreCase("local")) {
-            try {
-                StargateService stargateService = getStargateService();
-                ClusterManager clusterManager = stargateService.getClusterManager();
-                Cluster localCluster = clusterManager.getLocalCluster();
-                return new DataObjectURI(localCluster.getName(), uri.getPath());
-            } catch (ManagerNotInstantiatedException ex) {
-                LOG.error(ex);
-                throw new IOException(ex);
-            }
-        }
-        
-        return uri;
-    }
-    
-    public synchronized Directory getDirectory(DataObjectURI uri) throws IOException, FileNotFoundException {
+    public Directory getDirectory(DataObjectURI uri) throws IOException, FileNotFoundException {
         if(uri == null) {
             throw new IllegalArgumentException("uri is null");
         }
         
         DataObjectURI absPath = makeAbsolutePath(uri);
         if(absPath.isRoot()) {
+            // root
             return getRootDirectory();
         } else if(isLocalCluster(absPath.getClusterName())) {
             // local
-            Directory dir = (Directory) this.localVolumeStore.get(absPath.getPath());
-            if(dir == null) {
-                throw new FileNotFoundException(String.format("cannot find a directory (%s)", absPath.getPath()));
-            }
-            
-            return dir;
+            return getLocalDirectory(absPath);
         } else {
             // remote
-            try {
-                StargateService stargateService = getStargateService();
-                TransportManager transportManager = stargateService.getTransportManager();
-                Directory directory = transportManager.getDirectory(absPath);
-                if(directory == null) {
-                    throw new FileNotFoundException(String.format("cannot find a remote directory (%s)", absPath.toString()));
-                }
-                return directory;
-            } catch (ManagerNotInstantiatedException ex) {
-                LOG.info(ex);
-                throw new IOException(ex);
-            }
+            return getRemoteDirectory(absPath);
         }
     }
     
-    public synchronized URI getLocalDataSourcePath(DataObjectURI uri) throws IOException {
-        if(uri == null) {
-            throw new IllegalArgumentException("uri is null");
-        }
-        
-        DataObjectURI absPath = makeAbsolutePath(uri);
-        if(absPath.isRoot()) {
-            throw new IOException("cannot get local data path for a root directory");
-        } else if(absPath.isClusterRoot()) {
-            throw new IOException("cannot get local data path for a cluster directory");
-        } else if(isLocalDataObject(absPath)) {
-            // local
-            try {
-                StargateService stargateService = getStargateService();
-                DataExportManager dataExportManager = stargateService.getDataExportManager();
-                DataExportEntry dataExportEntry = dataExportManager.getDataExportEntry(absPath.getPath());
-                if(dataExportEntry == null) {
-                    throw new IOException(String.format("unable to find a data export entry for %s", absPath.getPath()));
-                }
-                
-                return dataExportEntry.getSourceURI();
-            } catch (ManagerNotInstantiatedException ex) {
-                LOG.info(ex);
-                throw new IOException(ex);
-            }
-        } else {
-            // remote
-            throw new IOException(String.format("cannot get a data source path from a remote cluster %s", absPath.toString()));
-        }
-    }
-    
-    public synchronized DataObjectMetadata getDataObjectMetadata(DataObjectURI uri) throws IOException, FileNotFoundException {
+    public DataObjectMetadata getDataObjectMetadata(DataObjectURI uri) throws IOException, FileNotFoundException {
         if(uri == null) {
             throw new IllegalArgumentException("uri is null");
         }
@@ -369,6 +363,7 @@ public class VolumeManager extends AbstractManager<NullDriver> {
             Directory rootDir = getRootDirectory();
             return rootDir.toDataObjectMetadata();
         } else if(absPath.isClusterRoot()) {
+            // cluster root
             Directory rootDir = getRootDirectory();
             if(rootDir == null) {
                 throw new IOException("cannot find a root directory");
@@ -380,6 +375,7 @@ public class VolumeManager extends AbstractManager<NullDriver> {
             }
             return entry;
         } else {
+            // we get metadata list in a directory level for efficiency
             Directory parentDir = getDirectory(parentPath);
             if(parentDir == null) {
                 throw new FileNotFoundException(String.format("cannot find a directory %s", parentPath.getPath()));
@@ -393,7 +389,37 @@ public class VolumeManager extends AbstractManager<NullDriver> {
         }
     }
     
-    public synchronized Recipe getRecipe(DataObjectURI uri) throws IOException, FileNotFoundException {
+    private Recipe getLocalRecipe(DataObjectURI uri) throws IOException, FileNotFoundException {
+        try {
+            StargateService stargateService = getStargateService();
+            RecipeManager recipeManager = stargateService.getRecipeManager();
+            Recipe recipe = recipeManager.getRecipe(uri.getPath());
+            if(recipe == null) {
+                throw new FileNotFoundException(String.format("cannot find a recipe %s", uri.getPath()));
+            }
+            return recipe;
+        } catch (ManagerNotInstantiatedException ex) {
+            LOG.info(ex);
+            throw new IOException(ex);
+        }
+    }
+    
+    private Recipe getRemoteRecipe(DataObjectURI uri) throws IOException, FileNotFoundException {
+        try {
+            StargateService stargateService = getStargateService();
+            TransportManager transportManager = stargateService.getTransportManager();
+            Recipe recipe = transportManager.getRecipe(uri);
+            if(recipe == null) {
+                throw new FileNotFoundException(String.format("cannot find a remote recipe (%s)", uri.toString()));
+            }
+            return recipe;
+        } catch (ManagerNotInstantiatedException ex) {
+            LOG.info(ex);
+            throw new IOException(ex);
+        }
+    }
+    
+    public Recipe getRecipe(DataObjectURI uri) throws IOException, FileNotFoundException {
         if(uri == null) {
             throw new IllegalArgumentException("uri is null");
         }
@@ -401,137 +427,88 @@ public class VolumeManager extends AbstractManager<NullDriver> {
         DataObjectURI absPath = makeAbsolutePath(uri);
         if(isLocalDataObject(absPath)) {
             // local
-            try {
-                StargateService stargateService = getStargateService();
-                RecipeManager recipeManager = stargateService.getRecipeManager();
-                Recipe recipe = recipeManager.getRecipe(uri.getPath());
-                if(recipe == null) {
-                    throw new FileNotFoundException(String.format("cannot find a recipe %s", absPath.getPath()));
-                }
-                return recipe;
-            } catch (ManagerNotInstantiatedException ex) {
-                LOG.info(ex);
-                throw new IOException(ex);
-            }
+            return getLocalRecipe(absPath);
         } else {
             // remote
-            try {
-                StargateService stargateService = getStargateService();
-                TransportManager transportManager = stargateService.getTransportManager();
-                Recipe recipe = transportManager.getRecipe(absPath);
-                if(recipe == null) {
-                    throw new FileNotFoundException(String.format("cannot find a remote recipe (%s)", absPath.toString()));
-                }
-                return recipe;
-            } catch (ManagerNotInstantiatedException ex) {
-                LOG.info(ex);
-                throw new IOException(ex);
-            }
+            return getRemoteRecipe(absPath);
         }
     }
     
-    public InputStream getDataChunk(DataObjectURI uri, String hash) throws IOException, FileNotFoundException {
-        if(uri == null) {
-            throw new IllegalArgumentException("uri is null");
-        }
-        
-        if(hash == null || hash.isEmpty()) {
-            throw new IllegalArgumentException("hash is null or empty");
-        }
-        
-        DataObjectURI absPath = makeAbsolutePath(uri);
-        if(isLocalDataObject(absPath)) {
-            // local
-            try {
-                StargateService stargateService = getStargateService();
-                RecipeManager recipeManager = stargateService.getRecipeManager();
-                DataExportManager dataExportManager = stargateService.getDataExportManager();
-                DataSourceManager dataSourceManager = stargateService.getDataSourceManager();
-                
-                Recipe recipe = recipeManager.getRecipe(absPath.getPath());
-                if(recipe == null) {
-                    throw new FileNotFoundException(String.format("cannot find a recipe (%s)", absPath.getPath()));
-                }
-                
-                RecipeChunk chunk = recipe.getChunk(hash);
-                if(chunk == null) {
-                    throw new IOException(String.format("cannot find a chunk for hash %s", hash));
-                }
-            
-                DataExportEntry dataExportEntry = dataExportManager.getDataExportEntry(absPath.getPath());
-                if(dataExportEntry == null) {
-                    throw new IOException(String.format("cannot find a data export entry (%s)", absPath.getPath()));
-                }
-                
-                URI sourceURI = dataExportEntry.getSourceURI();
-                AbstractDataSourceDriver dataSourceDriver = dataSourceManager.getDriver(sourceURI);
-                SourceFileMetadata sourcecMetadata = dataSourceDriver.getMetadata(sourceURI);
-                if(sourcecMetadata == null || !sourcecMetadata.exist()) {
-                    throw new IOException(String.format("cannot find a source file (%s)", sourceURI.toASCIIString()));
-                }
-                return dataSourceDriver.openFile(sourcecMetadata.getURI());
-            } catch (ManagerNotInstantiatedException ex) {
-                LOG.info(ex);
-                throw new IOException(ex);
-            }
-        } else {
-            // remote
-            try {
-                StargateService stargateService = getStargateService();
-                TransportManager transportManager = stargateService.getTransportManager();
-                
-                String clusterName = absPath.getClusterName();
-                
-                InputStream is = transportManager.getDataChunk(clusterName, hash);
-                if(is == null) {
-                    throw new FileNotFoundException(String.format("cannot find a remote data chunk for has %s", clusterName, hash));
-                }
-                return is;
-            } catch (ManagerNotInstantiatedException ex) {
-                LOG.info(ex);
-                throw new IOException(ex);
-            }
-        }
-    }
-    
-    public InputStream getDataChunk(String hash) throws IOException, FileNotFoundException {
-        if(hash == null || hash.isEmpty()) {
-            throw new IllegalArgumentException("hash is null or empty");
-        }
-        
-        // local
+    private InputStream getLocalDataChunk(String hash) throws IOException, FileNotFoundException {
         try {
             StargateService stargateService = getStargateService();
             RecipeManager recipeManager = stargateService.getRecipeManager();
             DataExportManager dataExportManager = stargateService.getDataExportManager();
             DataSourceManager dataSourceManager = stargateService.getDataSourceManager();
 
+            // find recipe
             Recipe recipe = recipeManager.getRecipeByHash(hash);
             if(recipe == null) {
                 throw new FileNotFoundException(String.format("cannot find a recipe for hash %s", hash));
             }
 
+            // find data object metadata
             DataObjectMetadata metadata = recipe.getMetadata();
-            RecipeChunk chunk = recipe.getChunk(hash);
-            if(chunk == null) {
-                throw new IOException(String.format("cannot find a chunk for hash %s", hash));
-            }
-
+            
+            // find data export entry to find a source file
             DataExportEntry dataExportEntry = dataExportManager.getDataExportEntry(metadata.getURI().getPath());
             if(dataExportEntry == null) {
                 throw new IOException(String.format("cannot find a data export entry (%s)", metadata.getURI().getPath()));
             }
 
+            // find source metadata
             URI sourceURI = dataExportEntry.getSourceURI();
             AbstractDataSourceDriver dataSourceDriver = dataSourceManager.getDriver(sourceURI);
-            SourceFileMetadata sourcecMetadata = dataSourceDriver.getMetadata(sourceURI);
-            if(sourcecMetadata == null || !sourcecMetadata.exist()) {
+            SourceFileMetadata sourceMetadata = dataSourceDriver.getMetadata(sourceURI);
+            if(sourceMetadata == null || !sourceMetadata.exist()) {
                 throw new IOException(String.format("cannot find a source file (%s)", sourceURI.toASCIIString()));
             }
-            return dataSourceDriver.openFile(sourcecMetadata.getURI(), chunk.getOffset(), chunk.getLength());
+            
+            // get recipe chunk for offset/length 
+            RecipeChunk chunk = recipe.getChunk(hash);
+            if(chunk == null) {
+                throw new IOException(String.format("cannot find a chunk for hash %s", hash));
+            }
+            
+            // access the file
+            return dataSourceDriver.openFile(sourceMetadata.getURI(), chunk.getOffset(), chunk.getLength());
         } catch (ManagerNotInstantiatedException ex) {
             LOG.info(ex);
             throw new IOException(ex);
+        }
+    }
+    
+    private InputStream getRemoteDataChunk(String clusterName, String hash) throws IOException, FileNotFoundException {
+        try {
+            StargateService stargateService = getStargateService();
+            TransportManager transportManager = stargateService.getTransportManager();
+
+            InputStream is = transportManager.getDataChunk(clusterName, hash);
+            if(is == null) {
+                throw new FileNotFoundException(String.format("cannot find a remote data chunk for has %s", clusterName, hash));
+            }
+            return is;
+        } catch (ManagerNotInstantiatedException ex) {
+            LOG.info(ex);
+            throw new IOException(ex);
+        }
+    }
+    
+    public InputStream getDataChunk(String clusterName, String hash) throws IOException, FileNotFoundException {
+        if(clusterName == null || clusterName.isEmpty()) {
+            throw new IllegalArgumentException("clusterName is null or empty");
+        }
+        
+        if(hash == null || hash.isEmpty()) {
+            throw new IllegalArgumentException("hash is null or empty");
+        }
+        
+        if(isLocalCluster(clusterName)) {
+            // local
+            return getLocalDataChunk(hash);
+        } else {
+            // remote
+            return getRemoteDataChunk(clusterName, hash);
         }
     }
     

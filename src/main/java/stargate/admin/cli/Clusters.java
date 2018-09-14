@@ -231,8 +231,7 @@ public class Clusters {
             client.connect();
             Cluster cluster = client.getCluster();
 
-            JsonSerializer serializer = new JsonSerializer();
-            String json = serializer.formatPretty(cluster.toJson());
+            String json = JsonSerializer.formatPretty(cluster.toJson());
             System.out.println(json);
             String dateTimeString = DateTimeUtils.getDateTimeString(client.getLastActiveTime());
             System.out.println(String.format("<Request processed %s>", dateTimeString));
@@ -250,8 +249,7 @@ public class Clusters {
             client.connect();
             Cluster cluster = client.getRemoteCluster(name);
 
-            JsonSerializer serializer = new JsonSerializer();
-            String json = serializer.formatPretty(cluster.toJson());
+            String json = JsonSerializer.formatPretty(cluster.toJson());
             System.out.println(json);
             String dateTimeString = DateTimeUtils.getDateTimeString(client.getLastActiveTime());
             System.out.println(String.format("<Request processed %s>", dateTimeString));
@@ -271,9 +269,8 @@ public class Clusters {
             if(remoteClusters == null || remoteClusters.isEmpty()) {
                 System.out.println("<EMPTY!>");
             } else {
-                JsonSerializer serializer = new JsonSerializer();
                 for(Cluster cluster : remoteClusters) {
-                    String json = serializer.formatPretty(cluster.toJson());
+                    String json = JsonSerializer.formatPretty(cluster.toJson());
                     System.out.println(json);
                 }
             }

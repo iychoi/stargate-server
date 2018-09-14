@@ -33,6 +33,7 @@ import stargate.commons.transport.AbstractTransportClient;
 import stargate.commons.transport.TransportServiceInfo;
 import stargate.commons.utils.DateTimeUtils;
 import stargate.commons.utils.PathUtils;
+import stargate.drivers.userinterface.http.HTTPUserInterfaceRestfulConstants;
 
 /**
  *
@@ -86,51 +87,32 @@ public class HTTPTransportClient extends AbstractTransportClient {
     }
     
     private String makeAPIPath(String path) {
-        if(path == null || path.isEmpty()) {
-            throw new IllegalArgumentException("path is null or empty");
-        }
-        
         return PathUtils.concatPath(HTTPTransportRestfulConstants.API_PATH, path);
     }
     
     private String makeGetMetadataPath(String path) {
-        if(path == null || path.isEmpty()) {
-            throw new IllegalArgumentException("path is null or empty");
-        }
-        
         return PathUtils.concatPath(HTTPTransportRestfulConstants.GET_METADATA_PATH, path);
     }
     
     private String makeListMetadataPath(String path) {
-        if(path == null || path.isEmpty()) {
-            throw new IllegalArgumentException("path is null or empty");
-        }
-        
         return PathUtils.concatPath(HTTPTransportRestfulConstants.LIST_METADATA_PATH, path);
     }
     
     private String makeGetDirectoryPath(String path) {
-        if(path == null || path.isEmpty()) {
-            throw new IllegalArgumentException("path is null or empty");
-        }
-        
         return PathUtils.concatPath(HTTPTransportRestfulConstants.GET_DIRECTORY_PATH, path);
     }
     
     private String makeGetRecipePath(String path) {
-        if(path == null || path.isEmpty()) {
-            throw new IllegalArgumentException("path is null or empty");
-        }
-        
         return PathUtils.concatPath(HTTPTransportRestfulConstants.GET_RECIPE_PATH, path);
     }
     
     private String makeGetDataChunkPath(String hash) {
-        if(hash == null || hash.isEmpty()) {
-            throw new IllegalArgumentException("hash is null or empty");
-        }
-        
         return PathUtils.concatPath(HTTPTransportRestfulConstants.GET_DATA_CHUNK_PATH, hash);
+    }
+    
+    private String makeGetDataChunkPath(String clusterName, String hash) {
+        String path = PathUtils.concatPath(clusterName, hash);
+        return PathUtils.concatPath(HTTPUserInterfaceRestfulConstants.GET_DATA_CHUNK_PATH, path);
     }
     
     @Override
@@ -259,6 +241,28 @@ public class HTTPTransportClient extends AbstractTransportClient {
         
         // URL pattern = http://xxx.xxx.xxx.xxx/data/hash
         String url = makeGetDataChunkPath(hash);
+        InputStream is = this.restfulClient.download(url);
+
+        updateLastActivetime();
+        return is;
+    }
+
+    @Override
+    public InputStream getDataChunk(String clusterName, String hash) throws IOException {
+        if(!this.connected) {
+            throw new IOException("Client is not connected");
+        }
+        
+        if(clusterName == null || clusterName.isEmpty()) {
+            throw new IllegalArgumentException("clusterName is null or empty");
+        }
+        
+        if(hash == null || hash.isEmpty()) {
+            throw new IllegalArgumentException("hash is null or empty");
+        }
+        
+        // URL pattern = http://xxx.xxx.xxx.xxx/data/clusterName/hash
+        String url = makeGetDataChunkPath(clusterName, hash);
         InputStream is = this.restfulClient.download(url);
 
         updateLastActivetime();

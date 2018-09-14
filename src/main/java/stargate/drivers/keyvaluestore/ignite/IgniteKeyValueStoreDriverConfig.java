@@ -35,8 +35,7 @@ public class IgniteKeyValueStoreDriverConfig extends AbstractKeyValueStoreDriver
             throw new IllegalArgumentException("file is null");
         }
 
-        JsonSerializer serializer = new JsonSerializer();
-        return (IgniteKeyValueStoreDriverConfig) serializer.fromJsonFile(file, IgniteKeyValueStoreDriverConfig.class);
+        return (IgniteKeyValueStoreDriverConfig) JsonSerializer.fromJsonFile(file, IgniteKeyValueStoreDriverConfig.class);
     }
     
     public static IgniteKeyValueStoreDriverConfig createInstance(String json) throws IOException {
@@ -44,8 +43,7 @@ public class IgniteKeyValueStoreDriverConfig extends AbstractKeyValueStoreDriver
             throw new IllegalArgumentException("json is null or empty");
         }
         
-        JsonSerializer serializer = new JsonSerializer();
-        return (IgniteKeyValueStoreDriverConfig) serializer.fromJson(json, IgniteKeyValueStoreDriverConfig.class);
+        return (IgniteKeyValueStoreDriverConfig) JsonSerializer.fromJson(json, IgniteKeyValueStoreDriverConfig.class);
     }
     
     public IgniteKeyValueStoreDriverConfig() {

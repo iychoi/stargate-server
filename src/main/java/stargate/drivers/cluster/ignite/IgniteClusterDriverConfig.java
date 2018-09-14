@@ -40,8 +40,7 @@ public class IgniteClusterDriverConfig extends AbstractClusterDriverConfig {
             throw new IllegalArgumentException("file is null");
         }
 
-        JsonSerializer serializer = new JsonSerializer();
-        return (IgniteClusterDriverConfig) serializer.fromJsonFile(file, IgniteClusterDriverConfig.class);
+        return (IgniteClusterDriverConfig) JsonSerializer.fromJsonFile(file, IgniteClusterDriverConfig.class);
     }
     
     public static IgniteClusterDriverConfig createInstance(String json) throws IOException {
@@ -49,8 +48,7 @@ public class IgniteClusterDriverConfig extends AbstractClusterDriverConfig {
             throw new IllegalArgumentException("json is null or empty");
         }
         
-        JsonSerializer serializer = new JsonSerializer();
-        return (IgniteClusterDriverConfig) serializer.fromJson(json, IgniteClusterDriverConfig.class);
+        return (IgniteClusterDriverConfig) JsonSerializer.fromJson(json, IgniteClusterDriverConfig.class);
     }
     
     public IgniteClusterDriverConfig() {

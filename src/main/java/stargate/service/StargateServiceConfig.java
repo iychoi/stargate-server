@@ -64,8 +64,7 @@ public class StargateServiceConfig extends AbstractImmutableConfig {
             throw new IllegalArgumentException("file is null");
         }
 
-        JsonSerializer serializer = new JsonSerializer();
-        return (StargateServiceConfig) serializer.fromJsonFile(file, StargateServiceConfig.class);
+        return (StargateServiceConfig) JsonSerializer.fromJsonFile(file, StargateServiceConfig.class);
     }
     
     public static StargateServiceConfig createInstance(String json) throws IOException {
@@ -73,8 +72,7 @@ public class StargateServiceConfig extends AbstractImmutableConfig {
             throw new IllegalArgumentException("json is null or empty");
         }
         
-        JsonSerializer serializer = new JsonSerializer();
-        return (StargateServiceConfig) serializer.fromJson(json, StargateServiceConfig.class);
+        return (StargateServiceConfig) JsonSerializer.fromJson(json, StargateServiceConfig.class);
     }
     
     public StargateServiceConfig() {

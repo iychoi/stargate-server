@@ -86,59 +86,36 @@ public class HTTPUserInterfaceClient extends AbstractUserInterfaceClient {
     }
     
     private String makeAPIPath(String path) {
-        if(path == null || path.isEmpty()) {
-            throw new IllegalArgumentException("path is null or empty");
-        }
-        
         return PathUtils.concatPath(HTTPUserInterfaceRestfulConstants.API_PATH, path);
     }
     
     private String makeAPIPath(String path1, String path2) {
-        if(path1 == null || path1.isEmpty()) {
-            throw new IllegalArgumentException("path1 is null or empty");
-        }
-        
-        if(path2 == null || path2.isEmpty()) {
-            throw new IllegalArgumentException("path2 is null or empty");
-        }
-        
         String api_path = PathUtils.concatPath(HTTPUserInterfaceRestfulConstants.API_PATH, path1);
         return PathUtils.concatPath(api_path, path2);
     }
     
     private String makeGetMetadataPath(DataObjectURI uri) {
-        if(uri == null) {
-            throw new IllegalArgumentException("uri is null");
-        }
-        
         String path = PathUtils.concatPath(uri.getClusterName(), uri.getPath());
         return PathUtils.concatPath(HTTPUserInterfaceRestfulConstants.GET_METADATA_PATH, path);
     }
     
     private String makeListMetadataPath(DataObjectURI uri) {
-        if(uri == null) {
-            throw new IllegalArgumentException("uri is null");
-        }
-        
         String path = PathUtils.concatPath(uri.getClusterName(), uri.getPath());
         return PathUtils.concatPath(HTTPUserInterfaceRestfulConstants.LIST_METADATAS_PATH, path);
     }
     
     private String makeGetRecipePath(DataObjectURI uri) {
-        if(uri == null) {
-            throw new IllegalArgumentException("uri is null");
-        }
-        
         String path = PathUtils.concatPath(uri.getClusterName(), uri.getPath());
         return PathUtils.concatPath(HTTPUserInterfaceRestfulConstants.GET_RECIPE_PATH, path);
     }
     
     private String makeGetDataChunkPath(String hash) {
-        if(hash == null || hash.isEmpty()) {
-            throw new IllegalArgumentException("hash is null or empty");
-        }
-        
         return PathUtils.concatPath(HTTPUserInterfaceRestfulConstants.GET_DATA_CHUNK_PATH, hash);
+    }
+    
+    private String makeGetDataChunkPath(String clusterName, String hash) {
+        String path = PathUtils.concatPath(clusterName, hash);
+        return PathUtils.concatPath(HTTPUserInterfaceRestfulConstants.GET_DATA_CHUNK_PATH, path);
     }
     
     @Override
@@ -388,6 +365,28 @@ public class HTTPUserInterfaceClient extends AbstractUserInterfaceClient {
         
         // URL pattern = http://xxx.xxx.xxx.xxx/data/hash
         String url = makeGetDataChunkPath(hash);
+        InputStream is = this.restfulClient.download(url);
+
+        updateLastActivetime();
+        return is;
+    }
+    
+    @Override
+    public InputStream getDataChunk(String clusterName, String hash) throws IOException {
+        if(!this.connected) {
+            throw new IOException("Client is not connected");
+        }
+        
+        if(clusterName == null || clusterName.isEmpty()) {
+            throw new IllegalArgumentException("clusterName is null or empty");
+        }
+        
+        if(hash == null || hash.isEmpty()) {
+            throw new IllegalArgumentException("hash is null or empty");
+        }
+        
+        // URL pattern = http://xxx.xxx.xxx.xxx/data/clusterName/hash
+        String url = makeGetDataChunkPath(clusterName, hash);
         InputStream is = this.restfulClient.download(url);
 
         updateLastActivetime();

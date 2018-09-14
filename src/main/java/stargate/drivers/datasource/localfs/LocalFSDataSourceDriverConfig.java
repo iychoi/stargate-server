@@ -42,8 +42,7 @@ public class LocalFSDataSourceDriverConfig extends AbstractDataSourceDriverConfi
             throw new IllegalArgumentException("file is null");
         }
 
-        JsonSerializer serializer = new JsonSerializer();
-        return (LocalFSDataSourceDriverConfig) serializer.fromJsonFile(file, LocalFSDataSourceDriverConfig.class);
+        return (LocalFSDataSourceDriverConfig) JsonSerializer.fromJsonFile(file, LocalFSDataSourceDriverConfig.class);
     }
     
     public static LocalFSDataSourceDriverConfig createInstance(String json) throws IOException {
@@ -51,8 +50,7 @@ public class LocalFSDataSourceDriverConfig extends AbstractDataSourceDriverConfi
             throw new IllegalArgumentException("json is null or empty");
         }
         
-        JsonSerializer serializer = new JsonSerializer();
-        return (LocalFSDataSourceDriverConfig) serializer.fromJson(json, LocalFSDataSourceDriverConfig.class);
+        return (LocalFSDataSourceDriverConfig) JsonSerializer.fromJson(json, LocalFSDataSourceDriverConfig.class);
     }
     
     public LocalFSDataSourceDriverConfig() {

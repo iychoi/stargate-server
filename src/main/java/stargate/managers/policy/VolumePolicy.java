@@ -48,8 +48,7 @@ public class VolumePolicy extends AbstractPolicy {
             throw new IllegalArgumentException("file is null");
         }
         
-        JsonSerializer serializer = new JsonSerializer();
-        return (VolumePolicy) serializer.fromJsonFile(file, VolumePolicy.class);
+        return (VolumePolicy) JsonSerializer.fromJsonFile(file, VolumePolicy.class);
     }
     
     public static VolumePolicy createInstance(String json) throws IOException {
@@ -57,8 +56,7 @@ public class VolumePolicy extends AbstractPolicy {
             throw new IllegalArgumentException("json is null or empty");
         }
         
-        JsonSerializer serializer = new JsonSerializer();
-        return (VolumePolicy) serializer.fromJson(json, VolumePolicy.class);
+        return (VolumePolicy) JsonSerializer.fromJson(json, VolumePolicy.class);
     }
     
     VolumePolicy() {

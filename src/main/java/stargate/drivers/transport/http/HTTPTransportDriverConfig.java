@@ -42,8 +42,7 @@ public class HTTPTransportDriverConfig extends AbstractTransportDriverConfig {
             throw new IllegalArgumentException("file is null");
         }
 
-        JsonSerializer serializer = new JsonSerializer();
-        return (HTTPTransportDriverConfig) serializer.fromJsonFile(file, HTTPTransportDriverConfig.class);
+        return (HTTPTransportDriverConfig) JsonSerializer.fromJsonFile(file, HTTPTransportDriverConfig.class);
     }
     
     public static HTTPTransportDriverConfig createInstance(String json) throws IOException {
@@ -51,8 +50,7 @@ public class HTTPTransportDriverConfig extends AbstractTransportDriverConfig {
             throw new IllegalArgumentException("json is null or empty");
         }
         
-        JsonSerializer serializer = new JsonSerializer();
-        return (HTTPTransportDriverConfig) serializer.fromJson(json, HTTPTransportDriverConfig.class);
+        return (HTTPTransportDriverConfig) JsonSerializer.fromJson(json, HTTPTransportDriverConfig.class);
     }
     
     public HTTPTransportDriverConfig() {

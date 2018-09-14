@@ -99,8 +99,7 @@ public class Service {
             if(config == null) {
                 System.out.println("<EMPTY!>");
             } else {
-                JsonSerializer serializer = new JsonSerializer();
-                String json = serializer.formatPretty(config.toJson());
+                String json = JsonSerializer.formatPretty(config.toJson());
                 System.out.println(json);
             }
             String dateTimeString = DateTimeUtils.getDateTimeString(client.getLastActiveTime());

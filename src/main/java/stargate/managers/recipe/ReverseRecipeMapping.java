@@ -43,8 +43,7 @@ public class ReverseRecipeMapping {
             throw new IllegalArgumentException("file is null");
         }
 
-        JsonSerializer serializer = new JsonSerializer();
-        return (ReverseRecipeMapping) serializer.fromJsonFile(file, ReverseRecipeMapping.class);
+        return (ReverseRecipeMapping) JsonSerializer.fromJsonFile(file, ReverseRecipeMapping.class);
     }
     
     public static ReverseRecipeMapping createInstance(String json) throws IOException {
@@ -52,8 +51,7 @@ public class ReverseRecipeMapping {
             throw new IllegalArgumentException("json is null or empty");
         }
         
-        JsonSerializer serializer = new JsonSerializer();
-        return (ReverseRecipeMapping) serializer.fromJson(json, ReverseRecipeMapping.class);
+        return (ReverseRecipeMapping) JsonSerializer.fromJson(json, ReverseRecipeMapping.class);
     }
     
     ReverseRecipeMapping() {
@@ -102,13 +100,12 @@ public class ReverseRecipeMapping {
     
     @Override
     public String toString() {
-        return this.hash.toString();
+        return this.hash;
     }
     
     @JsonIgnore
     public String toJson() throws IOException {
-        JsonSerializer serializer = new JsonSerializer();
-        return serializer.toJson(this);
+        return JsonSerializer.toJson(this);
     }
     
     @JsonIgnore
@@ -117,7 +114,6 @@ public class ReverseRecipeMapping {
             throw new IllegalArgumentException("file is null");
         }
         
-        JsonSerializer serializer = new JsonSerializer();
-        serializer.toJsonFile(file, this);
+        JsonSerializer.toJsonFile(file, this);
     }
 }

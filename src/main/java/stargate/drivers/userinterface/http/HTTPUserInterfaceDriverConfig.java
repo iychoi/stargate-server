@@ -42,8 +42,7 @@ public class HTTPUserInterfaceDriverConfig extends AbstractUserInterfaceDriverCo
             throw new IllegalArgumentException("file is null");
         }
 
-        JsonSerializer serializer = new JsonSerializer();
-        return (HTTPUserInterfaceDriverConfig) serializer.fromJsonFile(file, HTTPUserInterfaceDriverConfig.class);
+        return (HTTPUserInterfaceDriverConfig) JsonSerializer.fromJsonFile(file, HTTPUserInterfaceDriverConfig.class);
     }
     
     public static HTTPUserInterfaceDriverConfig createInstance(String json) throws IOException {
@@ -51,8 +50,7 @@ public class HTTPUserInterfaceDriverConfig extends AbstractUserInterfaceDriverCo
             throw new IllegalArgumentException("json is null or empty");
         }
         
-        JsonSerializer serializer = new JsonSerializer();
-        return (HTTPUserInterfaceDriverConfig) serializer.fromJson(json, HTTPUserInterfaceDriverConfig.class);
+        return (HTTPUserInterfaceDriverConfig) JsonSerializer.fromJson(json, HTTPUserInterfaceDriverConfig.class);
     }
     
     public HTTPUserInterfaceDriverConfig() {

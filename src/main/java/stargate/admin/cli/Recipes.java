@@ -117,13 +117,12 @@ public class Recipes {
             
             HTTPUserInterfaceClient client = HTTPUIClient.getClient(serviceURI);
             client.connect();
-            DataObjectURI uri = new DataObjectURI("local", concatPath);
+            DataObjectURI uri = new DataObjectURI(DataObjectURI.WILDCARD_LOCAL_CLUSTER_NAME, concatPath);
             Recipe recipe = client.getRecipe(uri);
             if(recipe == null) {
                 System.out.println("<ENTRY DOES NOT EXIST!>");
             } else {
-                JsonSerializer serializer = new JsonSerializer();
-                String json = serializer.formatPretty(recipe.toJson());
+                String json = JsonSerializer.formatPretty(recipe.toJson());
                 System.out.println(json);
             }
             String dateTimeString = DateTimeUtils.getDateTimeString(client.getLastActiveTime());

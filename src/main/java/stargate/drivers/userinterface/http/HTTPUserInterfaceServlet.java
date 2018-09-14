@@ -73,6 +73,31 @@ public class HTTPUserInterfaceServlet extends AbstractUserInterfaceServer {
 
     private static HTTPUserInterfaceDriver driver = null;
     
+    public class StreamingOutputData implements StreamingOutput {
+
+        private static final int BUFFER_SIZE = 8*1024; // 8k
+        private InputStream is;
+        private byte[] buffer;
+        
+        StreamingOutputData(InputStream is) {
+            this.is = is;
+            this.buffer = new byte[BUFFER_SIZE];
+        }
+        
+        @Override
+        public void write(OutputStream out) throws IOException, WebApplicationException {
+            try {
+                int read = 0;
+                while ((read = this.is.read(this.buffer)) > 0) {
+                    out.write(this.buffer, 0, read);
+                }
+                this.is.close();
+            } catch (Exception ex) {
+                throw new WebApplicationException(ex);
+            }
+        }
+    }
+    
     static void setDriver(HTTPUserInterfaceDriver driver) {
         HTTPUserInterfaceServlet.driver = driver;
     }
@@ -156,16 +181,16 @@ public class HTTPUserInterfaceServlet extends AbstractUserInterfaceServer {
     }
     
     @GET
-    @Path(HTTPUserInterfaceRestfulConstants.API_PATH + "/" + HTTPUserInterfaceRestfulConstants.API_GET_REMOTE_CLUSTER_PATH + "/{path:.*}")
+    @Path(HTTPUserInterfaceRestfulConstants.API_PATH + "/" + HTTPUserInterfaceRestfulConstants.API_GET_REMOTE_CLUSTER_PATH + "/{cluster:.*}")
     @Produces(MediaType.APPLICATION_JSON)
     public Response getRemoteClusterRestful(
-        @DefaultValue("") @PathParam("path") String path) throws IOException {
-        if(path == null || path.isEmpty()) {
-            throw new IllegalArgumentException("path is null or empty");
+        @DefaultValue("") @PathParam("cluster") String cluster) throws IOException {
+        if(cluster == null || cluster.isEmpty()) {
+            throw new IllegalArgumentException("cluster is null or empty");
         }
         
         try {
-            Cluster remoteCluster = getRemoteCluster(path);
+            Cluster remoteCluster = getRemoteCluster(cluster);
             RestfulResponse rres = new RestfulResponse(remoteCluster);
             return Response.status(Response.Status.OK).entity(rres).build();
         } catch(Exception ex) {
@@ -274,16 +299,16 @@ public class HTTPUserInterfaceServlet extends AbstractUserInterfaceServer {
     }
     
     @DELETE
-    @Path(HTTPUserInterfaceRestfulConstants.API_PATH + "/" + HTTPUserInterfaceRestfulConstants.API_REMOVE_REMOTE_CLUSTER_PATH + "/{path: .*}")
+    @Path(HTTPUserInterfaceRestfulConstants.API_PATH + "/" + HTTPUserInterfaceRestfulConstants.API_REMOVE_REMOTE_CLUSTER_PATH + "/{cluster: .*}")
     @Produces(MediaType.APPLICATION_JSON)
     public Response removeRemoteClusterRestful(
-            @DefaultValue("") @PathParam("path") String path) throws IOException {
-        if(path == null || path.isEmpty()) {
-            throw new IllegalArgumentException("path is null or empty");
+            @DefaultValue("") @PathParam("cluster") String cluster) throws IOException {
+        if(cluster == null || cluster.isEmpty()) {
+            throw new IllegalArgumentException("cluster is null or empty");
         }
         
         try {
-            removeRemoteCluster(path);
+            removeRemoteCluster(cluster);
             RestfulResponse rres = new RestfulResponse(true);
             return Response.status(Response.Status.OK).entity(rres).build();
         } catch(Exception ex) {
@@ -349,7 +374,6 @@ public class HTTPUserInterfaceServlet extends AbstractUserInterfaceServer {
             throw new IOException(ex);
         }
     }
-    
     
     @GET
     @Path(HTTPUserInterfaceRestfulConstants.LIST_METADATAS_PATH + "/{path:.*}")
@@ -519,7 +543,7 @@ public class HTTPUserInterfaceServlet extends AbstractUserInterfaceServer {
     }
     
     @GET
-    @Path(HTTPUserInterfaceRestfulConstants.GET_DATA_CHUNK_PATH + "/{hash:.*}")
+    @Path(HTTPUserInterfaceRestfulConstants.GET_DATA_CHUNK_PATH + "/{hash:\\w*}")
     @Produces(MediaType.APPLICATION_OCTET_STREAM)
     public Response getDataChunkRestful(
             @DefaultValue("") @PathParam("hash") String hash) throws Exception {
@@ -533,25 +557,39 @@ public class HTTPUserInterfaceServlet extends AbstractUserInterfaceServer {
                 return Response.status(Response.Status.NOT_FOUND).build();
             }
             
-            StreamingOutput stream = new StreamingOutput() {
-                @Override
-                public void write(OutputStream out) throws IOException, WebApplicationException {
-                    try {
-                        int buffersize = 100 * 1024;
-                        byte[] buffer = new byte[buffersize];
-
-                        int read = 0;
-                        while ((read = is.read(buffer)) > 0) {
-                            out.write(buffer, 0, read);
-                        }
-                        is.close();
-
-                    } catch (Exception ex) {
-                        throw new WebApplicationException(ex);
-                    }
-                }
-            };
-
+            StreamingOutputData stream = new StreamingOutputData(is);
+            return Response.ok(stream).header("content-disposition", "attachment; filename = " + hash).build();
+        } catch (Exception ex) {
+            return Response.status(Response.Status.INTERNAL_SERVER_ERROR).build();
+        }
+    }
+    
+    @Override
+    public InputStream getDataChunk(String hash) throws IOException {
+        return getDataChunk(DataObjectURI.WILDCARD_LOCAL_CLUSTER_NAME, hash);
+    }
+    
+    @GET
+    @Path(HTTPUserInterfaceRestfulConstants.GET_DATA_CHUNK_PATH + "/{cluster:.*}/{hash:\\w+}")
+    @Produces(MediaType.APPLICATION_OCTET_STREAM)
+    public Response getDataChunkRestful(
+            @DefaultValue("") @PathParam("cluster") String cluster,
+            @DefaultValue("") @PathParam("hash") String hash) throws Exception {
+        if(cluster == null || cluster.isEmpty()) {
+            throw new IllegalArgumentException("cluster is null or empty");
+        }
+        
+        if(hash == null || hash.isEmpty()) {
+            throw new IllegalArgumentException("hash is null or empty");
+        }
+        
+        try {
+            final InputStream is = getDataChunk(cluster, hash);
+            if(is == null) {
+                return Response.status(Response.Status.NOT_FOUND).build();
+            }
+            
+            StreamingOutputData stream = new StreamingOutputData(is);
             return Response.ok(stream).header("content-disposition", "attachment; filename = " + hash).build();
         } catch (Exception ex) {
             return Response.status(Response.Status.INTERNAL_SERVER_ERROR).build();
@@ -559,7 +597,11 @@ public class HTTPUserInterfaceServlet extends AbstractUserInterfaceServer {
     }
 
     @Override
-    public InputStream getDataChunk(String hash) throws IOException {
+    public InputStream getDataChunk(String clusterName, String hash) throws IOException {
+        if(clusterName == null || clusterName.isEmpty()) {
+            throw new IllegalArgumentException("clusterName is null or empty");
+        }
+        
         if(hash == null || hash.isEmpty()) {
             throw new IllegalArgumentException("hash is null or empty");
         }
@@ -567,7 +609,7 @@ public class HTTPUserInterfaceServlet extends AbstractUserInterfaceServer {
         try {
             StargateService service = getStargateService();
             VolumeManager volumeManager = service.getVolumeManager();
-            return volumeManager.getDataChunk(hash);
+            return volumeManager.getDataChunk(clusterName, hash);
         } catch (ManagerNotInstantiatedException ex) {
             LOG.error(ex);
             throw new IOException(ex);
