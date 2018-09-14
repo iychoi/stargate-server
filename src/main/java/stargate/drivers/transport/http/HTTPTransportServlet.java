@@ -334,42 +334,6 @@ public class HTTPTransportServlet extends AbstractTransportServer {
 
     @Override
     public InputStream getDataChunk(String hash) throws IOException {
-        return getDataChunk(DataObjectURI.WILDCARD_LOCAL_CLUSTER_NAME, hash);
-    }
-    
-    @GET
-    @Path(HTTPTransportRestfulConstants.GET_DATA_CHUNK_PATH + "/{cluster:.*}/{hash:\\w+}")
-    @Produces(MediaType.APPLICATION_OCTET_STREAM)
-    public Response getDataChunkRestful(
-            @DefaultValue("") @PathParam("cluster") String cluster,
-            @DefaultValue("") @PathParam("hash") String hash) throws Exception {
-        if(cluster == null || cluster.isEmpty()) {
-            throw new IllegalArgumentException("cluster is null or empty");
-        }
-        
-        if(hash == null || hash.isEmpty()) {
-            throw new IllegalArgumentException("hash is null or empty");
-        }
-        
-        try {
-            final InputStream is = getDataChunk(cluster, hash);
-            if(is == null) {
-                return Response.status(Response.Status.NOT_FOUND).build();
-            }
-            
-            StreamingOutputData stream = new StreamingOutputData(is);
-            return Response.ok(stream).header("content-disposition", "attachment; filename = " + hash).build();
-        } catch (Exception ex) {
-            return Response.status(Response.Status.INTERNAL_SERVER_ERROR).build();
-        }
-    }
-
-    @Override
-    public InputStream getDataChunk(String clusterName, String hash) throws IOException {
-        if(clusterName == null || clusterName.isEmpty()) {
-            throw new IllegalArgumentException("clusterName is null or empty");
-        }
-        
         if(hash == null || hash.isEmpty()) {
             throw new IllegalArgumentException("hash is null or empty");
         }
@@ -377,7 +341,7 @@ public class HTTPTransportServlet extends AbstractTransportServer {
         try {
             StargateService service = getStargateService();
             VolumeManager volumeManager = service.getVolumeManager();
-            return volumeManager.getDataChunk(clusterName, hash);
+            return volumeManager.getDataChunk(DataObjectURI.WILDCARD_LOCAL_CLUSTER_NAME, hash);
         } catch (ManagerNotInstantiatedException ex) {
             LOG.error(ex);
             throw new IOException(ex);

@@ -21,9 +21,9 @@ import org.apache.commons.logging.Log;
 import org.apache.commons.logging.LogFactory;
 import org.codehaus.jackson.annotate.JsonIgnore;
 import org.codehaus.jackson.annotate.JsonProperty;
-import stargate.commons.config.AbstractImmutableConfig;
 import stargate.commons.driver.DriverInjection;
 import stargate.commons.manager.ManagerConfig;
+import stargate.commons.service.ServiceConfig;
 import stargate.commons.utils.JsonSerializer;
 import stargate.commons.utils.PathUtils;
 import stargate.drivers.cluster.ignite.IgniteClusterDriver;
@@ -46,17 +46,10 @@ import stargate.drivers.userinterface.http.HTTPUserInterfaceDriverConfig;
  *
  * @author iychoi
  */
-public class StargateServiceConfig extends AbstractImmutableConfig {
+public class StargateServiceConfig extends ServiceConfig {
     
     private static final Log LOG = LogFactory.getLog(StargateServiceConfig.class);
     
-    private ManagerConfig clusterManagerConfig;
-    private ManagerConfig dataSourceManagerConfig;
-    private ManagerConfig keyValueStoreManagerConfig;
-    private ManagerConfig recipeManagerConfig;
-    private ManagerConfig transportManagerConfig;
-    private ManagerConfig userInterfaceManagerConfig;
-    private ManagerConfig scheduleManagerConfig;
     private UserConfig userConfig;
     
     public static StargateServiceConfig createInstance(File file) throws IOException {
@@ -75,7 +68,7 @@ public class StargateServiceConfig extends AbstractImmutableConfig {
         return (StargateServiceConfig) JsonSerializer.fromJson(json, StargateServiceConfig.class);
     }
     
-    public StargateServiceConfig() {
+    public StargateServiceConfig () {
         initDefaults();
     }
     
@@ -91,148 +84,11 @@ public class StargateServiceConfig extends AbstractImmutableConfig {
     }
     
     @Override
+    @JsonIgnore
     public void setImmutable() {
         super.setImmutable();
         
-        if(this.clusterManagerConfig != null) {
-            this.clusterManagerConfig.setImmutable();
-        }
-        
-        if(this.dataSourceManagerConfig != null) {
-            this.dataSourceManagerConfig.setImmutable();
-        }
-        
-        if(this.keyValueStoreManagerConfig != null) {
-            this.keyValueStoreManagerConfig.setImmutable();
-        }
-    
-        if(this.recipeManagerConfig != null) {
-            this.recipeManagerConfig.setImmutable();
-        }
-        
-        if(this.transportManagerConfig != null) {
-            this.transportManagerConfig.setImmutable();
-        }
-        
-        if(this.userInterfaceManagerConfig != null) {
-            this.userInterfaceManagerConfig.setImmutable();
-        }
-        
-        if(this.scheduleManagerConfig != null) {
-            this.scheduleManagerConfig.setImmutable();
-        }
-    }
-    
-    @JsonProperty("cluster")
-    public void setClusterConfig(ManagerConfig clusterConfig) {
-        if(clusterConfig == null) {
-            throw new IllegalArgumentException("clusterConfig is null");
-        }
-        
-        super.checkMutableAndRaiseException();
-        
-        this.clusterManagerConfig = clusterConfig;
-    }
-    
-    @JsonProperty("cluster")
-    public ManagerConfig getClusterConfig() {
-        return this.clusterManagerConfig;
-    }
-    
-    @JsonProperty("data_source")
-    public void setDataSourceConfig(ManagerConfig dataSourceConfig) {
-        if(dataSourceConfig == null) {
-            throw new IllegalArgumentException("dataSourceConfig is null");
-        }
-        
-        super.checkMutableAndRaiseException();
-        
-        this.dataSourceManagerConfig = dataSourceConfig;
-    }
-    
-    @JsonProperty("data_source")
-    public ManagerConfig getDataSourceConfig() {
-        return this.dataSourceManagerConfig;
-    }
-    
-    @JsonProperty("keyvalue_store")
-    public void setKeyValueStoreConfig(ManagerConfig keyValueStoreConfig) {
-        if(keyValueStoreConfig == null) {
-            throw new IllegalArgumentException("keyValueStoreConfig is null");
-        }
-        
-        super.checkMutableAndRaiseException();
-        
-        this.keyValueStoreManagerConfig = keyValueStoreConfig;
-    }
-    
-    @JsonProperty("keyvalue_store")
-    public ManagerConfig getKeyValueStoreConfig() {
-        return this.keyValueStoreManagerConfig;
-    }
-    
-    @JsonProperty("recipe")
-    public void setRecipeConfig(ManagerConfig recipeConfig) {
-        if(recipeConfig == null) {
-            throw new IllegalArgumentException("recipeConfig is null");
-        }
-        
-        super.checkMutableAndRaiseException();
-        
-        this.recipeManagerConfig = recipeConfig;
-    }
-    
-    @JsonProperty("recipe")
-    public ManagerConfig getRecipeConfig() {
-        return this.recipeManagerConfig;
-    }
-    
-    @JsonProperty("transport")
-    public void setTransportConfig(ManagerConfig transportConfig) {
-        if(transportConfig == null) {
-            throw new IllegalArgumentException("transportConfig is null");
-        }
-        
-        super.checkMutableAndRaiseException();
-        
-        this.transportManagerConfig = transportConfig;
-    }
-    
-    @JsonProperty("transport")
-    public ManagerConfig getTransportConfig() {
-        return this.transportManagerConfig;
-    }
-    
-    @JsonProperty("user_interface")
-    public void setUserInterfaceConfig(ManagerConfig userInterfaceConfig) {
-        if(userInterfaceConfig == null) {
-            throw new IllegalArgumentException("userInterfaceConfig is null");
-        }
-        
-        super.checkMutableAndRaiseException();
-        
-        this.userInterfaceManagerConfig = userInterfaceConfig;
-    }
-    
-    @JsonProperty("schedule")
-    public ManagerConfig getScheduleConfig() {
-        return this.scheduleManagerConfig;
-    }
-    
-    @JsonProperty("schedule")
-    public void setScheduleConfig(ManagerConfig scheduleConfig) {
-        if(scheduleConfig == null) {
-            throw new IllegalArgumentException("scheduleConfig is null");
-        }
-        
-        super.checkMutableAndRaiseException();
-        
-        this.scheduleManagerConfig = scheduleConfig;
-    }
-    
-    @JsonProperty("user_interface")
-    public ManagerConfig getUserInterfaceConfig() {
-        return this.userInterfaceManagerConfig;
+        this.userConfig.setImmutable();
     }
     
     @JsonProperty("user_config")
@@ -346,5 +202,18 @@ public class StargateServiceConfig extends AbstractImmutableConfig {
         ManagerConfig managerConfig = new ManagerConfig();
         managerConfig.addDriverSetting(driverInjection);
         return managerConfig;
+    }
+
+    @JsonIgnore
+    public ServiceConfig toServiceConfig() {
+        ServiceConfig serviceConfig = new ServiceConfig();
+        serviceConfig.setClusterConfig(this.clusterManagerConfig);
+        serviceConfig.setDataSourceConfig(this.dataSourceManagerConfig);
+        serviceConfig.setKeyValueStoreConfig(this.keyValueStoreManagerConfig);
+        serviceConfig.setRecipeConfig(this.recipeManagerConfig);
+        serviceConfig.setTransportConfig(this.transportManagerConfig);
+        serviceConfig.setUserInterfaceConfig(this.userInterfaceManagerConfig);
+        serviceConfig.setScheduleConfig(this.scheduleManagerConfig);
+        return serviceConfig;
     }
 }

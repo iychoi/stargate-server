@@ -22,7 +22,6 @@ import org.apache.commons.logging.LogFactory;
 import stargate.commons.utils.DateTimeUtils;
 import stargate.commons.utils.JsonSerializer;
 import stargate.drivers.userinterface.http.HTTPUserInterfaceClient;
-import stargate.service.StargateServiceConfig;
 
 /**
  *
@@ -95,11 +94,11 @@ public class Service {
         try {
             HTTPUserInterfaceClient client = HTTPUIClient.getClient(serviceURI);
             client.connect();
-            StargateServiceConfig config = (StargateServiceConfig) client.getServiceConfig();
-            if(config == null) {
+            String config = (String) client.getServiceConfig();
+            if(config == null || config.isEmpty()) {
                 System.out.println("<EMPTY!>");
             } else {
-                String json = JsonSerializer.formatPretty(config.toJson());
+                String json = JsonSerializer.formatPretty(config);
                 System.out.println(json);
             }
             String dateTimeString = DateTimeUtils.getDateTimeString(client.getLastActiveTime());

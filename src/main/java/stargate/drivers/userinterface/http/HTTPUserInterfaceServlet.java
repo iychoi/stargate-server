@@ -39,7 +39,6 @@ import javax.ws.rs.core.StreamingOutput;
 import org.apache.commons.logging.Log;
 import org.apache.commons.logging.LogFactory;
 import stargate.commons.cluster.Cluster;
-import stargate.commons.config.AbstractImmutableConfig;
 import stargate.commons.dataobject.DataObjectMetadata;
 import stargate.commons.dataobject.DataObjectURI;
 import stargate.commons.dataobject.Directory;
@@ -48,6 +47,7 @@ import stargate.commons.manager.AbstractManager;
 import stargate.commons.manager.ManagerNotInstantiatedException;
 import stargate.commons.recipe.Recipe;
 import stargate.commons.restful.RestfulResponse;
+import stargate.commons.service.ServiceConfig;
 import stargate.commons.userinterface.AbstractUserInterfaceServer;
 import stargate.commons.utils.PathUtils;
 import stargate.managers.cluster.ClusterManager;
@@ -139,7 +139,7 @@ public class HTTPUserInterfaceServlet extends AbstractUserInterfaceServer {
     @Produces(MediaType.APPLICATION_JSON)
     public Response getServiceConfigRestful() throws IOException {
         try {
-            StargateServiceConfig config = (StargateServiceConfig) getServiceConfig();
+            String config = getServiceConfig();
             RestfulResponse rres = new RestfulResponse(config);
             return Response.status(Response.Status.OK).entity(rres).build();
         } catch(Exception ex) {
@@ -149,9 +149,10 @@ public class HTTPUserInterfaceServlet extends AbstractUserInterfaceServer {
     }
     
     @Override
-    public AbstractImmutableConfig getServiceConfig() throws IOException {
+    public String getServiceConfig() throws IOException {
         StargateService stargateService = getStargateService();
-        return stargateService.getConfig();
+        StargateServiceConfig config = stargateService.getConfig();
+        return config.toJson();
     }
 
     @GET

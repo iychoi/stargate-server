@@ -33,7 +33,6 @@ import stargate.commons.transport.AbstractTransportClient;
 import stargate.commons.transport.TransportServiceInfo;
 import stargate.commons.utils.DateTimeUtils;
 import stargate.commons.utils.PathUtils;
-import stargate.drivers.userinterface.http.HTTPUserInterfaceRestfulConstants;
 
 /**
  *
@@ -108,11 +107,6 @@ public class HTTPTransportClient extends AbstractTransportClient {
     
     private String makeGetDataChunkPath(String hash) {
         return PathUtils.concatPath(HTTPTransportRestfulConstants.GET_DATA_CHUNK_PATH, hash);
-    }
-    
-    private String makeGetDataChunkPath(String clusterName, String hash) {
-        String path = PathUtils.concatPath(clusterName, hash);
-        return PathUtils.concatPath(HTTPUserInterfaceRestfulConstants.GET_DATA_CHUNK_PATH, path);
     }
     
     @Override
@@ -241,28 +235,6 @@ public class HTTPTransportClient extends AbstractTransportClient {
         
         // URL pattern = http://xxx.xxx.xxx.xxx/data/hash
         String url = makeGetDataChunkPath(hash);
-        InputStream is = this.restfulClient.download(url);
-
-        updateLastActivetime();
-        return is;
-    }
-
-    @Override
-    public InputStream getDataChunk(String clusterName, String hash) throws IOException {
-        if(!this.connected) {
-            throw new IOException("Client is not connected");
-        }
-        
-        if(clusterName == null || clusterName.isEmpty()) {
-            throw new IllegalArgumentException("clusterName is null or empty");
-        }
-        
-        if(hash == null || hash.isEmpty()) {
-            throw new IllegalArgumentException("hash is null or empty");
-        }
-        
-        // URL pattern = http://xxx.xxx.xxx.xxx/data/clusterName/hash
-        String url = makeGetDataChunkPath(clusterName, hash);
         InputStream is = this.restfulClient.download(url);
 
         updateLastActivetime();
