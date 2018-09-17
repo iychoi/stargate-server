@@ -40,10 +40,12 @@ import stargate.commons.cluster.NodeStatus;
 import stargate.commons.driver.AbstractDriverConfig;
 import stargate.commons.manager.ManagerNotInstantiatedException;
 import stargate.commons.transport.TransportServiceInfo;
+import stargate.commons.userinterface.UserInterfaceServiceInfo;
 import stargate.commons.utils.IPUtils;
 import stargate.drivers.ignite.IgniteDriver;
 import stargate.managers.cluster.ClusterManager;
 import stargate.managers.transport.TransportManager;
+import stargate.managers.userinterface.UserInterfaceManager;
 import stargate.service.StargateService;
 
 /**
@@ -168,7 +170,7 @@ public class IgniteClusterDriver extends AbstractClusterDriver {
         IgniteCluster igniteCluster = ignite.cluster();
         ClusterNode localNode = igniteCluster.localNode();
 
-        String nodeName = localNode.id().toString();
+        String nodeName = localNode.consistentId().toString();
         String clusterName = this.config.getClusterName();
         Set<String> hostnames = new HashSet<String>();
         Collection<String> igniteHostNames = localNode.hostNames();
@@ -183,9 +185,12 @@ public class IgniteClusterDriver extends AbstractClusterDriver {
         try {    
             StargateService stargateService = getStargateService();
             TransportManager transportManager = stargateService.getTransportManager();
-            TransportServiceInfo serviceInfo = transportManager.getServiceInfo();
+            TransportServiceInfo transportServiceInfo = transportManager.getServiceInfo();
             
-            Node stargateNode = new Node(nodeName, clusterName, new NodeStatus(), serviceInfo, hostnames);
+            UserInterfaceManager userInterfaceManager = stargateService.getUserInterfaceManager();
+            UserInterfaceServiceInfo userInterfaceServiceInfo = userInterfaceManager.getServiceInfo();
+            
+            Node stargateNode = new Node(nodeName, clusterName, new NodeStatus(), transportServiceInfo, userInterfaceServiceInfo, hostnames);
             //LOG.info(stargateNode.toJson());
             return stargateNode;
         } catch (ManagerNotInstantiatedException ex) {

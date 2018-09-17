@@ -81,6 +81,11 @@ public class HTTPTransportClient extends AbstractTransportClient {
     }
     
     @Override
+    public URI getServiceURI() {
+        return this.serviceUri;
+    }
+    
+    @Override
     public boolean isConnected() {
         return this.connected;
     }
@@ -138,13 +143,13 @@ public class HTTPTransportClient extends AbstractTransportClient {
     }
 
     @Override
-    public Cluster getCluster() throws IOException {
+    public Cluster getLocalCluster() throws IOException {
         if(!this.connected) {
             throw new IOException("Client is not connected");
         }
         
         // URL pattern = http://xxx.xxx.xxx.xxx/api/cluster
-        String url = makeAPIPath(HTTPTransportRestfulConstants.API_GET_CLUSTER_PATH);
+        String url = makeAPIPath(HTTPTransportRestfulConstants.API_GET_LOCAL_CLUSTER_PATH);
         Cluster response = (Cluster) this.restfulClient.get(url);
 
         updateLastActivetime();

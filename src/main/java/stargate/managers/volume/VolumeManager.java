@@ -138,7 +138,7 @@ public class VolumeManager extends AbstractManager<NullDriver> {
                 }
                 return false;
             } catch (ManagerNotInstantiatedException ex) {
-                LOG.info(ex);
+                LOG.error(ex);
                 return false;
             }
         }
@@ -219,7 +219,7 @@ public class VolumeManager extends AbstractManager<NullDriver> {
             this.lastUpdateTime = DateTimeUtils.getTimestamp();
             return rootDirectory;
         } catch (ManagerNotInstantiatedException ex) {
-            LOG.info(ex);
+            LOG.error(ex);
             throw new IOException(ex);
         }
     }
@@ -284,7 +284,7 @@ public class VolumeManager extends AbstractManager<NullDriver> {
             
             this.lastUpdateTime = DateTimeUtils.getTimestamp();
         } catch (ManagerNotInstantiatedException ex) {
-            LOG.info(ex);
+            LOG.error(ex);
             throw new IOException(ex);
         }
     }
@@ -304,7 +304,7 @@ public class VolumeManager extends AbstractManager<NullDriver> {
             
             buildLocalDirectoryHierarchy(metadatas);
         } catch (ManagerNotInstantiatedException ex) {
-            LOG.info(ex);
+            LOG.error(ex);
             throw new IOException(ex);
         }
     }
@@ -328,7 +328,7 @@ public class VolumeManager extends AbstractManager<NullDriver> {
             }
             return directory;
         } catch (ManagerNotInstantiatedException ex) {
-            LOG.info(ex);
+            LOG.error(ex);
             throw new IOException(ex);
         }
     }
@@ -399,7 +399,7 @@ public class VolumeManager extends AbstractManager<NullDriver> {
             }
             return recipe;
         } catch (ManagerNotInstantiatedException ex) {
-            LOG.info(ex);
+            LOG.error(ex);
             throw new IOException(ex);
         }
     }
@@ -414,7 +414,7 @@ public class VolumeManager extends AbstractManager<NullDriver> {
             }
             return recipe;
         } catch (ManagerNotInstantiatedException ex) {
-            LOG.info(ex);
+            LOG.error(ex);
             throw new IOException(ex);
         }
     }
@@ -473,7 +473,7 @@ public class VolumeManager extends AbstractManager<NullDriver> {
             // access the file
             return dataSourceDriver.openFile(sourceMetadata.getURI(), chunk.getOffset(), chunk.getLength());
         } catch (ManagerNotInstantiatedException ex) {
-            LOG.info(ex);
+            LOG.error(ex);
             throw new IOException(ex);
         }
     }
@@ -489,7 +489,7 @@ public class VolumeManager extends AbstractManager<NullDriver> {
             }
             return is;
         } catch (ManagerNotInstantiatedException ex) {
-            LOG.info(ex);
+            LOG.error(ex);
             throw new IOException(ex);
         }
     }

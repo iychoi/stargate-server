@@ -47,7 +47,6 @@ import stargate.commons.manager.AbstractManager;
 import stargate.commons.manager.ManagerNotInstantiatedException;
 import stargate.commons.recipe.Recipe;
 import stargate.commons.restful.RestfulResponse;
-import stargate.commons.service.ServiceConfig;
 import stargate.commons.userinterface.AbstractUserInterfaceServer;
 import stargate.commons.utils.PathUtils;
 import stargate.managers.cluster.ClusterManager;
@@ -72,7 +71,7 @@ public class HTTPUserInterfaceServlet extends AbstractUserInterfaceServer {
     private static final Log LOG = LogFactory.getLog(HTTPUserInterfaceServlet.class);
 
     private static HTTPUserInterfaceDriver driver = null;
-    
+
     public class StreamingOutputData implements StreamingOutput {
 
         private static final int BUFFER_SIZE = 8*1024; // 8k
@@ -156,11 +155,16 @@ public class HTTPUserInterfaceServlet extends AbstractUserInterfaceServer {
     }
 
     @GET
-    @Path(HTTPUserInterfaceRestfulConstants.API_PATH + "/" + HTTPUserInterfaceRestfulConstants.API_GET_CLUSTER_PATH)
+    @Path(HTTPUserInterfaceRestfulConstants.API_PATH + "/" + HTTPUserInterfaceRestfulConstants.API_GET_CLUSTER_PATH + "/{name:.*}")
     @Produces(MediaType.APPLICATION_JSON)
-    public Response getClusterRestful() throws IOException {
+    public Response getClusterRestful(
+        @DefaultValue("") @PathParam("name") String name) throws IOException {
+        if(name == null || name.isEmpty()) {
+            throw new IllegalArgumentException("name is null or empty");
+        }
+        
         try {
-            Cluster cluster = getCluster();
+            Cluster cluster = getCluster(name);
             RestfulResponse rres = new RestfulResponse(cluster);
             return Response.status(Response.Status.OK).entity(rres).build();
         } catch(Exception ex) {
@@ -170,7 +174,42 @@ public class HTTPUserInterfaceServlet extends AbstractUserInterfaceServer {
     }
     
     @Override
-    public Cluster getCluster() throws IOException {
+    public Cluster getCluster(String name) throws IOException {
+        if(name == null || name.isEmpty()) {
+            throw new IllegalArgumentException("name is null or empty");
+        }
+        
+        try {
+            StargateService service = getStargateService();
+            ClusterManager clusterManager = service.getClusterManager();
+            String localClusterName = clusterManager.getLocalClusterName();
+            if(localClusterName.equals(name) || name.equalsIgnoreCase(DataObjectURI.WILDCARD_LOCAL_CLUSTER_NAME)) {
+                return clusterManager.getLocalCluster();
+            } else {
+                return clusterManager.getRemoteCluster(name);
+            }
+        } catch (ManagerNotInstantiatedException ex) {
+            LOG.error(ex);
+            throw new IOException(ex);
+        }
+    }
+    
+    @GET
+    @Path(HTTPUserInterfaceRestfulConstants.API_PATH + "/" + HTTPUserInterfaceRestfulConstants.API_GET_LOCAL_CLUSTER_PATH)
+    @Produces(MediaType.APPLICATION_JSON)
+    public Response getLocalClusterRestful() throws IOException {
+        try {
+            Cluster localCluster = getLocalCluster();
+            RestfulResponse rres = new RestfulResponse(localCluster);
+            return Response.status(Response.Status.OK).entity(rres).build();
+        } catch(Exception ex) {
+            RestfulResponse rres = new RestfulResponse(ex);
+            return Response.status(Response.Status.INTERNAL_SERVER_ERROR).entity(rres).build();
+        }
+    }
+    
+    @Override
+    public Cluster getLocalCluster() throws IOException {
         try {
             StargateService service = getStargateService();
             ClusterManager clusterManager = service.getClusterManager();
@@ -182,17 +221,17 @@ public class HTTPUserInterfaceServlet extends AbstractUserInterfaceServer {
     }
     
     @GET
-    @Path(HTTPUserInterfaceRestfulConstants.API_PATH + "/" + HTTPUserInterfaceRestfulConstants.API_GET_REMOTE_CLUSTER_PATH + "/{cluster:.*}")
+    @Path(HTTPUserInterfaceRestfulConstants.API_PATH + "/" + HTTPUserInterfaceRestfulConstants.API_GET_REMOTE_CLUSTER_PATH + "/{name:.*}")
     @Produces(MediaType.APPLICATION_JSON)
     public Response getRemoteClusterRestful(
-        @DefaultValue("") @PathParam("cluster") String cluster) throws IOException {
-        if(cluster == null || cluster.isEmpty()) {
-            throw new IllegalArgumentException("cluster is null or empty");
+        @DefaultValue("") @PathParam("name") String name) throws IOException {
+        if(name == null || name.isEmpty()) {
+            throw new IllegalArgumentException("name is null or empty");
         }
         
         try {
-            Cluster remoteCluster = getRemoteCluster(cluster);
-            RestfulResponse rres = new RestfulResponse(remoteCluster);
+            Cluster cluster = getRemoteCluster(name);
+            RestfulResponse rres = new RestfulResponse(cluster);
             return Response.status(Response.Status.OK).entity(rres).build();
         } catch(Exception ex) {
             RestfulResponse rres = new RestfulResponse(ex);

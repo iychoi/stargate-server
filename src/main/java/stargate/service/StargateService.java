@@ -134,7 +134,7 @@ public class StargateService extends AbstractService {
         this.dataExportManager.addDataExportEventHandler(dataExportUpdateEventHandler);
         LOG.info("Event handlers are registered");
         
-        LOG.info("Resynchronizing states");
+        LOG.info("Synchronizing states");
         try {
             this.recipeManager.syncRecipes();
             this.volumeManager.buildLocalDirectoryHierarchy();
@@ -143,7 +143,7 @@ public class StargateService extends AbstractService {
         } catch (RecipeManagerException ex) {
             throw new IOException(ex);
         }
-        LOG.info("States are resynchronized");
+        LOG.info("States are synchronized");
         
         this.started = true;
         

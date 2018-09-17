@@ -36,7 +36,9 @@ public class HDFSDataSourceDriverConfig extends AbstractDataSourceDriverConfig {
     public static final String DEFAULT_SCHEME = "hdfs";
     
     private String scheme = DEFAULT_SCHEME;
+    private String nameNodeURI = "hdfs://localhost:9000";
     private Path rootPath = new Path("/");
+    private String hadoopUsername = "hdfs";
     
     public static HDFSDataSourceDriverConfig createInstance(File file) throws IOException {
         if(file == null) {
@@ -73,6 +75,23 @@ public class HDFSDataSourceDriverConfig extends AbstractDataSourceDriverConfig {
         return this.scheme;
     }
     
+    
+    @JsonProperty("namenode_uri")
+    public void setNameNodeURI(String nameNodeURI) {
+        if(nameNodeURI == null || nameNodeURI.isEmpty()) {
+            throw new IllegalArgumentException("nameNodeURI is null or empty");
+        }
+        
+        super.checkMutableAndRaiseException();
+        
+        this.nameNodeURI = nameNodeURI;
+    }
+    
+    @JsonProperty("namenode_uri")
+    public String getNameNodeURI() {
+        return this.nameNodeURI;
+    }
+    
     @JsonProperty("root_path")
     public void setRootPath(String rootPath) {
         if(rootPath == null || rootPath.isEmpty()) {
@@ -103,5 +122,21 @@ public class HDFSDataSourceDriverConfig extends AbstractDataSourceDriverConfig {
     @JsonIgnore
     public Path getRootPath() {
         return this.rootPath;
+    }
+
+    @JsonProperty("hadoop_username")
+    public void setHadoopUsername(String username) {
+        if(username == null || username.isEmpty()) {
+            throw new IllegalArgumentException("username is null or empty");
+        }
+        
+        super.checkMutableAndRaiseException();
+        
+        this.hadoopUsername = username;
+    }
+    
+    @JsonProperty("hadoop_username")
+    public String getHadoopUsername() {
+        return this.hadoopUsername;
     }
 }

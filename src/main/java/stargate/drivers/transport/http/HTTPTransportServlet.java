@@ -116,11 +116,11 @@ public class HTTPTransportServlet extends AbstractTransportServer {
     }
 
     @GET
-    @Path(HTTPTransportRestfulConstants.API_PATH + "/" + HTTPTransportRestfulConstants.API_GET_CLUSTER_PATH)
+    @Path(HTTPTransportRestfulConstants.API_PATH + "/" + HTTPTransportRestfulConstants.API_GET_LOCAL_CLUSTER_PATH)
     @Produces(MediaType.APPLICATION_JSON)
-    public Response getClusterRestful() throws IOException {
+    public Response getLocalClusterRestful() throws IOException {
         try {
-            Cluster cluster = getCluster();
+            Cluster cluster = getLocalCluster();
             RestfulResponse rres = new RestfulResponse(cluster);
             return Response.status(Response.Status.OK).entity(rres).build();
         } catch(Exception ex) {
@@ -130,7 +130,7 @@ public class HTTPTransportServlet extends AbstractTransportServer {
     }
     
     @Override
-    public Cluster getCluster() throws IOException {
+    public Cluster getLocalCluster() throws IOException {
         try {
             StargateService service = getStargateService();
             ClusterManager clusterManager = service.getClusterManager();

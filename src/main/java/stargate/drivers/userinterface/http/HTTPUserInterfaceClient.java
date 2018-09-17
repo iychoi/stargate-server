@@ -117,6 +117,11 @@ public class HTTPUserInterfaceClient extends AbstractUserInterfaceClient {
     }
     
     @Override
+    public URI getServiceURI() {
+        return this.serviceUri;
+    }
+    
+    @Override
     public long getConnectionEstablishedTime() {
         return this.connectionEstablishedTime;
     }
@@ -159,13 +164,31 @@ public class HTTPUserInterfaceClient extends AbstractUserInterfaceClient {
     }
 
     @Override
-    public Cluster getCluster() throws IOException {
+    public Cluster getCluster(String name) throws IOException {
         if(!this.connected) {
             throw new IOException("Client is not connected");
         }
         
-        // URL pattern = http://xxx.xxx.xxx.xxx/api/cluster
-        String url = makeAPIPath(HTTPUserInterfaceRestfulConstants.API_GET_CLUSTER_PATH);
+        if(name == null || name.isEmpty()) {
+            throw new IllegalArgumentException("name is null or empty");
+        }
+        
+        // URL pattern = http://xxx.xxx.xxx.xxx/api/cluster/clustername
+        String url = makeAPIPath(HTTPUserInterfaceRestfulConstants.API_GET_CLUSTER_PATH, name);
+        Cluster cluster = (Cluster) this.restfulClient.get(url);
+
+        updateLastActivetime();
+        return cluster;
+    }
+    
+    @Override
+    public Cluster getLocalCluster() throws IOException {
+        if(!this.connected) {
+            throw new IOException("Client is not connected");
+        }
+        
+        // URL pattern = http://xxx.xxx.xxx.xxx/api/lcluster
+        String url = makeAPIPath(HTTPUserInterfaceRestfulConstants.API_GET_LOCAL_CLUSTER_PATH);
         Cluster cluster = (Cluster) this.restfulClient.get(url);
 
         updateLastActivetime();

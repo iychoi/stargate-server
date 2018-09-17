@@ -19,18 +19,24 @@ import java.io.File;
 import java.io.FileNotFoundException;
 import java.io.FileOutputStream;
 import java.io.IOException;
-import java.io.InputStream;
 import java.net.URI;
 import java.util.Collection;
+import java.util.HashMap;
+import java.util.Map;
 import org.apache.commons.logging.Log;
 import org.apache.commons.logging.LogFactory;
+import stargate.commons.cluster.Cluster;
+import stargate.commons.cluster.Node;
 import stargate.commons.dataobject.DataObjectMetadata;
 import stargate.commons.dataobject.DataObjectURI;
 import stargate.commons.recipe.Recipe;
-import stargate.commons.recipe.RecipeChunk;
+import stargate.commons.transport.TransportServiceInfo;
+import stargate.commons.userinterface.UserInterfaceServiceInfo;
 import stargate.commons.utils.DateTimeUtils;
+import stargate.commons.utils.IPUtils;
 import stargate.commons.utils.JsonSerializer;
 import stargate.commons.utils.PathUtils;
+import stargate.drivers.userinterface.http.HTTPChunkInputStream;
 import stargate.drivers.userinterface.http.HTTPUserInterfaceClient;
 
 /**
@@ -195,7 +201,7 @@ public class FileSystem {
             System.exit(1);
         }
     }
-
+    
     private static void process_fs_get(URI serviceURI, String stargatePath, String targetPath) {
         DataObjectURI uri = new DataObjectURI(stargatePath);
         
@@ -214,6 +220,30 @@ public class FileSystem {
                     if(recipe == null) {
                         System.out.println("<Recipe does not exist!>");
                     } else {
+                        String clusterName = uri.getClusterName();
+                        LOG.debug(String.format("Downloading a cluster information for %s", clusterName));
+                        
+                        Cluster cluster = client.getCluster(clusterName);
+                        if(cluster == null) {
+                            throw new IOException(String.format("Cannot retrieve cluster information for %s", clusterName));
+                        }
+                        
+                        Map<String, HTTPUserInterfaceClient> clients = new HashMap<String, HTTPUserInterfaceClient>();
+                        Collection<String> nodeNames = recipe.getNodeNames();
+                        for(String nodeName : nodeNames) {
+                            // find from cluster
+                            Node node = cluster.getNode(nodeName);
+                            UserInterfaceServiceInfo userInterfaceServiceInfo = node.getUserInterfaceServiceInfo();
+                            URI svcURI = userInterfaceServiceInfo.getServiceURI();
+                            
+                            HTTPUserInterfaceClient c = HTTPUIClient.getClient(svcURI);
+                            c.connect();
+                            clients.put(nodeName, c);
+                            break;
+                        }
+                        // add default
+                        clients.put(HTTPChunkInputStream.DEFAULT_NODE_NAME, client);
+                        
                         File f = (new File(targetPath)).getAbsoluteFile();
                         if(f.isDirectory()) {
                             f = new File(f, PathUtils.getFileName(stargatePath));
@@ -222,18 +252,31 @@ public class FileSystem {
                         FileOutputStream fos = new FileOutputStream(f);
                         int bufferlen = 1024*4;
                         byte[] buffer = new byte[bufferlen];
-                        Collection<RecipeChunk> chunks = recipe.getChunks();
-                        for(RecipeChunk chunk : chunks) {
-                            String hash = chunk.getHashString();
-                            LOG.debug(String.format("Downloading a chunk for a hash %s", hash));
-                            InputStream is = client.getDataChunk(uri.getClusterName(), hash);
-                            int readLen = 0;
-                            while((readLen = is.read(buffer, 0, bufferlen)) > 0) {
-                                fos.write(buffer, 0, readLen);
-                            }
-                            is.close();
+                        
+                        HTTPChunkInputStream cis = new HTTPChunkInputStream(clients, recipe);
+                        int readLen = 0;
+                        while((readLen = cis.read(buffer, 0, bufferlen)) > 0) {
+                            fos.write(buffer, 0, readLen);
                         }
+                        cis.close();
+                        
+                        // Original implementation using inputstream per chunk
+                        //Collection<RecipeChunk> chunks = recipe.getChunks();
+                        //for(RecipeChunk chunk : chunks) {
+                        //    String hash = chunk.getHashString();
+                        //    LOG.debug(String.format("Downloading a chunk for a hash %s", hash));
+                        //    InputStream is = client.getDataChunk(uri.getClusterName(), hash);
+                        //    int readLen = 0;
+                        //    while((readLen = is.read(buffer, 0, bufferlen)) > 0) {
+                        //        fos.write(buffer, 0, readLen);
+                        //    }
+                        //    is.close();
+                        //}
+
                         fos.close();
+                        for(HTTPUserInterfaceClient c : clients.values()) {
+                            c.disconnect();
+                        }
                     }
                 }
             } catch (FileNotFoundException ex) {

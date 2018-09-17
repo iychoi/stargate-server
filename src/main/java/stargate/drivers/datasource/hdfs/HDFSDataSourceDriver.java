@@ -101,9 +101,26 @@ public class HDFSDataSourceDriver extends AbstractDataSourceDriver {
         LOG.info("Initializing HDFS Data Source Driver");
         
         this.hadoopConfig = new Configuration();
+        String nameNodeURI = this.config.getNameNodeURI();
+        if(nameNodeURI != null && !nameNodeURI.isEmpty()) {
+            this.hadoopConfig.set("fs.defaultFS", nameNodeURI);
+        } else {
+            this.hadoopConfig.set("fs.defaultFS", "hdfs://lolcalhost:9000");
+        }
+        
+        this.hadoopConfig.set("fs.hdfs.impl", org.apache.hadoop.hdfs.DistributedFileSystem.class.getName());
+        this.hadoopConfig.set("fs.file.impl", org.apache.hadoop.fs.LocalFileSystem.class.getName());
+        
         Path rootPath = this.config.getRootPath();
-        String hdfsRoot = this.hadoopConfig.get("fs.default.name");
+        String hdfsRoot = this.hadoopConfig.get("fs.defaultFS");
         LOG.info("hdfs root : " + hdfsRoot);
+        
+        // Set HADOOP user
+        String hadoopUser = this.config.getHadoopUsername();
+        if(hadoopUser != null && !hadoopUser.isEmpty()) {
+            System.setProperty("HADOOP_USER_NAME", hadoopUser);
+            System.setProperty("hadoop.home.dir", "/");
+        }
         
         // combine hdfs root + user defined root
         this.rootPath = new Path(hdfsRoot, rootPath);

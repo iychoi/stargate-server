@@ -16,6 +16,7 @@
 package stargate.managers.userinterface;
 
 import java.io.IOException;
+import java.net.URI;
 import java.util.ArrayList;
 import java.util.Collection;
 import java.util.List;
@@ -27,6 +28,7 @@ import stargate.commons.manager.AbstractManager;
 import stargate.commons.manager.ManagerConfig;
 import stargate.commons.manager.ManagerNotInstantiatedException;
 import stargate.commons.userinterface.AbstractUserInterfaceDriver;
+import stargate.commons.userinterface.UserInterfaceServiceInfo;
 import stargate.service.StargateService;
 
 /**
@@ -120,5 +122,11 @@ public class UserInterfaceManager extends AbstractManager<AbstractUserInterfaceD
         }
         
         super.stop();
+    }
+
+    public UserInterfaceServiceInfo getServiceInfo() throws IOException {
+        AbstractUserInterfaceDriver driver = getDriver();
+        URI serviceURI = driver.getServiceURI();
+        return new UserInterfaceServiceInfo(driver.getClass().getName(), serviceURI);
     }
 }

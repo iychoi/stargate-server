@@ -229,7 +229,7 @@ public class Clusters {
         try {
             HTTPUserInterfaceClient client = HTTPUIClient.getClient(serviceURI);
             client.connect();
-            Cluster cluster = client.getCluster();
+            Cluster cluster = client.getLocalCluster();
 
             String json = JsonSerializer.formatPretty(cluster.toJson());
             System.out.println(json);
