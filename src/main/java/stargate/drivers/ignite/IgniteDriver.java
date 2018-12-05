@@ -15,6 +15,7 @@
 */
 package stargate.drivers.ignite;
 
+import java.io.File;
 import java.io.IOException;
 import java.net.InetSocketAddress;
 import java.util.ArrayList;
@@ -48,7 +49,12 @@ public class IgniteDriver {
     public static final String PERSISTENT_REGION_NAME = "PERSISTENT_REGION";
     public static final String VOLATILE_REGION_NAME = "VOLATILE_REGION";
     
+    public static final String STORAGE_PATH = "storage";
+    public static final String WAL_PATH = "wal";
+    public static final String WAL_ARCHIVE_PATH = "wal_archive";
+    
     private static IgniteDriver instance;
+    private static File storageRootPath;
     
     private boolean initialized = false;
     private int initCount = 0;
@@ -65,6 +71,14 @@ public class IgniteDriver {
             }
             return instance;
         }
+    }
+    
+    public static void setStorageRootPath(File path) {
+        if(path == null) {
+            throw new IllegalArgumentException("path is null or empty");
+        }
+        
+        storageRootPath = path;
     }
     
     IgniteDriver() {
@@ -193,6 +207,14 @@ public class IgniteDriver {
         dsCfg.setDataRegionConfigurations(volatileDataRegConf);
         dsCfg.setDefaultDataRegionConfiguration(persistentDataRegConf);
         
+        if(storageRootPath != null) {
+            File storagePath = new File(storageRootPath, STORAGE_PATH);
+            File walPath = new File(storageRootPath, WAL_PATH);
+            File walArchivePath = new File(storageRootPath, WAL_ARCHIVE_PATH);
+            dsCfg.setStoragePath(storagePath.getAbsolutePath());
+            dsCfg.setWalPath(walPath.getAbsolutePath());
+            dsCfg.setWalArchivePath(walArchivePath.getAbsolutePath());
+        }
         return dsCfg;
     }
     

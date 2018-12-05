@@ -113,6 +113,10 @@ public class StargateServiceConfig extends ServiceConfig {
         driverInjection.setDriverClass(IgniteClusterDriver.class);
         
         IgniteClusterDriverConfig driverConfiguration = new IgniteClusterDriverConfig();
+        String workingDir = PathUtils.getWorkingDir();
+        File storageRootDir = new File(workingDir, "storage");
+        driverConfiguration.setStorageRootPath(storageRootDir);
+        
         driverInjection.setDriverConfig(driverConfiguration);
         
         ManagerConfig managerConfig = new ManagerConfig();

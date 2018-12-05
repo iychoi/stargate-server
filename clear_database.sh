@@ -1,2 +1,3 @@
 #! /bin/bash
-rm -rf ${IGNITE_HOME}/work/*
+
+rm -rf storage/*

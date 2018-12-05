@@ -23,6 +23,7 @@ import java.net.URI;
 import java.util.Collection;
 import java.util.HashMap;
 import java.util.Map;
+import java.util.Set;
 import org.apache.commons.logging.Log;
 import org.apache.commons.logging.LogFactory;
 import stargate.commons.cluster.Cluster;
@@ -30,7 +31,7 @@ import stargate.commons.cluster.Node;
 import stargate.commons.dataobject.DataObjectMetadata;
 import stargate.commons.dataobject.DataObjectURI;
 import stargate.commons.recipe.Recipe;
-import stargate.commons.transport.TransportServiceInfo;
+import stargate.commons.service.FSServiceInfo;
 import stargate.commons.userinterface.UserInterfaceServiceInfo;
 import stargate.commons.utils.DateTimeUtils;
 import stargate.commons.utils.IPUtils;
@@ -47,6 +48,7 @@ public class FileSystem {
     private static final Log LOG = LogFactory.getLog(FileSystem.class);
     
     private enum COMMAND_LV1 {
+        CMD_LV1_SHOW_INFO("show_info"),
         CMD_LV1_LIST("ls"),
         CMD_LV1_RECIPE("recipe"),
         CMD_LV1_GET("get"),
@@ -83,6 +85,9 @@ public class FileSystem {
                 COMMAND_LV1 cmd = COMMAND_LV1.fromString(cmd_lv1);
 
                 switch(cmd) {
+                    case CMD_LV1_SHOW_INFO:
+                        process_fs_show_info(parser.getServiceURI());
+                        break;
                     case CMD_LV1_LIST:
                         if(positionalArgs.length >= 2) {
                             process_fs_list(parser.getServiceURI(), positionalArgs[1]);
@@ -131,6 +136,27 @@ public class FileSystem {
         long size = metadata.getSize();
         String path = uri.toString();
         return String.format("%s\t%d\t%s", path, size, DateTimeUtils.getDateTimeString(lastModifiedTime));
+    }
+    
+    private static void process_fs_show_info(URI serviceURI) {
+        try {
+            HTTPUserInterfaceClient client = HTTPUIClient.getClient(serviceURI);
+            client.connect();
+            FSServiceInfo info = client.getFSServiceInfo();
+            if(info == null) {
+                System.out.println("<EMPTY!>");
+            } else {
+                String json = JsonSerializer.formatPretty(info.toJson());
+                System.out.println(json);
+            }
+            String dateTimeString = DateTimeUtils.getDateTimeString(client.getLastActiveTime());
+            System.out.println(String.format("<Request processed %s>", dateTimeString));
+            client.disconnect();
+            System.exit(0);
+        } catch (IOException ex) {
+            ex.printStackTrace();
+            System.exit(1);
+        }
     }
     
     private static void process_fs_list(URI serviceURI, String stargatePath) {
@@ -202,10 +228,23 @@ public class FileSystem {
         }
     }
     
+    private static Node get_local_node(Cluster cluster) throws IOException {
+        for(Node node : cluster.getNodes()) {
+            Collection<String> hostnames = node.getHostnames();
+            if(IPUtils.containLocalIPAddress(hostnames)) {
+                return node;
+            }
+        }
+        return null;
+    }
+    
     private static void process_fs_get(URI serviceURI, String stargatePath, String targetPath) {
         DataObjectURI uri = new DataObjectURI(stargatePath);
         
         try {
+            long startTimeG = DateTimeUtils.getTimestamp();
+            System.out.println(String.format("start get - %d", startTimeG));
+            
             HTTPUserInterfaceClient client = HTTPUIClient.getClient(serviceURI);
             client.connect();
             try {
@@ -222,7 +261,7 @@ public class FileSystem {
                     } else {
                         String clusterName = uri.getClusterName();
                         LOG.debug(String.format("Downloading a cluster information for %s", clusterName));
-                        
+   
                         Cluster cluster = client.getCluster(clusterName);
                         if(cluster == null) {
                             throw new IOException(String.format("Cannot retrieve cluster information for %s", clusterName));
@@ -237,10 +276,19 @@ public class FileSystem {
                             URI svcURI = userInterfaceServiceInfo.getServiceURI();
                             
                             HTTPUserInterfaceClient c = HTTPUIClient.getClient(svcURI);
-                            c.connect();
                             clients.put(nodeName, c);
                             break;
                         }
+                        // add local node
+                        Node local_node = get_local_node(cluster);
+                        if(local_node != null) {
+                            UserInterfaceServiceInfo userInterfaceServiceInfo = local_node.getUserInterfaceServiceInfo();
+                            URI svcURI = userInterfaceServiceInfo.getServiceURI();
+                            
+                            HTTPUserInterfaceClient c = HTTPUIClient.getClient(svcURI);
+                            clients.put(HTTPChunkInputStream.LOCAL_NODE_NAME, c);
+                        }
+                        
                         // add default
                         clients.put(HTTPChunkInputStream.DEFAULT_NODE_NAME, client);
                         
@@ -249,6 +297,9 @@ public class FileSystem {
                             f = new File(f, PathUtils.getFileName(stargatePath));
                         }
 
+                        long startTimeC = DateTimeUtils.getTimestamp();
+                        System.out.println(String.format("start copy - %d", startTimeC));
+                        
                         FileOutputStream fos = new FileOutputStream(f);
                         int bufferlen = 1024*4;
                         byte[] buffer = new byte[bufferlen];
@@ -259,6 +310,8 @@ public class FileSystem {
                             fos.write(buffer, 0, readLen);
                         }
                         cis.close();
+                        long endTimeC = DateTimeUtils.getTimestamp();
+                        System.out.println(String.format("copy took - %d ms", endTimeC - startTimeC));
                         
                         // Original implementation using inputstream per chunk
                         //Collection<RecipeChunk> chunks = recipe.getChunks();
@@ -274,8 +327,15 @@ public class FileSystem {
                         //}
 
                         fos.close();
-                        for(HTTPUserInterfaceClient c : clients.values()) {
-                            c.disconnect();
+                        Set<Map.Entry<String, HTTPUserInterfaceClient>> entrySet = clients.entrySet();
+                        for(Map.Entry<String, HTTPUserInterfaceClient> entry : entrySet) {
+                            String key = entry.getKey();
+                            HTTPUserInterfaceClient c = entry.getValue();
+                            if(!key.equals(HTTPChunkInputStream.DEFAULT_NODE_NAME)) {
+                                if(c.isConnected()) {
+                                    c.disconnect();
+                                }
+                            }
                         }
                     }
                 }
@@ -285,6 +345,8 @@ public class FileSystem {
             String dateTimeString = DateTimeUtils.getDateTimeString(client.getLastActiveTime());
             System.out.println(String.format("<Request processed %s>", dateTimeString));
             client.disconnect();
+            long endTimeG = DateTimeUtils.getTimestamp();
+            System.out.println(String.format("took - %d ms", endTimeG - startTimeG));
             System.exit(0);
         } catch (IOException ex) {
             ex.printStackTrace();

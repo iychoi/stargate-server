@@ -73,6 +73,7 @@ public class IgniteClusterDriver extends AbstractClusterDriver {
         }
         
         this.config = (IgniteClusterDriverConfig) config;
+        IgniteDriver.setStorageRootPath(this.config.getStorageRootPath());
     }
     
     public IgniteClusterDriver(AbstractClusterDriverConfig config) {
@@ -85,6 +86,7 @@ public class IgniteClusterDriver extends AbstractClusterDriver {
         }
         
         this.config = (IgniteClusterDriverConfig) config;
+        IgniteDriver.setStorageRootPath(this.config.getStorageRootPath());
     }
     
     public IgniteClusterDriver(IgniteClusterDriverConfig config) {
@@ -93,6 +95,7 @@ public class IgniteClusterDriver extends AbstractClusterDriver {
         }
         
         this.config = config;
+        IgniteDriver.setStorageRootPath(this.config.getStorageRootPath());
     }
     
     @Override
