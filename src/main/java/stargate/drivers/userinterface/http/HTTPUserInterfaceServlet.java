@@ -45,8 +45,10 @@ import stargate.commons.dataobject.Directory;
 import stargate.commons.datasource.DataExportEntry;
 import stargate.commons.manager.AbstractManager;
 import stargate.commons.manager.ManagerNotInstantiatedException;
+import stargate.commons.recipe.AbstractRecipeDriver;
 import stargate.commons.recipe.Recipe;
 import stargate.commons.restful.RestfulResponse;
+import stargate.commons.service.FSServiceInfo;
 import stargate.commons.userinterface.AbstractUserInterfaceServer;
 import stargate.commons.utils.PathUtils;
 import stargate.managers.cluster.ClusterManager;
@@ -152,6 +154,37 @@ public class HTTPUserInterfaceServlet extends AbstractUserInterfaceServer {
         StargateService stargateService = getStargateService();
         StargateServiceConfig config = stargateService.getConfig();
         return config.toJson();
+    }
+    
+    @GET
+    @Path(HTTPUserInterfaceRestfulConstants.API_PATH + "/" + HTTPUserInterfaceRestfulConstants.API_GET_FS_SERVICE_INFO_PATH)
+    @Produces(MediaType.APPLICATION_JSON)
+    public Response getFSServiceInfoRestful() throws IOException {
+        try {
+            FSServiceInfo info = getFSServiceInfo();
+            RestfulResponse rres = new RestfulResponse(info);
+            return Response.status(Response.Status.OK).entity(rres).build();
+        } catch(Exception ex) {
+            RestfulResponse rres = new RestfulResponse(ex);
+            return Response.status(Response.Status.INTERNAL_SERVER_ERROR).entity(rres).build();
+        }
+    }
+    
+    @Override
+    public FSServiceInfo getFSServiceInfo() throws IOException {
+        try {
+            StargateService stargateService = getStargateService();
+            RecipeManager recipeManager = stargateService.getRecipeManager();
+            AbstractRecipeDriver recipeDriver = recipeManager.getDriver();
+            int chunkSize = recipeDriver.getChunkSize();
+            String hashAlgorithm = recipeDriver.getHashAlgorithm();
+            
+            FSServiceInfo serviceInfo = new FSServiceInfo(chunkSize, hashAlgorithm);
+            return serviceInfo;
+        } catch (ManagerNotInstantiatedException ex) {
+            LOG.error(ex);
+            throw new IOException(ex);
+        }
     }
 
     @GET

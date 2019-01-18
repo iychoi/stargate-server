@@ -29,6 +29,7 @@ import stargate.commons.dataobject.DataObjectURI;
 import stargate.commons.datasource.DataExportEntry;
 import stargate.commons.recipe.Recipe;
 import stargate.commons.restful.RestfulClient;
+import stargate.commons.service.FSServiceInfo;
 import stargate.commons.userinterface.AbstractUserInterfaceClient;
 import stargate.commons.utils.DateTimeUtils;
 import stargate.commons.utils.PathUtils;
@@ -161,6 +162,20 @@ public class HTTPUserInterfaceClient extends AbstractUserInterfaceClient {
 
         updateLastActivetime();
         return config;
+    }
+    
+    @Override
+    public FSServiceInfo getFSServiceInfo() throws IOException {
+        if(!this.connected) {
+            throw new IOException("Client is not connected");
+        }
+        
+        // URL pattern = http://xxx.xxx.xxx.xxx/api/fssvcinfo
+        String url = makeAPIPath(HTTPUserInterfaceRestfulConstants.API_GET_FS_SERVICE_INFO_PATH);
+        FSServiceInfo info = (FSServiceInfo) this.restfulClient.get(url);
+
+        updateLastActivetime();
+        return info;
     }
 
     @Override
