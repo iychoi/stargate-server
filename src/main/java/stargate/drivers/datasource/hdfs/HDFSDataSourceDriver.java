@@ -105,7 +105,7 @@ public class HDFSDataSourceDriver extends AbstractDataSourceDriver {
         if(nameNodeURI != null && !nameNodeURI.isEmpty()) {
             this.hadoopConfig.set("fs.defaultFS", nameNodeURI);
         } else {
-            this.hadoopConfig.set("fs.defaultFS", "hdfs://lolcalhost:9000");
+            this.hadoopConfig.set("fs.defaultFS", "hdfs://localhost:9000");
         }
         
         this.hadoopConfig.set("fs.hdfs.impl", org.apache.hadoop.hdfs.DistributedFileSystem.class.getName());
@@ -116,11 +116,11 @@ public class HDFSDataSourceDriver extends AbstractDataSourceDriver {
         LOG.info("hdfs root : " + hdfsRoot);
         
         // Set HADOOP user
-        String hadoopUser = this.config.getHadoopUsername();
-        if(hadoopUser != null && !hadoopUser.isEmpty()) {
-            System.setProperty("HADOOP_USER_NAME", hadoopUser);
-            System.setProperty("hadoop.home.dir", "/");
-        }
+        //String hadoopUser = this.config.getHadoopUsername();
+        //if(hadoopUser != null && !hadoopUser.isEmpty()) {
+        //    System.setProperty("HADOOP_USER_NAME", hadoopUser);
+        //    System.setProperty("hadoop.home.dir", "/");
+        //}
         
         // combine hdfs root + user defined root
         this.rootPath = new Path(hdfsRoot, rootPath);
@@ -363,6 +363,22 @@ public class HDFSDataSourceDriver extends AbstractDataSourceDriver {
         List<String> locations = new ArrayList<String>();
         BlockLocation[] fileBlockLocations = this.filesystem.getFileBlockLocations(status, offset, size);
         if(fileBlockLocations != null) {
+            // example
+            //> Path : hdfs://node0.hadoop.cs.arizona.edu:9000/data/TOV/Station109_DCM.fa
+            //>> Offset: 0
+            //>> Length: 67108864
+            //>> Names
+            //150.135.65.19:50010
+            //150.135.65.12:50010
+            //>> Topology Paths
+            ///default-rack/150.135.65.19:50010
+            ///default-rack/150.135.65.12:50010
+            //>> Hosts
+            //node9.hadoop.cs.arizona.edu
+            //node2.hadoop.cs.arizona.edu
+            //>> Cached Hosts
+
+            
             Set<String> location_set = new HashSet<String>();
             for(BlockLocation location : fileBlockLocations) {
                 for(String host : location.getHosts()) {
@@ -376,7 +392,7 @@ public class HDFSDataSourceDriver extends AbstractDataSourceDriver {
             
             // convert HDFS node name to Stargate node name
             for(String location : location_set) {
-                String nodeName = convNodeName(cluster, location);
+                String nodeName = convToStargateNodeName(cluster, location);
                 if(nodeName != null) {
                     locations.add(nodeName);
                 } else {
@@ -388,24 +404,24 @@ public class HDFSDataSourceDriver extends AbstractDataSourceDriver {
             }
         }
         
-        if(locations.size() == 0) {
+        if(locations.isEmpty()) {
             throw new IOException("The block cannot be accessed");
         }
         
         return locations;
     }
     
-    private String convNodeName(Cluster cluster, String location) {
-        String nodeName = this.cachedNodeNameConvTable.get(location);
+    private String convToStargateNodeName(Cluster stargateCluster, String hadoopNode) {
+        String nodeName = this.cachedNodeNameConvTable.get(hadoopNode);
         if(nodeName != null) {
             return nodeName;
         }
         
-        Collection<Node> clusterNodes = cluster.getNodes();
+        Collection<Node> clusterNodes = stargateCluster.getNodes();
         for(Node node : clusterNodes) {
-            if(node.getName().equals(location)) {
+            if(node.getName().equals(hadoopNode)) {
                 nodeName = node.getName();
-                this.cachedNodeNameConvTable.put(location, nodeName);
+                this.cachedNodeNameConvTable.put(hadoopNode, nodeName);
                 return nodeName;
             }
         }
@@ -413,17 +429,17 @@ public class HDFSDataSourceDriver extends AbstractDataSourceDriver {
         for(Node node : clusterNodes) {
             Collection<String> hostnames = node.getHostnames();
             for(String hostname : hostnames) {
-                if(hostname.equals(location)) {
+                if(hostname.equals(hadoopNode)) {
                     nodeName = node.getName();
-                    this.cachedNodeNameConvTable.put(location, nodeName);
+                    this.cachedNodeNameConvTable.put(hadoopNode, nodeName);
                     return nodeName;
                 }
                 
                 // compare IP part
-                String location_hostname = extractHostname(location);
+                String location_hostname = extractHostname(hadoopNode);
                 if(hostname.equals(location_hostname)) {
                     nodeName = node.getName();
-                    this.cachedNodeNameConvTable.put(location, nodeName);
+                    this.cachedNodeNameConvTable.put(hadoopNode, nodeName);
                     return nodeName;
                 }
             }
@@ -442,11 +458,6 @@ public class HDFSDataSourceDriver extends AbstractDataSourceDriver {
         int idxPort = hostname.indexOf(":");
         if(idxPort >= 0) {
             hostname = hostname.substring(0, idxPort);
-        }
-        
-        int idxSlash = hostname.indexOf("/");
-        if(idxSlash >= 0) {
-            hostname = hostname.substring(0, idxSlash);
         }
         
         return hostname;
