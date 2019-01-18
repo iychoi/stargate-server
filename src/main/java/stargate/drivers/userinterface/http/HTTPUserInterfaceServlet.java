@@ -39,6 +39,7 @@ import javax.ws.rs.core.StreamingOutput;
 import org.apache.commons.logging.Log;
 import org.apache.commons.logging.LogFactory;
 import stargate.commons.cluster.Cluster;
+import stargate.commons.cluster.Node;
 import stargate.commons.dataobject.DataObjectMetadata;
 import stargate.commons.dataobject.DataObjectURI;
 import stargate.commons.dataobject.Directory;
@@ -396,6 +397,32 @@ public class HTTPUserInterfaceServlet extends AbstractUserInterfaceServer {
             StargateService service = getStargateService();
             ClusterManager clusterManager = service.getClusterManager();
             clusterManager.removeRemoteCluster(name);
+        } catch (ManagerNotInstantiatedException ex) {
+            LOG.error(ex);
+            throw new IOException(ex);
+        }
+    }
+    
+    @GET
+    @Path(HTTPUserInterfaceRestfulConstants.API_PATH + "/" + HTTPUserInterfaceRestfulConstants.API_GET_LOCAL_NODE_PATH)
+    @Produces(MediaType.APPLICATION_JSON)
+    public Response getLocalNodeRestful() throws IOException {
+        try {
+            Node localNode = getLocalNode();
+            RestfulResponse rres = new RestfulResponse(localNode);
+            return Response.status(Response.Status.OK).entity(rres).build();
+        } catch(Exception ex) {
+            RestfulResponse rres = new RestfulResponse(ex);
+            return Response.status(Response.Status.INTERNAL_SERVER_ERROR).entity(rres).build();
+        }
+    }
+    
+    @Override
+    public Node getLocalNode() throws IOException {
+        try {
+            StargateService service = getStargateService();
+            ClusterManager clusterManager = service.getClusterManager();
+            return clusterManager.getLocalNode();
         } catch (ManagerNotInstantiatedException ex) {
             LOG.error(ex);
             throw new IOException(ex);

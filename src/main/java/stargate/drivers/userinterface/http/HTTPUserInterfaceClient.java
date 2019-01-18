@@ -24,6 +24,7 @@ import java.util.Collection;
 import org.apache.commons.logging.Log;
 import org.apache.commons.logging.LogFactory;
 import stargate.commons.cluster.Cluster;
+import stargate.commons.cluster.Node;
 import stargate.commons.dataobject.DataObjectMetadata;
 import stargate.commons.dataobject.DataObjectURI;
 import stargate.commons.datasource.DataExportEntry;
@@ -289,6 +290,20 @@ public class HTTPUserInterfaceClient extends AbstractUserInterfaceClient {
         Boolean response = (Boolean) this.restfulClient.delete(url);
 
         updateLastActivetime();
+    }
+    
+    @Override
+    public Node getLocalNode() throws IOException {
+        if(!this.connected) {
+            throw new IOException("Client is not connected");
+        }
+        
+        // URL pattern = http://xxx.xxx.xxx.xxx/api/lnode
+        String url = makeAPIPath(HTTPUserInterfaceRestfulConstants.API_GET_LOCAL_NODE_PATH);
+        Node node = (Node) this.restfulClient.get(url);
+
+        updateLastActivetime();
+        return node;
     }
 
     @Override
