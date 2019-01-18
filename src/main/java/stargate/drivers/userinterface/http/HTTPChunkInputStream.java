@@ -21,6 +21,7 @@ import java.net.URI;
 import java.util.Collection;
 import java.util.HashMap;
 import java.util.Map;
+import java.util.Set;
 import org.apache.commons.logging.Log;
 import org.apache.commons.logging.LogFactory;
 import org.apache.hadoop.fs.FSInputStream;
@@ -29,6 +30,7 @@ import stargate.commons.dataobject.DataObjectMetadata;
 import stargate.commons.dataobject.DataObjectURI;
 import stargate.commons.recipe.Recipe;
 import stargate.commons.recipe.RecipeChunk;
+import stargate.commons.utils.IPUtils;
 
 /**
  *
@@ -38,8 +40,8 @@ public class HTTPChunkInputStream extends FSInputStream {
 
     private static final Log LOG = LogFactory.getLog(HTTPChunkInputStream.class);
     
-    public static final String DEFAULT_NODE_NAME = "*";
-    public static final String LOCAL_NODE_NAME = "localhost";
+    public static final String DEFAULT_NODE_NAME = "DEFAULT_NODE";
+    public static final String LOCAL_NODE_NAME = "LOCAL_NODE";
     
     // node-name to client mapping
     private Map<String, HTTPUserInterfaceClient> clients = new HashMap<String, HTTPUserInterfaceClient>();
@@ -85,10 +87,29 @@ public class HTTPChunkInputStream extends FSInputStream {
         }
         
         this.clients.putAll(clients);
+        setLocalClient();
+        
         this.recipe = recipe;
         this.offset = 0;
         this.size = recipe.getMetadata().getSize();
         this.chunkData = null;
+    }
+    
+    private void setLocalClient() {
+        if(!this.clients.containsKey(LOCAL_NODE_NAME)) {
+            Set<Map.Entry<String, HTTPUserInterfaceClient>> entrySet = this.clients.entrySet();
+            for(Map.Entry<String, HTTPUserInterfaceClient> entry : entrySet) {
+                HTTPUserInterfaceClient client = entry.getValue();
+                URI serviceURI = client.getServiceURI();
+                try {
+                    if(IPUtils.isLocalIPAddress(serviceURI.getHost())) {
+                        this.clients.put(LOCAL_NODE_NAME, client);
+                        break;
+                    }
+                } catch (IOException ex) {
+                }
+            }
+        }
     }
     
     @Override
@@ -168,7 +189,7 @@ public class HTTPChunkInputStream extends FSInputStream {
         DataObjectURI uri = metadata.getURI();
         
         Collection<Integer> nodeIDs = chunk.getNodeIDs();
-        Collection<String> nodeNames = recipe.getNodeNames(nodeIDs);
+        Collection<String> nodeNames = this.recipe.getNodeNames(nodeIDs);
         
         HTTPUserInterfaceClient localClient = this.clients.get(LOCAL_NODE_NAME);
         HTTPUserInterfaceClient client = null;

@@ -279,6 +279,7 @@ public class FileSystem {
                             clients.put(nodeName, c);
                             break;
                         }
+                        
                         // add local node
                         Node local_node = get_local_node(cluster);
                         if(local_node != null) {
@@ -313,19 +314,6 @@ public class FileSystem {
                         long endTimeC = DateTimeUtils.getTimestamp();
                         System.out.println(String.format("copy took - %d ms", endTimeC - startTimeC));
                         
-                        // Original implementation using inputstream per chunk
-                        //Collection<RecipeChunk> chunks = recipe.getChunks();
-                        //for(RecipeChunk chunk : chunks) {
-                        //    String hash = chunk.getHashString();
-                        //    LOG.debug(String.format("Downloading a chunk for a hash %s", hash));
-                        //    InputStream is = client.getDataChunk(uri.getClusterName(), hash);
-                        //    int readLen = 0;
-                        //    while((readLen = is.read(buffer, 0, bufferlen)) > 0) {
-                        //        fos.write(buffer, 0, readLen);
-                        //    }
-                        //    is.close();
-                        //}
-
                         fos.close();
                         Set<Map.Entry<String, HTTPUserInterfaceClient>> entrySet = clients.entrySet();
                         for(Map.Entry<String, HTTPUserInterfaceClient> entry : entrySet) {
