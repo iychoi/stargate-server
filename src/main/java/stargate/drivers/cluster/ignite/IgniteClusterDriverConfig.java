@@ -17,6 +17,10 @@ package stargate.drivers.cluster.ignite;
 
 import java.io.File;
 import java.io.IOException;
+import java.util.ArrayList;
+import java.util.Collection;
+import java.util.Collections;
+import java.util.List;
 import org.apache.commons.logging.Log;
 import org.apache.commons.logging.LogFactory;
 import org.codehaus.jackson.annotate.JsonIgnore;
@@ -37,6 +41,7 @@ public class IgniteClusterDriverConfig extends AbstractClusterDriverConfig {
     
     private String clusterName = DEFAULT_CLUSTER_NAME;
     private File storageRootPath = new File(DEFAULT_STORAGE_ROOT_PATH);
+    private List<String> clusterNodes = new ArrayList<String>();
     
     public static IgniteClusterDriverConfig createInstance(File file) throws IOException {
         if(file == null) {
@@ -103,5 +108,19 @@ public class IgniteClusterDriverConfig extends AbstractClusterDriverConfig {
     @JsonIgnore
     public File getStorageRootPath() {
         return this.storageRootPath;
+    }
+    
+    @JsonProperty("cluster_nodes")
+    public void addClusterNodes(Collection<String> nodes) {
+        if(nodes != null) {
+            for(String node : nodes) {
+                this.clusterNodes.add(node);
+            }
+        }
+    }
+    
+    @JsonProperty("cluster_nodes")
+    public Collection<String> getClusterNodes() {
+        return Collections.unmodifiableCollection(this.clusterNodes);
     }
 }

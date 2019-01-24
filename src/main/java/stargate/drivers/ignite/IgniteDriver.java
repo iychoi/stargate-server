@@ -19,6 +19,7 @@ import java.io.File;
 import java.io.IOException;
 import java.net.InetSocketAddress;
 import java.util.ArrayList;
+import java.util.Collection;
 import java.util.List;
 import java.util.concurrent.locks.Condition;
 import java.util.concurrent.locks.Lock;
@@ -37,6 +38,7 @@ import org.apache.ignite.spi.collision.priorityqueue.PriorityQueueCollisionSpi;
 import org.apache.ignite.spi.discovery.tcp.TcpDiscoverySpi;
 import org.apache.ignite.spi.discovery.tcp.ipfinder.TcpDiscoveryIpFinder;
 import org.apache.ignite.spi.discovery.tcp.ipfinder.multicast.TcpDiscoveryMulticastIpFinder;
+import org.apache.ignite.spi.discovery.tcp.ipfinder.vm.TcpDiscoveryVmIpFinder;
 
 /**
  *
@@ -55,6 +57,7 @@ public class IgniteDriver {
     
     private static IgniteDriver instance;
     private static File storageRootPath;
+    private static List<String> clusterNodes = new ArrayList<String>();
     
     private boolean initialized = false;
     private int initCount = 0;
@@ -81,6 +84,14 @@ public class IgniteDriver {
         storageRootPath = path;
     }
     
+    public static void addClusterNodes(Collection<String> nodes) {
+        if(nodes != null) {
+            for(String node : nodes) {
+                clusterNodes.add(node);
+            }
+        }
+    }
+    
     IgniteDriver() {
     }
     
@@ -91,7 +102,14 @@ public class IgniteDriver {
             IgniteConfiguration igniteConfig = new IgniteConfiguration();
             
             // discovery
-            IgniteDiscoverySpi discoveryConfig = getTCPMulticastIPFinderConfig();
+            IgniteDiscoverySpi discoveryConfig = null;
+            
+            if(clusterNodes == null || clusterNodes.isEmpty()) {
+                discoveryConfig = getTCPMulticastIPFinderConfig();
+            } else {
+                discoveryConfig = getTCPStaticIPFinderConfig(clusterNodes);
+            }
+            
             igniteConfig.setDiscoverySpi(discoveryConfig);
             
             // datastore
@@ -223,6 +241,30 @@ public class IgniteDriver {
         TcpDiscoverySpi discoSpi = new TcpDiscoverySpi();
         
         TcpDiscoveryIpFinder tdif = new TcpDiscoveryMulticastIpFinder();
+        List<InetSocketAddress> addresses = new ArrayList<InetSocketAddress>();
+        InetSocketAddress addr1 = new InetSocketAddress("127.0.0.1", 47500);
+        InetSocketAddress addr2 = new InetSocketAddress("127.0.0.1", 47501);
+        InetSocketAddress addr3 = new InetSocketAddress("127.0.0.1", 47502);
+        addresses.add(addr1);
+        addresses.add(addr2);
+        addresses.add(addr3);
+        tdif.registerAddresses(addresses);
+        
+        discoSpi.setIpFinder(tdif);
+        return discoSpi;
+    }
+    
+    private IgniteDiscoverySpi getTCPStaticIPFinderConfig(Collection<String> nodes) {
+        // DISCOVERY SPI
+        TcpDiscoverySpi discoSpi = new TcpDiscoverySpi();
+        
+        TcpDiscoveryVmIpFinder tdif = new TcpDiscoveryVmIpFinder();
+        tdif.setShared(true);
+        
+        // Set initial IP addresses.
+        // Note that you can optionally specify a port or a port range.
+        tdif.setAddresses(nodes);
+                
         List<InetSocketAddress> addresses = new ArrayList<InetSocketAddress>();
         InetSocketAddress addr1 = new InetSocketAddress("127.0.0.1", 47500);
         InetSocketAddress addr2 = new InetSocketAddress("127.0.0.1", 47501);
