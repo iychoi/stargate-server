@@ -31,6 +31,7 @@ public class Activation {
         CMD_LV1_ACTIVATE_CLUSTER("activate"),
         CMD_LV1_DEACTIVATE_CLUSTERS("deactivate"),
         CMD_LV1_STATE_CLUSTERS("state"),
+        CMD_LV1_BASELINE_CLUSTERS("baseline"),
         CMD_LV1_UNKNOWN("unknown");
         
         private String value;
@@ -73,6 +74,9 @@ public class Activation {
                     case CMD_LV1_STATE_CLUSTERS:
                         state_clusters(parser);
                         break;
+                    case CMD_LV1_BASELINE_CLUSTERS:
+                        baseline_clusters(parser);
+                        break;
                     case CMD_LV1_UNKNOWN:
                         throw new UnsupportedOperationException(String.format("Unknown command - %s", cmd_lv1));
                     default:
@@ -114,6 +118,13 @@ public class Activation {
         //String[] positionalArgs = parser.getPositionalArgs();
         CommandHandler hnd = new CommandHandler();
         String[] command = {"--state"};
+        hnd.execute(Arrays.asList(command));
+    }
+    
+    private static void baseline_clusters(CommandParser parser) {
+        //String[] positionalArgs = parser.getPositionalArgs();
+        CommandHandler hnd = new CommandHandler();
+        String[] command = {"--baseline"};
         hnd.execute(Arrays.asList(command));
     }
 }
