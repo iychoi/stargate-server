@@ -7,4 +7,4 @@ source ${CUR_DIR}/bootstrap.sh
 # - $STARGATE_STORAGE
 # - $STARGATE_LIBS
 
-java -cp "${STARGATE_LIBS}" stargate.service.ServiceMain
+java -cp "${STARGATE_LIBS}" stargate.service.ServiceMain $@
