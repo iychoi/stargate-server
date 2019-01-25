@@ -147,7 +147,8 @@ public class HDFSDataSourceDriver extends AbstractDataSourceDriver {
         }
         
         String path = uri.getPath();
-        Path hdfsPath = new Path(this.rootPath, path);
+        String concatPath = PathUtils.concatPath(this.rootPath.toString(), path);
+        Path hdfsPath = new Path(concatPath);
         return hdfsPath;
     }
     
