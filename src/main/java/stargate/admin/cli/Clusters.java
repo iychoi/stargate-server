@@ -18,9 +18,11 @@ package stargate.admin.cli;
 import java.io.File;
 import java.io.IOException;
 import java.net.URI;
+import java.util.Arrays;
 import java.util.Collection;
 import org.apache.commons.logging.Log;
 import org.apache.commons.logging.LogFactory;
+import org.apache.ignite.internal.commandline.CommandHandler;
 import stargate.commons.cluster.Cluster;
 import stargate.commons.utils.DateTimeUtils;
 import stargate.commons.utils.JsonSerializer;
@@ -60,6 +62,8 @@ public class Clusters {
     
     private enum COMMAND_LV2_LOCAL_CLUSTER {
         CMD_LV2_LOCAL_CLUSTER_SHOW("show"),
+        CMD_LV2_LOCAL_CLUSTER_ACTIVATE("activate"),
+        CMD_LV2_LOCAL_CLUSTER_ACTIVE("active"),
         CMD_LV2_LOCAL_CLUSTER_UNKNOWN("unknown");
         
         private String value;
@@ -160,6 +164,12 @@ public class Clusters {
                 case CMD_LV2_LOCAL_CLUSTER_SHOW:
                     process_local_cluster_show(parser.getServiceURI());
                     break;
+                case CMD_LV2_LOCAL_CLUSTER_ACTIVATE:
+                    process_local_cluster_activate(parser.getServiceURI());
+                    break;
+                case CMD_LV2_LOCAL_CLUSTER_ACTIVE:
+                    process_local_cluster_active(parser.getServiceURI());
+                    break;
                 case CMD_LV2_LOCAL_CLUSTER_UNKNOWN:
                     throw new UnsupportedOperationException(String.format("Unknown command - %s", cmd_lv2));
                 default:
@@ -233,6 +243,42 @@ public class Clusters {
 
             String json = JsonSerializer.formatPretty(cluster.toJson());
             System.out.println(json);
+            String dateTimeString = DateTimeUtils.getDateTimeString(client.getLastActiveTime());
+            System.out.println(String.format("<Request processed %s>", dateTimeString));
+            client.disconnect();
+            System.exit(0);
+        } catch (IOException ex) {
+            ex.printStackTrace();
+            System.exit(1);
+        }
+    }
+    
+    private static void process_local_cluster_activate(URI serviceURI) {
+            CommandHandler hnd = new CommandHandler();
+            String[] command = {"--activate"};
+            hnd.execute(Arrays.asList(command));
+            
+            /*
+            HTTPUserInterfaceClient client = HTTPUIClient.getClient(serviceURI);
+            client.connect();
+            System.out.println("Activating the cluster");
+            client.activateCluster();
+            
+            String dateTimeString = DateTimeUtils.getDateTimeString(client.getLastActiveTime());
+            System.out.println(String.format("<Request processed %s>", dateTimeString));
+            client.disconnect();
+            */
+            System.exit(0);
+    }
+    
+    private static void process_local_cluster_active(URI serviceURI) {
+        try {
+            HTTPUserInterfaceClient client = HTTPUIClient.getClient(serviceURI);
+            client.connect();
+            boolean active = client.isClusterActive();
+            
+            System.out.println(String.format("the cluster is %s", active ? "active" : "inactive"));
+            
             String dateTimeString = DateTimeUtils.getDateTimeString(client.getLastActiveTime());
             System.out.println(String.format("<Request processed %s>", dateTimeString));
             client.disconnect();

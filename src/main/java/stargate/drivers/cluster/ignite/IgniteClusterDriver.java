@@ -207,6 +207,18 @@ public class IgniteClusterDriver extends AbstractClusterDriver {
         }
     }
     
+    // this must not be synchronized because this function is called while 
+    // init() is blocked
+    @Override
+    public void activateCluster() throws IOException {
+        this.igniteDriver.activate();
+    }
+    
+    @Override
+    public boolean isClusterActive() throws IOException {
+        return this.igniteDriver.isActive();
+    }
+    
     @Override
     public synchronized Node getLocalNode() throws IOException {
         safeInitNodeStore();

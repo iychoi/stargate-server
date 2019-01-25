@@ -38,6 +38,7 @@ import javax.ws.rs.core.Response;
 import javax.ws.rs.core.StreamingOutput;
 import org.apache.commons.logging.Log;
 import org.apache.commons.logging.LogFactory;
+import stargate.commons.cluster.AbstractClusterDriver;
 import stargate.commons.cluster.Cluster;
 import stargate.commons.cluster.Node;
 import stargate.commons.dataobject.DataObjectMetadata;
@@ -254,6 +255,87 @@ public class HTTPUserInterfaceServlet extends AbstractUserInterfaceServer {
         }
     }
     
+    @POST
+    @Path(HTTPUserInterfaceRestfulConstants.API_PATH + "/" + HTTPUserInterfaceRestfulConstants.API_ACTIVATE_CLUSTER_PATH)
+    @Produces(MediaType.APPLICATION_JSON)
+    public Response activateClusterRestful() throws IOException {
+        try {
+            activateCluster();
+            
+            RestfulResponse rres = new RestfulResponse(true);
+            return Response.status(Response.Status.OK).entity(rres).build();
+        } catch(Exception ex) {
+            RestfulResponse rres = new RestfulResponse(ex);
+            return Response.status(Response.Status.INTERNAL_SERVER_ERROR).entity(rres).build();
+        }
+    }
+    
+    @Override
+    public void activateCluster() throws IOException {
+        try {
+            StargateService service = getStargateService();
+            ClusterManager clusterManager = service.getClusterManager();
+            AbstractClusterDriver clusterDriver = clusterManager.getDriver();
+            clusterDriver.activateCluster();
+        } catch (ManagerNotInstantiatedException ex) {
+            LOG.error(ex);
+            throw new IOException(ex);
+        }
+    }
+    
+    @GET
+    @Path(HTTPUserInterfaceRestfulConstants.API_PATH + "/" + HTTPUserInterfaceRestfulConstants.API_CHECK_ACTIVE_CLUSTER_PATH)
+    @Produces(MediaType.APPLICATION_JSON)
+    public Response isClusterActiveRestful() throws IOException {
+        try {
+            boolean active = isClusterActive();
+            RestfulResponse rres = new RestfulResponse(active);
+            return Response.status(Response.Status.OK).entity(rres).build();
+        } catch(Exception ex) {
+            RestfulResponse rres = new RestfulResponse(ex);
+            return Response.status(Response.Status.INTERNAL_SERVER_ERROR).entity(rres).build();
+        }
+    }
+    
+    @Override
+    public boolean isClusterActive() throws IOException {
+        try {
+            StargateService service = getStargateService();
+            ClusterManager clusterManager = service.getClusterManager();
+            AbstractClusterDriver clusterDriver = clusterManager.getDriver();
+            return clusterDriver.isClusterActive();
+        } catch (ManagerNotInstantiatedException ex) {
+            LOG.error(ex);
+            throw new IOException(ex);
+        }
+    }
+    
+    @GET
+    @Path(HTTPUserInterfaceRestfulConstants.API_PATH + "/" + HTTPUserInterfaceRestfulConstants.API_GET_LOCAL_NODE_PATH)
+    @Produces(MediaType.APPLICATION_JSON)
+    public Response getLocalNodeRestful() throws IOException {
+        try {
+            Node localNode = getLocalNode();
+            RestfulResponse rres = new RestfulResponse(localNode);
+            return Response.status(Response.Status.OK).entity(rres).build();
+        } catch(Exception ex) {
+            RestfulResponse rres = new RestfulResponse(ex);
+            return Response.status(Response.Status.INTERNAL_SERVER_ERROR).entity(rres).build();
+        }
+    }
+    
+    @Override
+    public Node getLocalNode() throws IOException {
+        try {
+            StargateService service = getStargateService();
+            ClusterManager clusterManager = service.getClusterManager();
+            return clusterManager.getLocalNode();
+        } catch (ManagerNotInstantiatedException ex) {
+            LOG.error(ex);
+            throw new IOException(ex);
+        }
+    }
+    
     @GET
     @Path(HTTPUserInterfaceRestfulConstants.API_PATH + "/" + HTTPUserInterfaceRestfulConstants.API_GET_REMOTE_CLUSTER_PATH + "/{name:.*}")
     @Produces(MediaType.APPLICATION_JSON)
@@ -403,32 +485,6 @@ public class HTTPUserInterfaceServlet extends AbstractUserInterfaceServer {
         }
     }
     
-    @GET
-    @Path(HTTPUserInterfaceRestfulConstants.API_PATH + "/" + HTTPUserInterfaceRestfulConstants.API_GET_LOCAL_NODE_PATH)
-    @Produces(MediaType.APPLICATION_JSON)
-    public Response getLocalNodeRestful() throws IOException {
-        try {
-            Node localNode = getLocalNode();
-            RestfulResponse rres = new RestfulResponse(localNode);
-            return Response.status(Response.Status.OK).entity(rres).build();
-        } catch(Exception ex) {
-            RestfulResponse rres = new RestfulResponse(ex);
-            return Response.status(Response.Status.INTERNAL_SERVER_ERROR).entity(rres).build();
-        }
-    }
-    
-    @Override
-    public Node getLocalNode() throws IOException {
-        try {
-            StargateService service = getStargateService();
-            ClusterManager clusterManager = service.getClusterManager();
-            return clusterManager.getLocalNode();
-        } catch (ManagerNotInstantiatedException ex) {
-            LOG.error(ex);
-            throw new IOException(ex);
-        }
-    }
-
     @GET
     @Path(HTTPUserInterfaceRestfulConstants.GET_METADATA_PATH + "/{path:.*}")
     @Produces(MediaType.APPLICATION_JSON)

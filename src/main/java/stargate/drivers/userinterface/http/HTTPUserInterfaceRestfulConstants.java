@@ -32,6 +32,8 @@ public abstract class HTTPUserInterfaceRestfulConstants {
     public static final String API_GET_FS_SERVICE_INFO_PATH = "fssvcinfo";
     public static final String API_GET_CLUSTER_PATH = "cluster";
     public static final String API_GET_LOCAL_CLUSTER_PATH = "lcluster";
+    public static final String API_ACTIVATE_CLUSTER_PATH = "activate";
+    public static final String API_CHECK_ACTIVE_CLUSTER_PATH = "active";
     public static final String API_GET_REMOTE_CLUSTER_PATH = "rcluster";
     public static final String API_LIST_REMOTE_CLUSTERS_PATH = "lrcluster";
     public static final String API_GET_REMOTE_CLUSTERS_PATH = "rclusters";

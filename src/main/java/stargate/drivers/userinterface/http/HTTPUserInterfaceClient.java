@@ -211,6 +211,48 @@ public class HTTPUserInterfaceClient extends AbstractUserInterfaceClient {
         return cluster;
     }
     
+    public static final String API_CHECK_ACTIVE_CLUSTER_PATH = "active";
+    @Override
+    public void activateCluster() throws IOException {
+        if(!this.connected) {
+            throw new IOException("Client is not connected");
+        }
+        
+        // URL pattern = http://xxx.xxx.xxx.xxx/api/activate
+        String url = makeAPIPath(HTTPUserInterfaceRestfulConstants.API_ACTIVATE_CLUSTER_PATH);
+        Boolean response = (Boolean) this.restfulClient.post(url, null);
+
+        updateLastActivetime();
+    }
+    
+    @Override
+    public boolean isClusterActive() throws IOException {
+        if(!this.connected) {
+            throw new IOException("Client is not connected");
+        }
+        
+        // URL pattern = http://xxx.xxx.xxx.xxx/api/active
+        String url = makeAPIPath(HTTPUserInterfaceRestfulConstants.API_CHECK_ACTIVE_CLUSTER_PATH);
+        Boolean active = (Boolean) this.restfulClient.get(url);
+
+        updateLastActivetime();
+        return active;
+    }
+    
+    @Override
+    public Node getLocalNode() throws IOException {
+        if(!this.connected) {
+            throw new IOException("Client is not connected");
+        }
+        
+        // URL pattern = http://xxx.xxx.xxx.xxx/api/lnode
+        String url = makeAPIPath(HTTPUserInterfaceRestfulConstants.API_GET_LOCAL_NODE_PATH);
+        Node node = (Node) this.restfulClient.get(url);
+
+        updateLastActivetime();
+        return node;
+    }
+    
     @Override
     public Cluster getRemoteCluster(String name) throws IOException {
         if(!this.connected) {
@@ -292,20 +334,6 @@ public class HTTPUserInterfaceClient extends AbstractUserInterfaceClient {
         updateLastActivetime();
     }
     
-    @Override
-    public Node getLocalNode() throws IOException {
-        if(!this.connected) {
-            throw new IOException("Client is not connected");
-        }
-        
-        // URL pattern = http://xxx.xxx.xxx.xxx/api/lnode
-        String url = makeAPIPath(HTTPUserInterfaceRestfulConstants.API_GET_LOCAL_NODE_PATH);
-        Node node = (Node) this.restfulClient.get(url);
-
-        updateLastActivetime();
-        return node;
-    }
-
     @Override
     public DataObjectMetadata getDataObjectMetadata(DataObjectURI uri) throws FileNotFoundException, IOException {
         if(!this.connected) {

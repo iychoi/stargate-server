@@ -208,6 +208,16 @@ public class IgniteDriver {
         return this.initialized;
     }
     
+    public void activate() {
+        IgniteCluster cluster = this.igniteInstance.cluster();
+        cluster.active(true);
+    }
+    
+    public boolean isActive() {
+        IgniteCluster cluster = this.igniteInstance.cluster();
+        return cluster.active();
+    }
+    
     private DataStorageConfiguration getDataStoreConfig() {
         // DATA STORAGE
         DataStorageConfiguration dsCfg = new DataStorageConfiguration();
