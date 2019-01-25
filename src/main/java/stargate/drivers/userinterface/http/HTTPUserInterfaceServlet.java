@@ -19,6 +19,7 @@ import java.io.FileNotFoundException;
 import java.io.IOException;
 import java.io.InputStream;
 import java.io.OutputStream;
+import java.net.URI;
 import java.util.ArrayList;
 import java.util.Collection;
 import java.util.Collections;
@@ -44,7 +45,9 @@ import stargate.commons.cluster.Node;
 import stargate.commons.dataobject.DataObjectMetadata;
 import stargate.commons.dataobject.DataObjectURI;
 import stargate.commons.dataobject.Directory;
+import stargate.commons.datasource.AbstractDataSourceDriver;
 import stargate.commons.datasource.DataExportEntry;
+import stargate.commons.datasource.SourceFileMetadata;
 import stargate.commons.manager.AbstractManager;
 import stargate.commons.manager.ManagerNotInstantiatedException;
 import stargate.commons.recipe.AbstractRecipeDriver;
@@ -933,14 +936,45 @@ public class HTTPUserInterfaceServlet extends AbstractUserInterfaceServer {
     public void addDataExportEntry(DataExportEntry entry) throws IOException {
         try {
             StargateService service = getStargateService();
+            DataSourceManager dataSourceManager = service.getDataSourceManager();
             DataExportManager dataExportManager = service.getDataExportManager();
-            dataExportManager.addDataExportEntry(entry);
+            
+            URI sourceURI = entry.getSourceURI();
+            AbstractDataSourceDriver dataSourceDriver = dataSourceManager.getDriver(sourceURI);
+            SourceFileMetadata sourceFileMetadata = dataSourceDriver.getMetadata(sourceURI);
+            if(sourceFileMetadata.isDirectory()) {
+                addDataExportEntryRecursively(dataExportManager, entry.getStargatePath(), dataSourceDriver, sourceFileMetadata);
+            } else {
+                // entry.stargatePath is a directory
+                // so we need to auto-complete the filename to be exposed
+                String stargateFileName = PathUtils.getFileName(sourceFileMetadata.getURI());
+                String concatPath = PathUtils.concatPath(entry.getStargatePath(), stargateFileName);
+                entry.setStargatePath(concatPath);
+                dataExportManager.addDataExportEntry(entry);
+            }
         } catch (ManagerNotInstantiatedException ex) {
             LOG.error(ex);
             throw new IOException(ex);
         } catch (DataExportManagerException ex) {
             LOG.error(ex);
             throw new IOException(ex);
+        }
+    }
+    
+    private void addDataExportEntryRecursively(DataExportManager dataExportManager, String stargatePath, AbstractDataSourceDriver dataSourceDriver, SourceFileMetadata sourceDirectoryMetadata) throws IOException, DataExportManagerException {
+        Collection<SourceFileMetadata> listDirectoryWithMetadata = dataSourceDriver.listDirectoryWithMetadata(sourceDirectoryMetadata.getURI());
+        for(SourceFileMetadata fileMetadata : listDirectoryWithMetadata) {
+            String stargateFileName = PathUtils.getFileName(fileMetadata.getURI());
+            String concatPath = PathUtils.concatPath(stargatePath, stargateFileName);
+                
+            if(fileMetadata.isFile()) {
+                // make a new DataExportEntry to register
+                DataExportEntry entry = new DataExportEntry(fileMetadata.getURI(), concatPath);
+                dataExportManager.addDataExportEntry(entry);
+            } else {
+                // call recursively
+                addDataExportEntryRecursively(dataExportManager, concatPath, dataSourceDriver, fileMetadata);
+            }
         }
     }
     

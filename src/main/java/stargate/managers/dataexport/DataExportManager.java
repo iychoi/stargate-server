@@ -22,6 +22,9 @@ import java.util.Collections;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
+import java.util.concurrent.BlockingQueue;
+import java.util.concurrent.LinkedBlockingDeque;
+import java.util.concurrent.TimeUnit;
 import org.apache.commons.logging.Log;
 import org.apache.commons.logging.LogFactory;
 import stargate.commons.datasource.DataExportEntry;
@@ -46,6 +49,9 @@ public class DataExportManager extends AbstractManager<NullDriver> {
     
     private AbstractKeyValueStore dataExportEntryStore;
     private List<AbstractDataExportEventHandler> dataExportEventHandlers = new ArrayList<AbstractDataExportEventHandler>();
+    private BlockingQueue<DataExportEvent> dataExportEventQueue = new LinkedBlockingDeque<DataExportEvent>(1000);
+    private Thread eventDispatchThread;
+    private boolean dispatchEvent = true;
     protected long lastUpdateTime;
     
     private static final String DATA_EXPORT_STORE = "dexport";
@@ -83,13 +89,44 @@ public class DataExportManager extends AbstractManager<NullDriver> {
     @Override
     public synchronized void start() throws IOException {
         super.start();
+        
+        runEventDispatchThread();
     }
     
     @Override
     public synchronized void stop() throws IOException {
+        this.dispatchEvent = false;
+        this.dataExportEventQueue.clear();
+        if(this.eventDispatchThread != null) {
+            if(this.eventDispatchThread.isAlive()) {
+                this.eventDispatchThread.interrupt();
+            }
+            this.eventDispatchThread = null;
+        }
+        
         this.dataExportEventHandlers.clear();
         
         super.stop();
+    }
+    
+    private void runEventDispatchThread() {
+        this.dispatchEvent = true;
+        this.eventDispatchThread = new Thread(new Runnable() {
+            @Override
+            public void run() {
+                try {
+                    while(dispatchEvent) {
+                        DataExportEvent event = dataExportEventQueue.poll(1, TimeUnit.SECONDS);
+                        if(event != null) {
+                            processDataExportEntryEvent(event);
+                        }
+                    }
+                } catch (Exception ex) {
+                    LOG.error(ex);
+                }
+            }
+        });
+        this.eventDispatchThread.start();
     }
     
     private synchronized void safeInitDataExportEntryStore() throws IOException {
@@ -228,7 +265,11 @@ public class DataExportManager extends AbstractManager<NullDriver> {
         
         this.lastUpdateTime = DateTimeUtils.getTimestamp();
         
-        raiseEventForDataExportEntryAdded(entry);
+        try {
+            raiseEventForDataExportEntryAdded(entry);
+        } catch (InterruptedException ex) {
+            throw new IOException(ex);
+        }
     }
     
     public synchronized void removeDataExportEntry(DataExportEntry entry) throws IOException {
@@ -262,7 +303,11 @@ public class DataExportManager extends AbstractManager<NullDriver> {
             
             this.lastUpdateTime = DateTimeUtils.getTimestamp();
 
-            raiseEventForDataExportEntryRemoved(entry);
+            try {
+                raiseEventForDataExportEntryRemoved(entry);
+            } catch (InterruptedException ex) {
+                throw new IOException(ex);
+            }
         }
     }
     
@@ -281,7 +326,11 @@ public class DataExportManager extends AbstractManager<NullDriver> {
         
         this.lastUpdateTime = DateTimeUtils.getTimestamp();
         
-        raiseEventForDataExportEntryUpdated(entry);
+        try {
+            raiseEventForDataExportEntryUpdated(entry);
+        } catch (InterruptedException ex) {
+            throw new IOException(ex);
+        }
     }
     
     public synchronized void addDataExportEventHandler(AbstractDataExportEventHandler eventHandler) {
@@ -292,30 +341,47 @@ public class DataExportManager extends AbstractManager<NullDriver> {
         this.dataExportEventHandlers.remove(eventHandler);
     }
 
-    private synchronized void raiseEventForDataExportEntryAdded(DataExportEntry entry) {
-        LOG.debug("data export entry is added : " + entry.getStargatePath());
-        
-        for(AbstractDataExportEventHandler handler: this.dataExportEventHandlers) {
-            handler.added(this, entry);
+    private void raiseEventForDataExportEntryAdded(DataExportEntry entry) throws InterruptedException {
+        DataExportEvent event = new DataExportEvent(DataExportEventType.DATAEXPORT_EVENT_TYPE_ADD, entry);
+        this.dataExportEventQueue.put(event);
+    }
+    
+    private synchronized void raiseEventForDataExportEntryRemoved(DataExportEntry entry) throws InterruptedException {
+        DataExportEvent event = new DataExportEvent(DataExportEventType.DATAEXPORT_EVENT_TYPE_REMOVE, entry);
+        this.dataExportEventQueue.put(event);
+    }
+    
+    private synchronized void raiseEventForDataExportEntryUpdated(DataExportEntry entry)  throws InterruptedException {
+        DataExportEvent event = new DataExportEvent(DataExportEventType.DATAEXPORT_EVENT_TYPE_UPDATE, entry);
+        this.dataExportEventQueue.put(event);
+    }
+    
+    private void processDataExportEntryEvent(DataExportEvent event) throws IOException {
+        DataExportEntry entry = event.getEntry();
+        switch(event.getEventType()) {
+            case DATAEXPORT_EVENT_TYPE_ADD:
+                LOG.debug("data export entry is added : " + entry.getStargatePath());
+                for(AbstractDataExportEventHandler handler: this.dataExportEventHandlers) {
+                    handler.added(this, entry);
+                }
+                break;
+            case DATAEXPORT_EVENT_TYPE_REMOVE:
+                LOG.debug("data export entry is removed : " + entry.getStargatePath());
+                for(AbstractDataExportEventHandler handler: this.dataExportEventHandlers) {
+                    handler.removed(this, entry);
+                }
+                break;
+            case DATAEXPORT_EVENT_TYPE_UPDATE:
+                LOG.debug("data export entry is updated : " + entry.getStargatePath());
+                for(AbstractDataExportEventHandler handler: this.dataExportEventHandlers) {
+                    handler.updated(this, entry);
+                }
+                break;
+            default:
+                throw new IOException(String.format("cannot handle %s", event.getEventType().name()));
         }
     }
     
-    private synchronized void raiseEventForDataExportEntryRemoved(DataExportEntry entry) {
-        LOG.debug("data export entry is removed : " + entry.getStargatePath());
-        
-        for(AbstractDataExportEventHandler handler: this.dataExportEventHandlers) {
-            handler.removed(this, entry);
-        }
-    }
-    
-    private synchronized void raiseEventForDataExportEntryUpdated(DataExportEntry entry) {
-        LOG.debug("data export entry is updated : " + entry.getStargatePath());
-        
-        for(AbstractDataExportEventHandler handler: this.dataExportEventHandlers) {
-            handler.updated(this, entry);
-        }
-    }
-
     public synchronized long getLastUpdateTime() {
         return this.lastUpdateTime;
     }

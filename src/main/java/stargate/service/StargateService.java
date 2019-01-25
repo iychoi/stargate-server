@@ -131,7 +131,7 @@ public class StargateService extends AbstractService {
         
         LOG.info("Registering event handlers");
         this.dataExportUpdateEventHandler = new DataExportUpdateEventHandler(this.recipeManager, this.volumeManager);
-        this.dataExportManager.addDataExportEventHandler(dataExportUpdateEventHandler);
+        this.dataExportManager.addDataExportEventHandler(this.dataExportUpdateEventHandler);
         LOG.info("Event handlers are registered");
         
         LOG.info("Synchronizing states");
