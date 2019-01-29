@@ -396,7 +396,7 @@ public class HDFSDataSourceDriver extends AbstractDataSourceDriver {
                 if(nodeName != null) {
                     locations.add(nodeName);
                 } else {
-                    LOG.info(String.format("Cannot convert block location to a node name - %s", location));
+                    LOG.debug(String.format("Cannot convert block location to a stargate node name - %s", location));
                     locations.clear();
                     locations.add("*");
                     break;

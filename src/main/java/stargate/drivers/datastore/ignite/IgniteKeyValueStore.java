@@ -13,7 +13,7 @@
    See the License for the specific language governing permissions and
    limitations under the License.
 */
-package stargate.drivers.keyvaluestore.ignite;
+package stargate.drivers.datastore.ignite;
 
 import java.io.IOException;
 import java.util.Collection;
@@ -32,8 +32,8 @@ import org.apache.ignite.cache.CacheMode;
 import org.apache.ignite.cache.CachePeekMode;
 import org.apache.ignite.cache.CacheWriteSynchronizationMode;
 import org.apache.ignite.configuration.CacheConfiguration;
-import stargate.commons.keyvaluestore.AbstractKeyValueStore;
-import stargate.commons.keyvaluestore.EnumKeyValueStoreProperty;
+import stargate.commons.datastore.AbstractKeyValueStore;
+import stargate.commons.datastore.EnumDataStoreProperty;
 import stargate.commons.utils.ObjectSerializer;
 import stargate.drivers.ignite.IgniteDriver;
 
@@ -45,15 +45,15 @@ public class IgniteKeyValueStore extends AbstractKeyValueStore {
 
     private static final Log LOG = LogFactory.getLog(IgniteKeyValueStore.class);
     
-    private IgniteKeyValueStoreDriver driver;
+    private IgniteDataStoreDriver driver;
     private Ignite ignite;
     private String name;
     private Class valueClass;
-    private EnumKeyValueStoreProperty property;
+    private EnumDataStoreProperty property;
     
     private IgniteCache<String, byte[]> store;
     
-    IgniteKeyValueStore(IgniteKeyValueStoreDriver driver, Ignite ignite, String name, Class valueClass, EnumKeyValueStoreProperty property) {
+    IgniteKeyValueStore(IgniteDataStoreDriver driver, Ignite ignite, String name, Class valueClass, EnumDataStoreProperty property) {
         this.driver = driver;
         this.ignite = ignite;
         this.name = name;
@@ -61,15 +61,15 @@ public class IgniteKeyValueStore extends AbstractKeyValueStore {
         this.property = property;
         
         CacheConfiguration<String, byte[]> cc = new CacheConfiguration<String, byte[]>();
-        if(EnumKeyValueStoreProperty.isDistributed(property)) {
+        if(EnumDataStoreProperty.isDistributed(property)) {
             cc.setCacheMode(CacheMode.PARTITIONED);
-        } else if(EnumKeyValueStoreProperty.isReplciated(property)) {
+        } else if(EnumDataStoreProperty.isReplciated(property)) {
             cc.setCacheMode(CacheMode.REPLICATED);
         }
         
-        if(EnumKeyValueStoreProperty.isPersistent(property)) {
+        if(EnumDataStoreProperty.isPersistent(property)) {
             cc.setDataRegionName(IgniteDriver.PERSISTENT_REGION_NAME);
-        } else if(EnumKeyValueStoreProperty.isVolatile(property)) {
+        } else if(EnumDataStoreProperty.isVolatile(property)) {
             cc.setDataRegionName(IgniteDriver.VOLATILE_REGION_NAME);
         }
         
@@ -90,7 +90,7 @@ public class IgniteKeyValueStore extends AbstractKeyValueStore {
     }
 
     @Override
-    public EnumKeyValueStoreProperty getProperty() {
+    public EnumDataStoreProperty getProperty() {
         return this.property;
     }
     

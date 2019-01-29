@@ -13,7 +13,7 @@
    See the License for the specific language governing permissions and
    limitations under the License.
 */
-package stargate.drivers.keyvaluestore.localfs;
+package stargate.drivers.datastore.localfs;
 
 import java.io.File;
 import java.io.FileInputStream;
@@ -29,10 +29,11 @@ import java.util.Map;
 import org.apache.commons.logging.Log;
 import org.apache.commons.logging.LogFactory;
 import stargate.commons.driver.AbstractDriverConfig;
-import stargate.commons.keyvaluestore.AbstractKeyValueStore;
-import stargate.commons.keyvaluestore.AbstractKeyValueStoreDriver;
-import stargate.commons.keyvaluestore.AbstractKeyValueStoreDriverConfig;
-import stargate.commons.keyvaluestore.EnumKeyValueStoreProperty;
+import stargate.commons.datastore.AbstractKeyValueStore;
+import stargate.commons.datastore.AbstractDataStoreDriver;
+import stargate.commons.datastore.AbstractDataStoreDriverConfig;
+import stargate.commons.datastore.AbstractQueue;
+import stargate.commons.datastore.EnumDataStoreProperty;
 import stargate.commons.utils.IOUtils;
 import stargate.commons.utils.PathUtils;
 
@@ -40,39 +41,40 @@ import stargate.commons.utils.PathUtils;
  *
  * @author iychoi
  */
-public class LocalFSKeyValueStoreDriver extends AbstractKeyValueStoreDriver {
+public class LocalFSDataStoreDriver extends AbstractDataStoreDriver {
 
-    private static final Log LOG = LogFactory.getLog(LocalFSKeyValueStoreDriver.class);
+    private static final Log LOG = LogFactory.getLog(LocalFSDataStoreDriver.class);
     
-    private LocalFSKeyValueStoreDriverConfig config;
+    private LocalFSDataStoreDriverConfig config;
     private File rootPath;
-    private Map<String, LocalFSKeyValueStore> stores = new HashMap<String, LocalFSKeyValueStore>();
+    private Map<String, LocalFSKeyValueStore> kvStores = new HashMap<String, LocalFSKeyValueStore>();
+    private Map<String, LocalFSQueue> queues = new HashMap<String, LocalFSQueue>();
     
-    public LocalFSKeyValueStoreDriver(AbstractDriverConfig config) {
+    public LocalFSDataStoreDriver(AbstractDriverConfig config) {
         if(config == null) {
             throw new IllegalArgumentException("config is null");
         }
         
-        if(!(config instanceof LocalFSKeyValueStoreDriverConfig)) {
-            throw new IllegalArgumentException("config is not an instance of LocalFSKeyValueStoreDriverConfig");
+        if(!(config instanceof LocalFSDataStoreDriverConfig)) {
+            throw new IllegalArgumentException("config is not an instance of LocalFSDataStoreDriverConfig");
         }
         
-        this.config = (LocalFSKeyValueStoreDriverConfig) config;
+        this.config = (LocalFSDataStoreDriverConfig) config;
     }
     
-    public LocalFSKeyValueStoreDriver(AbstractKeyValueStoreDriverConfig config) {
+    public LocalFSDataStoreDriver(AbstractDataStoreDriverConfig config) {
         if(config == null) {
             throw new IllegalArgumentException("config is null");
         }
         
-        if(!(config instanceof LocalFSKeyValueStoreDriverConfig)) {
-            throw new IllegalArgumentException("config is not an instance of LocalFSKeyValueStoreDriverConfig");
+        if(!(config instanceof LocalFSDataStoreDriverConfig)) {
+            throw new IllegalArgumentException("config is not an instance of LocalFSDataStoreDriverConfig");
         }
         
-        this.config = (LocalFSKeyValueStoreDriverConfig) config;
+        this.config = (LocalFSDataStoreDriverConfig) config;
     }
     
-    public LocalFSKeyValueStoreDriver(LocalFSKeyValueStoreDriverConfig config) {
+    public LocalFSDataStoreDriver(LocalFSDataStoreDriverConfig config) {
         if(config == null) {
             throw new IllegalArgumentException("config is null");
         }
@@ -92,13 +94,13 @@ public class LocalFSKeyValueStoreDriver extends AbstractKeyValueStoreDriver {
 
     @Override
     public synchronized void uninit() throws IOException {
-        for(LocalFSKeyValueStore store : this.stores.values()) {
-            EnumKeyValueStoreProperty property = store.getProperty();
-            if(EnumKeyValueStoreProperty.isVolatile(property)) {
+        for(LocalFSKeyValueStore store : this.kvStores.values()) {
+            EnumDataStoreProperty property = store.getProperty();
+            if(EnumDataStoreProperty.isVolatile(property)) {
                 store.clear();
             }
         }
-        this.stores.clear();
+        this.kvStores.clear();
         
         super.uninit();
     }
@@ -300,16 +302,30 @@ public class LocalFSKeyValueStoreDriver extends AbstractKeyValueStoreDriver {
     }
 
     @Override
-    public AbstractKeyValueStore getKeyValueStore(String name, Class valueClass, EnumKeyValueStoreProperty property) throws IOException {
-        LocalFSKeyValueStore s = this.stores.get(name);
+    public AbstractKeyValueStore getKeyValueStore(String name, Class valueClass, EnumDataStoreProperty property) throws IOException {
+        LocalFSKeyValueStore s = this.kvStores.get(name);
         if(s == null) {
             if(!makeStore(name)) {
-                throw new IOException("Cannot create a store (" + name + ")");
+                throw new IOException("Cannot create a kv store (" + name + ")");
             }
             
             s = new LocalFSKeyValueStore(this, name, valueClass, property);
-            this.stores.put(name, s);
+            this.kvStores.put(name, s);
         }
         return s;
+    }
+
+    @Override
+    public AbstractQueue getQueue(String name, Class valueClass, EnumDataStoreProperty property) throws IOException {
+        LocalFSQueue q = this.queues.get(name);
+        if(q == null) {
+            if(!makeStore(name)) {
+                throw new IOException("Cannot create a queue (" + name + ")");
+            }
+            
+            q = new LocalFSQueue(this, name, valueClass, property);
+            this.queues.put(name, q);
+        }
+        return q;
     }
 }

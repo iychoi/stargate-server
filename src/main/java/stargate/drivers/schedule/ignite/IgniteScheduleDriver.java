@@ -20,20 +20,18 @@ import java.util.ArrayList;
 import java.util.Collection;
 import java.util.List;
 import java.util.UUID;
-import java.util.logging.Level;
-import java.util.logging.Logger;
 import org.apache.commons.logging.Log;
 import org.apache.commons.logging.LogFactory;
 import org.apache.ignite.Ignite;
 import org.apache.ignite.IgniteCompute;
 import org.apache.ignite.cluster.ClusterGroup;
+import org.apache.ignite.compute.ComputeTaskFuture;
 import org.apache.ignite.lang.IgniteRunnable;
 import org.apache.ignite.resources.IgniteInstanceResource;
 import stargate.commons.driver.AbstractDriverConfig;
 import stargate.commons.schedule.AbstractScheduleDriver;
 import stargate.commons.schedule.AbstractScheduleDriverConfig;
 import stargate.commons.schedule.Task;
-import stargate.commons.schedule.TaskRunnable;
 import stargate.commons.schedule.TaskSchedule;
 import stargate.drivers.ignite.IgniteDriver;
 import stargate.managers.schedule.ScheduleManager;
@@ -129,8 +127,11 @@ public class IgniteScheduleDriver extends AbstractScheduleDriver {
             // process task!
             Ignite ignite = this.igniteDriver.getIgnite();
             ClusterGroup group = parseTaskGroup(task.getNodeNames());
-            IgniteCompute compute = ignite.compute(group);
+            IgniteCompute compute = ignite.compute(group).withAsync();
             compute.broadcast(makeIgniteRunnable(task));
+            ComputeTaskFuture<Object> future = compute.future();
+            IgniteTaskFuture igniteTaskFuture = new IgniteTaskFuture(future);
+            task.setFuture(igniteTaskFuture);
         } catch (Exception ex) {
             throw new IOException(ex);
         }
@@ -166,7 +167,7 @@ public class IgniteScheduleDriver extends AbstractScheduleDriver {
     }
     
     private IgniteRunnable makeIgniteRunnable(Task task) throws Exception {
-        TaskRunnable r = task.getRunnable();
+        Runnable r = task.getRunnable();
         IgniteRunnable igniteRunnable = null;
         
         boolean repeat = false;

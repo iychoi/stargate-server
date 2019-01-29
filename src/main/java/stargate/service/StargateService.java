@@ -24,7 +24,7 @@ import stargate.commons.service.ServiceNotStartedException;
 import stargate.managers.cluster.ClusterManager;
 import stargate.managers.dataexport.DataExportManager;
 import stargate.managers.datasource.DataSourceManager;
-import stargate.managers.keyvaluestore.KeyValueStoreManager;
+import stargate.managers.datastore.DataStoreManager;
 import stargate.managers.policy.PolicyManager;
 import stargate.managers.recipe.RecipeManager;
 import stargate.managers.recipe.RecipeManagerException;
@@ -51,7 +51,7 @@ public class StargateService extends AbstractService {
     private DataSourceManager dataSourceManager;
     private DataExportManager dataExportManager;
     private RecipeManager recipeManager;
-    private KeyValueStoreManager keyValueStoreManager;
+    private DataStoreManager dataStoreManager;
     private ScheduleManager scheduleManager;
     private TransportManager transportManager;
     private UserInterfaceManager userInterfaceManager;
@@ -61,7 +61,7 @@ public class StargateService extends AbstractService {
     private DataExportUpdateEventHandler dataExportUpdateEventHandler;
     
     public static StargateService getInstance(StargateServiceConfig config) throws ServiceNotStartedException {
-        synchronized (KeyValueStoreManager.class) {
+        synchronized (DataStoreManager.class) {
             if(instance == null) {
                 if(config == null) {
                     throw new IllegalArgumentException("config is null");
@@ -105,7 +105,7 @@ public class StargateService extends AbstractService {
             this.dataSourceManager = DataSourceManager.getInstance(this, this.config.getDataSourceConfig());
             this.dataExportManager = DataExportManager.getInstance(this);
             this.recipeManager = RecipeManager.getInstance(this, this.config.getRecipeConfig());
-            this.keyValueStoreManager = KeyValueStoreManager.getInstance(this, this.config.getKeyValueStoreConfig());
+            this.dataStoreManager = DataStoreManager.getInstance(this, this.config.getDataStoreConfig());
             this.scheduleManager = ScheduleManager.getInstance(this, this.config.getScheduleConfig());
             this.transportManager = TransportManager.getInstance(this, this.config.getTransportConfig());
             this.userInterfaceManager = UserInterfaceManager.getInstance(this, this.config.getUserInterfaceConfig());
@@ -118,7 +118,7 @@ public class StargateService extends AbstractService {
         
         LOG.info("Starting managers");
         this.clusterManager.start();
-        this.keyValueStoreManager.start();
+        this.dataStoreManager.start();
         this.dataSourceManager.start();
         this.policyManager.start();
         this.dataExportManager.start();
@@ -172,7 +172,7 @@ public class StargateService extends AbstractService {
         this.dataExportManager.stop();
         this.policyManager.stop();
         this.dataSourceManager.stop();
-        this.keyValueStoreManager.stop();
+        this.dataStoreManager.stop();
         this.clusterManager.stop();
         LOG.info("Managers are stopped");
         
@@ -222,12 +222,12 @@ public class StargateService extends AbstractService {
         return this.recipeManager;
     }
     
-    public KeyValueStoreManager getKeyValueStoreManager() throws ManagerNotInstantiatedException {
-        if(this.keyValueStoreManager == null || !this.keyValueStoreManager.isStarted()) {
-            throw new ManagerNotInstantiatedException("KeyValueStoreManager is not started");
+    public DataStoreManager getDataStoreManager() throws ManagerNotInstantiatedException {
+        if(this.dataStoreManager == null || !this.dataStoreManager.isStarted()) {
+            throw new ManagerNotInstantiatedException("DataStoreManager is not started");
         }
         
-        return this.keyValueStoreManager;
+        return this.dataStoreManager;
     }
     
     public ScheduleManager getScheduleManager() throws ManagerNotInstantiatedException {

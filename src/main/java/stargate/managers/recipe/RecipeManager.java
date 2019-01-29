@@ -20,7 +20,9 @@ import java.io.InputStream;
 import java.util.ArrayList;
 import java.util.Collection;
 import java.util.Collections;
+import java.util.Iterator;
 import java.util.List;
+import java.util.concurrent.Future;
 import org.apache.commons.logging.Log;
 import org.apache.commons.logging.LogFactory;
 import stargate.commons.cluster.AbstractClusterDriver;
@@ -32,19 +34,21 @@ import stargate.commons.datasource.DataExportEntry;
 import stargate.commons.datasource.SourceFileMetadata;
 import stargate.commons.driver.AbstractDriver;
 import stargate.commons.driver.DriverFailedToLoadException;
-import stargate.commons.keyvaluestore.AbstractKeyValueStore;
-import stargate.commons.keyvaluestore.EnumKeyValueStoreProperty;
+import stargate.commons.datastore.AbstractKeyValueStore;
+import stargate.commons.datastore.EnumDataStoreProperty;
 import stargate.commons.manager.AbstractManager;
 import stargate.commons.manager.ManagerConfig;
 import stargate.commons.manager.ManagerNotInstantiatedException;
 import stargate.commons.recipe.AbstractRecipeDriver;
 import stargate.commons.recipe.Recipe;
 import stargate.commons.recipe.RecipeChunk;
+import stargate.commons.schedule.AbstractScheduleDriver;
 import stargate.commons.utils.DateTimeUtils;
 import stargate.managers.cluster.ClusterManager;
 import stargate.managers.dataexport.DataExportManager;
 import stargate.managers.datasource.DataSourceManager;
-import stargate.managers.keyvaluestore.KeyValueStoreManager;
+import stargate.managers.datastore.DataStoreManager;
+import stargate.managers.schedule.ScheduleManager;
 import stargate.service.StargateService;
 
 /**
@@ -147,8 +151,8 @@ public class RecipeManager extends AbstractManager<AbstractRecipeDriver> {
         if(this.recipeStore == null) {
             try {
                 StargateService stargateService = getStargateService();
-                KeyValueStoreManager keyValueStoreManager = stargateService.getKeyValueStoreManager();
-                this.recipeStore = keyValueStoreManager.getDriver().getKeyValueStore(RECIPE_STORE, Recipe.class, EnumKeyValueStoreProperty.KEY_VALUE_STORE_PROP_PERSISTENT_DISTRIBUTED);
+                DataStoreManager keyValueStoreManager = stargateService.getDataStoreManager();
+                this.recipeStore = keyValueStoreManager.getDriver().getKeyValueStore(RECIPE_STORE, Recipe.class, EnumDataStoreProperty.DATASTORE_PROP_PERSISTENT_DISTRIBUTED);
             } catch (ManagerNotInstantiatedException ex) {
                 LOG.error(ex);
                 throw new IOException(ex);
@@ -160,8 +164,8 @@ public class RecipeManager extends AbstractManager<AbstractRecipeDriver> {
         if(this.hashStore == null) {
             try {
                 StargateService stargateService = getStargateService();
-                KeyValueStoreManager keyValueStoreManager = stargateService.getKeyValueStoreManager();
-                this.hashStore = keyValueStoreManager.getDriver().getKeyValueStore(HASH_STORE, ReverseRecipeMapping.class, EnumKeyValueStoreProperty.KEY_VALUE_STORE_PROP_PERSISTENT_DISTRIBUTED);
+                DataStoreManager keyValueStoreManager = stargateService.getDataStoreManager();
+                this.hashStore = keyValueStoreManager.getDriver().getKeyValueStore(HASH_STORE, ReverseRecipeMapping.class, EnumDataStoreProperty.DATASTORE_PROP_PERSISTENT_DISTRIBUTED);
             } catch (ManagerNotInstantiatedException ex) {
                 LOG.error(ex);
                 throw new IOException(ex);
@@ -171,7 +175,6 @@ public class RecipeManager extends AbstractManager<AbstractRecipeDriver> {
     
     private synchronized void addHashes(Recipe recipe) throws IOException {
         Collection<RecipeChunk> chunks = recipe.getChunks();
-        String key = recipe.getMetadata().getURI().getPath();
         
         for(RecipeChunk chunk : chunks) {
             String hash = chunk.getHashString();
@@ -190,7 +193,6 @@ public class RecipeManager extends AbstractManager<AbstractRecipeDriver> {
     
     private synchronized void removeHashes(Recipe recipe) throws IOException {
         Collection<RecipeChunk> chunks = recipe.getChunks();
-        String key = recipe.getMetadata().getURI().getPath();
         
         for(RecipeChunk chunk : chunks) {
             String hash = chunk.getHashString();
@@ -558,6 +560,11 @@ public class RecipeManager extends AbstractManager<AbstractRecipeDriver> {
     }
     
     public Recipe createRecipe(DataExportEntry entry) throws IOException {
+        //return createRecipeLocal(entry);
+        return createRecipeParallel(entry);
+    }
+    
+    private Recipe createRecipeLocal(DataExportEntry entry) throws IOException {
         if(!this.started) {
             throw new IllegalStateException("Manager is not started");
         }
@@ -588,9 +595,7 @@ public class RecipeManager extends AbstractManager<AbstractRecipeDriver> {
             Recipe recipe = new Recipe(objMetadata, driver.getHashAlgorithm(), chunkSize, cluster.getNodeNames());
 
             // create recipe chunks
-            while((recipeChunk = driver.produceRecipeChunk(is)) != null) {
-                // update offset
-                recipeChunk.setOffset(offset);
+            while((recipeChunk = driver.produceRecipeChunk(is, offset)) != null) {
                 // update host
                 Collection<String> blockLocations = dataSourceDriver.listBlockLocations(cluster, sourceMetadata.getURI(), offset, chunkSize);
                 if(blockLocations.contains("*")) {
@@ -608,6 +613,185 @@ public class RecipeManager extends AbstractManager<AbstractRecipeDriver> {
             }
 
             is.close();
+            return recipe;
+        } catch (ManagerNotInstantiatedException ex) {
+            LOG.error(ex);
+            throw new IOException(ex);
+        }
+    }
+    
+    private RecipeChunk createRecipeChunk(RecipeChunkGenerateEvent event) throws IOException {
+        if(!this.started) {
+            throw new IllegalStateException("Manager is not started");
+        }
+        
+        try {
+            DataExportEntry dataExportEntry = event.getDataExportEntry();
+            SourceFileMetadata sourceFileMetadata = event.getSourceFileMetadata();
+            
+            StargateService stargateService = getStargateService();
+            DataSourceManager dataSourceManager = stargateService.getDataSourceManager();
+            AbstractDataSourceDriver dataSourceDriver = dataSourceManager.getDriver(dataExportEntry.getSourceURI());
+            
+            // create recipe chunk
+            AbstractRecipeDriver driver = getDriver();
+
+            InputStream is = dataSourceDriver.openFile(sourceFileMetadata.getURI(), event.getOffset(), event.getLength());
+            // create recipe chunks
+            RecipeChunk recipeChunk = driver.produceRecipeChunk(is, 0);
+            is.close();
+            
+            return recipeChunk;
+        } catch (ManagerNotInstantiatedException ex) {
+            LOG.error(ex);
+            throw new IOException(ex);
+        }
+    }
+    
+    private synchronized Recipe createRecipeParallel(DataExportEntry entry) throws IOException {
+        if(!this.started) {
+            throw new IllegalStateException("Manager is not started");
+        }
+        
+        LOG.info(String.format("createRecipe - %s", entry.getStargatePath()));
+        try {
+            StargateService stargateService = getStargateService();
+
+            ClusterManager clusterManager = stargateService.getClusterManager();
+            AbstractClusterDriver clusterDriver = clusterManager.getDriver();
+            Cluster cluster = clusterDriver.getLocalCluster();
+
+            DataSourceManager dataSourceManager = stargateService.getDataSourceManager();
+            AbstractDataSourceDriver dataSourceDriver = dataSourceManager.getDriver(entry.getSourceURI());
+            SourceFileMetadata sourceMetadata = dataSourceDriver.getMetadata(entry.getSourceURI());
+
+            DataObjectURI dataObjectURI = new DataObjectURI(cluster.getName(), entry.getStargatePath());
+            DataObjectMetadata objMetadata = new DataObjectMetadata(dataObjectURI, sourceMetadata.getFileSize(), sourceMetadata.isDirectory(), sourceMetadata.getLastModifiedTime());
+
+            // create recipe
+            AbstractRecipeDriver driver = getDriver();
+
+            int chunkSize = driver.getChunkSize();
+            Collection<String> nodeNames = cluster.getNodeNames();
+            
+            Recipe recipe = new Recipe(objMetadata, driver.getHashAlgorithm(), chunkSize, nodeNames);
+            long offset = 0;
+            long remaining = sourceMetadata.getFileSize();
+            int recipeChunkNum = 0;
+            
+            // distribute tasks
+            List<RecipeChunkGenerateEvent> anyNodeTasks = new ArrayList<RecipeChunkGenerateEvent>();
+            
+            int numNodes = nodeNames.size();
+            List<RecipeChunkGenerateEvent> nodeTasks[] = new List[numNodes];
+            for(int i=0;i<numNodes;i++) {
+                nodeTasks[i] = new ArrayList<RecipeChunkGenerateEvent>();
+            }
+            
+            while(remaining > 0) {
+                int blockSize = (int) Math.min(chunkSize, remaining);
+                RecipeChunkGenerateEvent event = new RecipeChunkGenerateEvent(entry, sourceMetadata, offset, blockSize);
+                
+                Collection<String> blockLocations = dataSourceDriver.listBlockLocations(cluster, sourceMetadata.getURI(), offset, chunkSize);
+                if(blockLocations.contains("*")) {
+                    // distribute to any
+                    anyNodeTasks.add(event);
+                } else {
+                    // simply use the primary host
+                    for(String nodeName : blockLocations) {
+                        int nodeID = recipe.getNodeID(nodeName);
+                        if(nodeID >= 0) {
+                            nodeTasks[nodeID].add(event);
+                        } else {
+                            anyNodeTasks.add(event);
+                        }
+                        break;
+                    }
+                }
+                
+                offset += blockSize;
+                remaining -= blockSize;
+                recipeChunkNum++;
+            }
+            
+            int remainingTasks = recipeChunkNum;
+            int remainingNodes = numNodes;
+            int optimalTasksPerNode = remainingTasks / remainingNodes;
+            
+            for(int i=0;i<numNodes;i++) {
+                if(nodeTasks[i].size() > optimalTasksPerNode) {
+                    remainingTasks -= nodeTasks[i].size();
+                    remainingNodes--;
+                }
+            }
+            
+            optimalTasksPerNode = remainingTasks / remainingNodes;
+            for(int i=0;i<numNodes;i++) {
+                int toAdd = optimalTasksPerNode - nodeTasks[i].size();
+                for(int j=0;j<toAdd;j++) {
+                    if(anyNodeTasks.size() > 0) {
+                        RecipeChunkGenerateEvent event = anyNodeTasks.remove(0);
+                        nodeTasks[i].add(event);
+                        remainingTasks--;
+                    } else {
+                        break;
+                    }
+                }
+                    
+                if(anyNodeTasks.size() <= 0) {
+                    break;
+                }
+            }
+            
+            // remaining
+            if(anyNodeTasks.size() > 0) {
+                nodeTasks[numNodes - 1].addAll(anyNodeTasks);
+            }
+            
+            //// now launch tasks
+            ScheduleManager scheduleManager = stargateService.getScheduleManager();
+            AbstractScheduleDriver scheduleDriver = scheduleManager.getDriver();
+            
+            Iterator<String> nodeNameIterator = nodeNames.iterator();
+            int nodeId = 0;
+            
+            List<RecipeChunkGenerateTask> recipeChunkGenerateTasks = new ArrayList<RecipeChunkGenerateTask>();
+            while(nodeNameIterator.hasNext()) {
+                String nodeName = nodeNameIterator.next();
+                
+                if(nodeTasks[nodeId].size() > 0) {
+                    List<String> nodeNameList = new ArrayList<String>();
+                    nodeNameList.add(nodeName);
+
+                    RecipeChunkGenerateTask recipeChunkGenerateTask = new RecipeChunkGenerateTask(nodeNameList, nodeTasks[nodeId]);
+                    scheduleDriver.scheduleTask(recipeChunkGenerateTask);
+
+                    recipeChunkGenerateTasks.add(recipeChunkGenerateTask);
+                }
+                
+                nodeId++;
+            }
+            
+            // collect
+            for(RecipeChunkGenerateTask task : recipeChunkGenerateTasks) {
+                RecipeChunk recipeChunk = task.getRecipeChunk();
+                Collection<String> blockLocations = dataSourceDriver.listBlockLocations(cluster, sourceMetadata.getURI(), recipeChunk.getOffset(), recipeChunk.getLength());
+                if(blockLocations.contains("*")) {
+                    recipeChunk.setAccessibleFromAllNode();
+                } else {
+                    for(String nodeName : blockLocations) {
+                        int nodeID = recipe.getNodeID(nodeName);
+                        if(nodeID >= 0) {
+                            recipeChunk.addNodeID(nodeID);
+                        } else {
+                            recipeChunk.setAccessibleFromAllNode();
+                        }
+                    }
+                }
+
+                recipe.addChunk(recipeChunk);
+            }
+            
             return recipe;
         } catch (ManagerNotInstantiatedException ex) {
             LOG.error(ex);

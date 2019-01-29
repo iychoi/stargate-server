@@ -13,39 +13,39 @@
    See the License for the specific language governing permissions and
    limitations under the License.
 */
-package stargate.drivers.keyvaluestore.ignite;
+package stargate.drivers.datastore.ignite;
 
 import java.io.File;
 import java.io.IOException;
 import org.apache.commons.logging.Log;
 import org.apache.commons.logging.LogFactory;
 import stargate.commons.utils.JsonSerializer;
-import stargate.commons.keyvaluestore.AbstractKeyValueStoreDriverConfig;
+import stargate.commons.datastore.AbstractDataStoreDriverConfig;
 
 /**
  *
  * @author iychoi
  */
-public class IgniteKeyValueStoreDriverConfig extends AbstractKeyValueStoreDriverConfig {
+public class IgniteDataStoreDriverConfig extends AbstractDataStoreDriverConfig {
     
-    private static final Log LOG = LogFactory.getLog(IgniteKeyValueStoreDriverConfig.class);
+    private static final Log LOG = LogFactory.getLog(IgniteDataStoreDriverConfig.class);
     
-    public static IgniteKeyValueStoreDriverConfig createInstance(File file) throws IOException {
+    public static IgniteDataStoreDriverConfig createInstance(File file) throws IOException {
         if(file == null) {
             throw new IllegalArgumentException("file is null");
         }
 
-        return (IgniteKeyValueStoreDriverConfig) JsonSerializer.fromJsonFile(file, IgniteKeyValueStoreDriverConfig.class);
+        return (IgniteDataStoreDriverConfig) JsonSerializer.fromJsonFile(file, IgniteDataStoreDriverConfig.class);
     }
     
-    public static IgniteKeyValueStoreDriverConfig createInstance(String json) throws IOException {
+    public static IgniteDataStoreDriverConfig createInstance(String json) throws IOException {
         if(json == null || json.isEmpty()) {
             throw new IllegalArgumentException("json is null or empty");
         }
         
-        return (IgniteKeyValueStoreDriverConfig) JsonSerializer.fromJson(json, IgniteKeyValueStoreDriverConfig.class);
+        return (IgniteDataStoreDriverConfig) JsonSerializer.fromJson(json, IgniteDataStoreDriverConfig.class);
     }
     
-    public IgniteKeyValueStoreDriverConfig() {
+    public IgniteDataStoreDriverConfig() {
     }
 }

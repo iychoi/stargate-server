@@ -13,7 +13,7 @@
    See the License for the specific language governing permissions and
    limitations under the License.
 */
-package stargate.managers.keyvaluestore;
+package stargate.managers.datastore;
 
 import java.io.IOException;
 import java.util.ArrayList;
@@ -23,7 +23,7 @@ import org.apache.commons.logging.Log;
 import org.apache.commons.logging.LogFactory;
 import stargate.commons.driver.AbstractDriver;
 import stargate.commons.driver.DriverFailedToLoadException;
-import stargate.commons.keyvaluestore.AbstractKeyValueStoreDriver;
+import stargate.commons.datastore.AbstractDataStoreDriver;
 import stargate.commons.manager.AbstractManager;
 import stargate.commons.manager.ManagerConfig;
 import stargate.commons.manager.ManagerNotInstantiatedException;
@@ -33,24 +33,24 @@ import stargate.service.StargateService;
  *
  * @author iychoi
  */
-public class KeyValueStoreManager extends AbstractManager<AbstractKeyValueStoreDriver> {
+public class DataStoreManager extends AbstractManager<AbstractDataStoreDriver> {
     
-    private static final Log LOG = LogFactory.getLog(KeyValueStoreManager.class);
+    private static final Log LOG = LogFactory.getLog(DataStoreManager.class);
     
-    private static KeyValueStoreManager instance;
+    private static DataStoreManager instance;
     
 
-    public static KeyValueStoreManager getInstance(StargateService service, Collection<AbstractKeyValueStoreDriver> drivers) throws ManagerNotInstantiatedException {
-        synchronized (KeyValueStoreManager.class) {
+    public static DataStoreManager getInstance(StargateService service, Collection<AbstractDataStoreDriver> drivers) throws ManagerNotInstantiatedException {
+        synchronized (DataStoreManager.class) {
             if(instance == null) {
-                instance = new KeyValueStoreManager(service, drivers);
+                instance = new DataStoreManager(service, drivers);
             }
             return instance;
         }
     }
     
-    public static KeyValueStoreManager getInstance(StargateService service, ManagerConfig config) throws ManagerNotInstantiatedException {
-        synchronized (KeyValueStoreManager.class) {
+    public static DataStoreManager getInstance(StargateService service, ManagerConfig config) throws ManagerNotInstantiatedException {
+        synchronized (DataStoreManager.class) {
             if(instance == null) {
                 if(config == null) {
                     throw new IllegalArgumentException("config is null");
@@ -59,11 +59,11 @@ public class KeyValueStoreManager extends AbstractManager<AbstractKeyValueStoreD
                 try {
                     // type cast
                     Collection<AbstractDriver> drivers = (Collection<AbstractDriver>) config.getDrivers();
-                    List<AbstractKeyValueStoreDriver> keyValueStoreDrivers = new ArrayList<AbstractKeyValueStoreDriver>();
+                    List<AbstractDataStoreDriver> dataStoreDrivers = new ArrayList<AbstractDataStoreDriver>();
                     for(AbstractDriver driver : drivers) {
-                        keyValueStoreDrivers.add((AbstractKeyValueStoreDriver) driver);
+                        dataStoreDrivers.add((AbstractDataStoreDriver) driver);
                     }
-                    instance = new KeyValueStoreManager(service, keyValueStoreDrivers);
+                    instance = new DataStoreManager(service, dataStoreDrivers);
                 } catch (DriverFailedToLoadException ex) {
                     LOG.error(ex);
                     throw new ManagerNotInstantiatedException(ex.toString());
@@ -73,8 +73,8 @@ public class KeyValueStoreManager extends AbstractManager<AbstractKeyValueStoreD
         }
     }
     
-    public static KeyValueStoreManager getInstance() throws ManagerNotInstantiatedException {
-        synchronized (KeyValueStoreManager.class) {
+    public static DataStoreManager getInstance() throws ManagerNotInstantiatedException {
+        synchronized (DataStoreManager.class) {
             if(instance == null) {
                 throw new ManagerNotInstantiatedException("PersistentStorageManager is not started");
             }
@@ -82,7 +82,7 @@ public class KeyValueStoreManager extends AbstractManager<AbstractKeyValueStoreD
         }
     }
     
-    KeyValueStoreManager(StargateService service, Collection<AbstractKeyValueStoreDriver> drivers) throws ManagerNotInstantiatedException {
+    DataStoreManager(StargateService service, Collection<AbstractDataStoreDriver> drivers) throws ManagerNotInstantiatedException {
         if(service == null) {
             throw new IllegalArgumentException("service is null");
         }
@@ -93,7 +93,7 @@ public class KeyValueStoreManager extends AbstractManager<AbstractKeyValueStoreD
         
         this.setService(service);
         
-        for(AbstractKeyValueStoreDriver driver : drivers) {
+        for(AbstractDataStoreDriver driver : drivers) {
             this.drivers.add(driver);
         }
     }
@@ -108,7 +108,7 @@ public class KeyValueStoreManager extends AbstractManager<AbstractKeyValueStoreD
         super.stop();
     }
     
-    public AbstractKeyValueStoreDriver getDriver() {
+    public AbstractDataStoreDriver getDriver() {
         if(this.drivers.size() > 0) {
             return this.drivers.get(0);
         }

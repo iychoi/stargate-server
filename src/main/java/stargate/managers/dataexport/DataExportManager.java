@@ -29,12 +29,12 @@ import org.apache.commons.logging.Log;
 import org.apache.commons.logging.LogFactory;
 import stargate.commons.datasource.DataExportEntry;
 import stargate.commons.driver.NullDriver;
-import stargate.commons.keyvaluestore.AbstractKeyValueStore;
-import stargate.commons.keyvaluestore.EnumKeyValueStoreProperty;
+import stargate.commons.datastore.AbstractKeyValueStore;
+import stargate.commons.datastore.EnumDataStoreProperty;
 import stargate.commons.manager.AbstractManager;
 import stargate.commons.manager.ManagerNotInstantiatedException;
 import stargate.commons.utils.DateTimeUtils;
-import stargate.managers.keyvaluestore.KeyValueStoreManager;
+import stargate.managers.datastore.DataStoreManager;
 import stargate.service.StargateService;
 
 /**
@@ -133,8 +133,8 @@ public class DataExportManager extends AbstractManager<NullDriver> {
         if(this.dataExportEntryStore == null) {
             try {
                 StargateService stargateService = getStargateService();
-                KeyValueStoreManager keyValueStoreManager = stargateService.getKeyValueStoreManager();
-                this.dataExportEntryStore = keyValueStoreManager.getDriver().getKeyValueStore(DATA_EXPORT_STORE, DataExportEntry.class, EnumKeyValueStoreProperty.KEY_VALUE_STORE_PROP_PERSISTENT_REPLICATED);
+                DataStoreManager keyValueStoreManager = stargateService.getDataStoreManager();
+                this.dataExportEntryStore = keyValueStoreManager.getDriver().getKeyValueStore(DATA_EXPORT_STORE, DataExportEntry.class, EnumDataStoreProperty.DATASTORE_PROP_PERSISTENT_REPLICATED);
             } catch (ManagerNotInstantiatedException ex) {
                 LOG.error(ex);
                 throw new IOException(ex);

@@ -13,32 +13,33 @@
    See the License for the specific language governing permissions and
    limitations under the License.
 */
-package stargate.drivers.keyvaluestore.localfs;
+package stargate.drivers.datastore.localfs;
 
 import java.io.IOException;
+import java.util.ArrayList;
 import java.util.Collection;
-import java.util.HashMap;
-import java.util.Map;
+import java.util.Collections;
+import java.util.List;
 import org.apache.commons.logging.Log;
 import org.apache.commons.logging.LogFactory;
-import stargate.commons.keyvaluestore.AbstractKeyValueStore;
-import stargate.commons.keyvaluestore.EnumKeyValueStoreProperty;
+import stargate.commons.datastore.AbstractQueue;
+import stargate.commons.datastore.EnumDataStoreProperty;
 import stargate.commons.utils.ObjectSerializer;
 
 /**
  *
  * @author iychoi
  */
-public class LocalFSKeyValueStore extends AbstractKeyValueStore {
+public class LocalFSQueue extends AbstractQueue {
 
-    private static final Log LOG = LogFactory.getLog(LocalFSKeyValueStore.class);
+    private static final Log LOG = LogFactory.getLog(LocalFSQueue.class);
     
-    private LocalFSKeyValueStoreDriver driver;
+    private LocalFSDataStoreDriver driver;
     private String name;
     private Class valueClass;
-    private EnumKeyValueStoreProperty property;
+    private EnumDataStoreProperty property;
     
-    LocalFSKeyValueStore(LocalFSKeyValueStoreDriver driver, String name, Class valueClass, EnumKeyValueStoreProperty property) {
+    LocalFSQueue(LocalFSDataStoreDriver driver, String name, Class valueClass, EnumDataStoreProperty property) {
         this.driver = driver;
         this.name = name;
         this.valueClass = valueClass;
@@ -56,7 +57,7 @@ public class LocalFSKeyValueStore extends AbstractKeyValueStore {
     }
     
     @Override
-    public EnumKeyValueStoreProperty getProperty() {
+    public EnumDataStoreProperty getProperty() {
         return this.property;
     }
     
@@ -79,19 +80,15 @@ public class LocalFSKeyValueStore extends AbstractKeyValueStore {
             return true;
         }
     }
-
+    
     @Override
-    public boolean containsKey(String key) {
-        try {
-            return this.driver.existKey(this.name, key);
-        } catch (IOException ex) {
-            LOG.error(ex);
-            return false;
-        }
-    }
+    public Object dequeue() throws IOException {
+        List<String> orderedKeys = new ArrayList<String>();
+        Collection<String> keys = this.driver.listKeys(this.name);
+        Collections.addAll(keys);
+        Collections.sort(orderedKeys);
 
-    @Override
-    public Object get(String key) throws IOException {
+        String key = orderedKeys.get(0);
         byte[] bytes = this.driver.getBytes(this.name, key);
         if(bytes == null) {
             return null;
@@ -100,28 +97,17 @@ public class LocalFSKeyValueStore extends AbstractKeyValueStore {
     }
 
     @Override
-    public void put(String key, Object value) throws IOException {
+    public void enqueue(Object value) throws IOException {
+        List<String> orderedKeys = new ArrayList<String>();
+        Collection<String> keys = this.driver.listKeys(this.name);
+        Collections.addAll(keys);
+        Collections.sort(orderedKeys);
+
+        String lastKey = orderedKeys.get(orderedKeys.size() - 1);
+        long newKeyNum = Long.parseLong(lastKey) + 1;
+        String key = "" + newKeyNum;
         byte[] bytes = ObjectSerializer.toByteArray(value);
         this.driver.putBytes(this.name, key, bytes);
-    }
-
-    @Override
-    public boolean putIfAbsent(String key, Object value) throws IOException {
-        if(!this.driver.existKey(name, key)) {
-            put(key, value);
-            return true;
-        }
-        return false;
-    }
-
-    @Override
-    public void remove(String key) throws IOException {
-        this.driver.remove(this.name, key);
-    }
-
-    @Override
-    public Collection<String> keys() throws IOException {
-        return this.driver.listKeys(this.name);
     }
 
     @Override
@@ -130,13 +116,21 @@ public class LocalFSKeyValueStore extends AbstractKeyValueStore {
     }
 
     @Override
-    public Map<String, Object> toMap() throws IOException {
-        Map<String, Object> map = new HashMap<String, Object>();
+    public List<Object> toList() throws IOException {
+        List<Object> list = new ArrayList<Object>();
+        List<String> orderedKeys = new ArrayList<String>();
         Collection<String> keys = this.driver.listKeys(this.name);
-        for(String key : keys) {
-            Object value = get(key);
-            map.put(key, value);
+        Collections.addAll(keys);
+        Collections.sort(orderedKeys);
+
+        for(String key : orderedKeys) {
+            byte[] bytes = this.driver.getBytes(this.name, key);
+            if(bytes == null) {
+                return null;
+            }
+            Object value = ObjectSerializer.fromByteArray(bytes, this.valueClass);
+            list.add(value);
         }
-        return map;
+        return list;
     }
 }

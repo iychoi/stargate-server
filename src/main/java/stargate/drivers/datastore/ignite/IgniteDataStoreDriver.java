@@ -13,7 +13,7 @@
    See the License for the specific language governing permissions and
    limitations under the License.
 */
-package stargate.drivers.keyvaluestore.ignite;
+package stargate.drivers.datastore.ignite;
 
 import java.io.IOException;
 import java.util.HashMap;
@@ -22,49 +22,51 @@ import org.apache.commons.logging.Log;
 import org.apache.commons.logging.LogFactory;
 import org.apache.ignite.Ignite;
 import stargate.commons.driver.AbstractDriverConfig;
-import stargate.commons.keyvaluestore.AbstractKeyValueStore;
-import stargate.commons.keyvaluestore.AbstractKeyValueStoreDriver;
-import stargate.commons.keyvaluestore.AbstractKeyValueStoreDriverConfig;
-import stargate.commons.keyvaluestore.EnumKeyValueStoreProperty;
+import stargate.commons.datastore.AbstractKeyValueStore;
+import stargate.commons.datastore.AbstractDataStoreDriver;
+import stargate.commons.datastore.AbstractDataStoreDriverConfig;
+import stargate.commons.datastore.AbstractQueue;
+import stargate.commons.datastore.EnumDataStoreProperty;
 import stargate.drivers.ignite.IgniteDriver;
 
 /**
  *
  * @author iychoi
  */
-public class IgniteKeyValueStoreDriver extends AbstractKeyValueStoreDriver {
+public class IgniteDataStoreDriver extends AbstractDataStoreDriver {
 
-    private static final Log LOG = LogFactory.getLog(IgniteKeyValueStoreDriver.class);
+    private static final Log LOG = LogFactory.getLog(IgniteDataStoreDriver.class);
     
-    private IgniteKeyValueStoreDriverConfig config;
+    private IgniteDataStoreDriverConfig config;
     private IgniteDriver igniteDriver;
-    private Map<String, IgniteKeyValueStore> stores = new HashMap<String, IgniteKeyValueStore>();
+    private Map<String, IgniteKeyValueStore> kvStores = new HashMap<String, IgniteKeyValueStore>();
+    private Map<String, IgniteQueue> queueStores = new HashMap<String, IgniteQueue>();
     
-    public IgniteKeyValueStoreDriver(AbstractDriverConfig config) {
+    public IgniteDataStoreDriver(AbstractDriverConfig config) {
         if(config == null) {
             throw new IllegalArgumentException("config is null");
         }
         
-        if(!(config instanceof IgniteKeyValueStoreDriverConfig)) {
-            throw new IllegalArgumentException("config is not an instance of IgniteKeyValueStoreDriverConfig");
+        if(!(config instanceof IgniteDataStoreDriverConfig)) {
+            throw new IllegalArgumentException("config is not an instance of IgniteDataStoreDriverConfig");
         }
         
-        this.config = (IgniteKeyValueStoreDriverConfig) config;
+        this.config = (IgniteDataStoreDriverConfig) config;
     }
     
-    public IgniteKeyValueStoreDriver(AbstractKeyValueStoreDriverConfig config) {
+    public IgniteDataStoreDriver(AbstractDataStoreDriverConfig config) {
         if(config == null) {
             throw new IllegalArgumentException("config is null");
         }
         
-        if(!(config instanceof IgniteKeyValueStoreDriverConfig)) {
-            throw new IllegalArgumentException("config is not an instance of IgniteKeyValueStoreDriverConfig");
+        if(!(config instanceof IgniteDataStoreDriverConfig)) {
+            throw new IllegalArgumentException("config is not an instance of IgniteDataStoreDriverConfig");
         }
         
-        this.config = (IgniteKeyValueStoreDriverConfig) config;
+        this.config = (IgniteDataStoreDriverConfig) config;
     }
     
-    public IgniteKeyValueStoreDriver(IgniteKeyValueStoreDriverConfig config) {
+    public IgniteDataStoreDriver(IgniteDataStoreDriverConfig config) {
         if(config == null) {
             throw new IllegalArgumentException("config is null");
         }
@@ -96,7 +98,7 @@ public class IgniteKeyValueStoreDriver extends AbstractKeyValueStoreDriver {
     }
     
     @Override
-    public AbstractKeyValueStore getKeyValueStore(String name, Class valueClass, EnumKeyValueStoreProperty property) throws IOException {
+    public AbstractKeyValueStore getKeyValueStore(String name, Class valueClass, EnumDataStoreProperty property) throws IOException {
         if(name == null || name.isEmpty()) {
             throw new IllegalArgumentException("name is null or empty");
         }
@@ -105,13 +107,33 @@ public class IgniteKeyValueStoreDriver extends AbstractKeyValueStoreDriver {
             throw new IllegalArgumentException("valueClass is null");
         }
         
-        IgniteKeyValueStore store = this.stores.get(name);
+        IgniteKeyValueStore store = this.kvStores.get(name);
         if(store == null) {
             Ignite ignite = this.igniteDriver.getIgnite();
             store = new IgniteKeyValueStore(this, ignite, name, valueClass, property);
-            this.stores.put(name, store);
+            this.kvStores.put(name, store);
         }
         
         return store;
+    }
+
+    @Override
+    public AbstractQueue getQueue(String name, Class valueClass, EnumDataStoreProperty property) throws IOException {
+        if(name == null || name.isEmpty()) {
+            throw new IllegalArgumentException("name is null or empty");
+        }
+        
+        if(valueClass == null) {
+            throw new IllegalArgumentException("valueClass is null");
+        }
+        
+        IgniteQueue queue = this.queueStores.get(name);
+        if(queue == null) {
+            Ignite ignite = this.igniteDriver.getIgnite();
+            queue = new IgniteQueue(this, ignite, name, valueClass, property);
+            this.queueStores.put(name, queue);
+        }
+        
+        return queue;
     }
 }

@@ -34,8 +34,8 @@ import stargate.commons.datasource.AbstractDataSourceDriver;
 import stargate.commons.datasource.DataExportEntry;
 import stargate.commons.datasource.SourceFileMetadata;
 import stargate.commons.driver.NullDriver;
-import stargate.commons.keyvaluestore.AbstractKeyValueStore;
-import stargate.commons.keyvaluestore.EnumKeyValueStoreProperty;
+import stargate.commons.datastore.AbstractKeyValueStore;
+import stargate.commons.datastore.EnumDataStoreProperty;
 import stargate.commons.manager.AbstractManager;
 import stargate.commons.manager.ManagerNotInstantiatedException;
 import stargate.commons.recipe.Recipe;
@@ -45,7 +45,7 @@ import stargate.commons.utils.PathUtils;
 import stargate.managers.cluster.ClusterManager;
 import stargate.managers.dataexport.DataExportManager;
 import stargate.managers.datasource.DataSourceManager;
-import stargate.managers.keyvaluestore.KeyValueStoreManager;
+import stargate.managers.datastore.DataStoreManager;
 import stargate.managers.recipe.RecipeManager;
 import stargate.managers.transport.TransportManager;
 import stargate.service.StargateService;
@@ -112,8 +112,8 @@ public class VolumeManager extends AbstractManager<NullDriver> {
         if(this.localVolumeStore == null) {
             try {
                 StargateService stargateService = getStargateService();
-                KeyValueStoreManager keyValueStoreManager = stargateService.getKeyValueStoreManager();
-                this.localVolumeStore = keyValueStoreManager.getDriver().getKeyValueStore(VOLUME_STORE, Directory.class, EnumKeyValueStoreProperty.KEY_VALUE_STORE_PROP_PERSISTENT_REPLICATED);
+                DataStoreManager keyValueStoreManager = stargateService.getDataStoreManager();
+                this.localVolumeStore = keyValueStoreManager.getDriver().getKeyValueStore(VOLUME_STORE, Directory.class, EnumDataStoreProperty.DATASTORE_PROP_PERSISTENT_REPLICATED);
             } catch (ManagerNotInstantiatedException ex) {
                 LOG.error(ex);
                 throw new IOException(ex);

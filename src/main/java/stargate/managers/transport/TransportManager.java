@@ -33,8 +33,8 @@ import stargate.commons.datasource.AbstractDataSourceDriver;
 import stargate.commons.datasource.DataExportEntry;
 import stargate.commons.driver.AbstractDriver;
 import stargate.commons.driver.DriverFailedToLoadException;
-import stargate.commons.keyvaluestore.AbstractKeyValueStore;
-import stargate.commons.keyvaluestore.EnumKeyValueStoreProperty;
+import stargate.commons.datastore.AbstractKeyValueStore;
+import stargate.commons.datastore.EnumDataStoreProperty;
 import stargate.commons.manager.AbstractManager;
 import stargate.commons.manager.ManagerConfig;
 import stargate.commons.manager.ManagerNotInstantiatedException;
@@ -47,7 +47,7 @@ import stargate.commons.utils.DateTimeUtils;
 import stargate.managers.cluster.ClusterManager;
 import stargate.managers.dataexport.DataExportManager;
 import stargate.managers.datasource.DataSourceManager;
-import stargate.managers.keyvaluestore.KeyValueStoreManager;
+import stargate.managers.datastore.DataStoreManager;
 import stargate.managers.recipe.RecipeManager;
 import stargate.service.StargateService;
 
@@ -163,8 +163,8 @@ public class TransportManager extends AbstractManager<AbstractTransportDriver> {
         if(this.blockCacheStore == null) {
             try {
                 StargateService stargateService = getStargateService();
-                KeyValueStoreManager keyValueStoreManager = stargateService.getKeyValueStoreManager();
-                this.blockCacheStore = keyValueStoreManager.getDriver().getKeyValueStore(BLOCK_CACHE_STORE, byte[].class, EnumKeyValueStoreProperty.KEY_VALUE_STORE_PROP_PERSISTENT_DISTRIBUTED);
+                DataStoreManager keyValueStoreManager = stargateService.getDataStoreManager();
+                this.blockCacheStore = keyValueStoreManager.getDriver().getKeyValueStore(BLOCK_CACHE_STORE, byte[].class, EnumDataStoreProperty.DATASTORE_PROP_PERSISTENT_DISTRIBUTED);
             } catch (ManagerNotInstantiatedException ex) {
                 LOG.error(ex);
                 throw new IOException(ex);

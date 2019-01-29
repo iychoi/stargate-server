@@ -30,8 +30,8 @@ import stargate.drivers.cluster.ignite.IgniteClusterDriver;
 import stargate.drivers.cluster.ignite.IgniteClusterDriverConfig;
 import stargate.drivers.datasource.localfs.LocalFSDataSourceDriver;
 import stargate.drivers.datasource.localfs.LocalFSDataSourceDriverConfig;
-import stargate.drivers.keyvaluestore.ignite.IgniteKeyValueStoreDriver;
-import stargate.drivers.keyvaluestore.ignite.IgniteKeyValueStoreDriverConfig;
+import stargate.drivers.datastore.ignite.IgniteDataStoreDriver;
+import stargate.drivers.datastore.ignite.IgniteDataStoreDriverConfig;
 import stargate.drivers.recipe.fixedsize.FixedSizeChunkRecipeDriver;
 import stargate.drivers.recipe.fixedsize.FixedSizeChunkRecipeDriverConfig;
 import stargate.drivers.schedule.ignite.IgniteScheduleDriver;
@@ -75,7 +75,7 @@ public class StargateServiceConfig extends ServiceConfig {
     private void initDefaults() {
         this.clusterManagerConfig = getDefaultClusterConfig();
         this.dataSourceManagerConfig = getDefaultDataSourceConfig();
-        this.keyValueStoreManagerConfig = getDefaultKeyValueStoreConfig();
+        this.dataStoreManagerConfig = getDefaultDataStoreConfig();
         this.recipeManagerConfig = getDefaultRecipeConfig();
         this.transportManagerConfig = getDefaultTransportConfig();
         this.userInterfaceManagerConfig = getDefaultUserInterfaceConfig();
@@ -143,11 +143,11 @@ public class StargateServiceConfig extends ServiceConfig {
     }
 
     @JsonIgnore
-    public ManagerConfig getDefaultKeyValueStoreConfig() {
+    public ManagerConfig getDefaultDataStoreConfig() {
         DriverInjection driverInjection = new DriverInjection();
-        driverInjection.setDriverClass(IgniteKeyValueStoreDriver.class);
+        driverInjection.setDriverClass(IgniteDataStoreDriver.class);
         
-        IgniteKeyValueStoreDriverConfig driverConfiguration = new IgniteKeyValueStoreDriverConfig();
+        IgniteDataStoreDriverConfig driverConfiguration = new IgniteDataStoreDriverConfig();
         
         driverInjection.setDriverConfig(driverConfiguration);
         
@@ -213,7 +213,7 @@ public class StargateServiceConfig extends ServiceConfig {
         ServiceConfig serviceConfig = new ServiceConfig();
         serviceConfig.setClusterConfig(this.clusterManagerConfig);
         serviceConfig.setDataSourceConfig(this.dataSourceManagerConfig);
-        serviceConfig.setKeyValueStoreConfig(this.keyValueStoreManagerConfig);
+        serviceConfig.setDataStoreConfig(this.dataStoreManagerConfig);
         serviceConfig.setRecipeConfig(this.recipeManagerConfig);
         serviceConfig.setTransportConfig(this.transportManagerConfig);
         serviceConfig.setUserInterfaceConfig(this.userInterfaceManagerConfig);

@@ -13,7 +13,7 @@
    See the License for the specific language governing permissions and
    limitations under the License.
 */
-package stargate.drivers.keyvaluestore.localfs;
+package stargate.drivers.datastore.localfs;
 
 import java.io.File;
 import java.io.IOException;
@@ -21,36 +21,36 @@ import org.apache.commons.logging.Log;
 import org.apache.commons.logging.LogFactory;
 import org.codehaus.jackson.annotate.JsonIgnore;
 import org.codehaus.jackson.annotate.JsonProperty;
-import stargate.commons.keyvaluestore.AbstractKeyValueStoreDriverConfig;
+import stargate.commons.datastore.AbstractDataStoreDriverConfig;
 import stargate.commons.utils.JsonSerializer;
 
 /**
  *
  * @author iychoi
  */
-public class LocalFSKeyValueStoreDriverConfig extends AbstractKeyValueStoreDriverConfig {
+public class LocalFSDataStoreDriverConfig extends AbstractDataStoreDriverConfig {
     
-    private static final Log LOG = LogFactory.getLog(LocalFSKeyValueStoreDriverConfig.class);
+    private static final Log LOG = LogFactory.getLog(LocalFSDataStoreDriverConfig.class);
     
     private File rootPath = new File("/");
     
-    public static LocalFSKeyValueStoreDriverConfig createInstance(File file) throws IOException {
+    public static LocalFSDataStoreDriverConfig createInstance(File file) throws IOException {
         if(file == null) {
             throw new IllegalArgumentException("file is null");
         }
 
-        return (LocalFSKeyValueStoreDriverConfig) JsonSerializer.fromJsonFile(file, LocalFSKeyValueStoreDriverConfig.class);
+        return (LocalFSDataStoreDriverConfig) JsonSerializer.fromJsonFile(file, LocalFSDataStoreDriverConfig.class);
     }
     
-    public static LocalFSKeyValueStoreDriverConfig createInstance(String json) throws IOException {
+    public static LocalFSDataStoreDriverConfig createInstance(String json) throws IOException {
         if(json == null || json.isEmpty()) {
             throw new IllegalArgumentException("json is null or empty");
         }
         
-        return (LocalFSKeyValueStoreDriverConfig) JsonSerializer.fromJson(json, LocalFSKeyValueStoreDriverConfig.class);
+        return (LocalFSDataStoreDriverConfig) JsonSerializer.fromJson(json, LocalFSDataStoreDriverConfig.class);
     }
     
-    public LocalFSKeyValueStoreDriverConfig() {
+    public LocalFSDataStoreDriverConfig() {
     }
     
     @JsonProperty("root_path")

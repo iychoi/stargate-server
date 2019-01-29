@@ -26,7 +26,6 @@ import stargate.commons.driver.AbstractDriverConfig;
 import stargate.commons.recipe.AbstractRecipeDriver;
 import stargate.commons.recipe.AbstractRecipeDriverConfig;
 import stargate.commons.recipe.RecipeChunk;
-import stargate.commons.utils.HexUtils;
 
 /**
  *
@@ -39,7 +38,9 @@ public class FixedSizeChunkRecipeDriver extends AbstractRecipeDriver {
     private FixedSizeChunkRecipeDriverConfig config;
     private int chunkSize;
     private String hashAlgorithm;
-    private static final int BUFFER_SIZE = 100*1024; // 100KB
+    private static final int BUFFER_SIZE = 64*1024; // 64KB
+    private int bufferSize = BUFFER_SIZE;
+    private byte[] buffer;
     
     public FixedSizeChunkRecipeDriver(AbstractDriverConfig config) {
         if(config == null) {
@@ -53,6 +54,8 @@ public class FixedSizeChunkRecipeDriver extends AbstractRecipeDriver {
         this.config = (FixedSizeChunkRecipeDriverConfig) config;
         this.chunkSize = this.config.getChunkSize();
         this.hashAlgorithm = this.config.getHashAlgorithm();
+        this.bufferSize = Math.min(this.chunkSize, BUFFER_SIZE);
+        this.buffer = new byte[this.bufferSize];
     }
     
     public FixedSizeChunkRecipeDriver(AbstractRecipeDriverConfig config) {
@@ -67,6 +70,8 @@ public class FixedSizeChunkRecipeDriver extends AbstractRecipeDriver {
         this.config = (FixedSizeChunkRecipeDriverConfig) config;
         this.chunkSize = this.config.getChunkSize();
         this.hashAlgorithm = this.config.getHashAlgorithm();
+        this.bufferSize = Math.min(this.chunkSize, BUFFER_SIZE);
+        this.buffer = new byte[this.bufferSize];
     }
     
     public FixedSizeChunkRecipeDriver(FixedSizeChunkRecipeDriverConfig config) {
@@ -77,6 +82,8 @@ public class FixedSizeChunkRecipeDriver extends AbstractRecipeDriver {
         this.config = config;
         this.chunkSize = this.config.getChunkSize();
         this.hashAlgorithm = this.config.getHashAlgorithm();
+        this.bufferSize = Math.min(this.chunkSize, BUFFER_SIZE);
+        this.buffer = new byte[this.bufferSize];
     }
     
     @Override
@@ -100,7 +107,7 @@ public class FixedSizeChunkRecipeDriver extends AbstractRecipeDriver {
     }
     
     @Override
-    public String calculateHash(byte[] buffer) throws IOException {
+    public byte[] calculateHash(byte[] buffer) throws IOException {
         if(buffer == null) {
             throw new IllegalArgumentException("buffer is null");
         }
@@ -110,20 +117,17 @@ public class FixedSizeChunkRecipeDriver extends AbstractRecipeDriver {
             messageDigest.update(buffer);
             
             byte[] digest = messageDigest.digest();
-            return HexUtils.toHexString(digest).toLowerCase();
+            return digest;
         } catch (NoSuchAlgorithmException ex) {
             throw new IOException(ex);
         }
     }
     
     @Override
-    public RecipeChunk produceRecipeChunk(InputStream is) throws IOException {
+    public RecipeChunk produceRecipeChunk(InputStream is, long offset) throws IOException {
         if(is == null) {
             throw new IllegalArgumentException("is is null");
         }
-        
-        int bufferSize = Math.min(this.chunkSize, BUFFER_SIZE);
-        byte[] buffer = new byte[bufferSize];
         
         try {
             MessageDigest messageDigest = MessageDigest.getInstance(this.hashAlgorithm);
@@ -133,7 +137,7 @@ public class FixedSizeChunkRecipeDriver extends AbstractRecipeDriver {
             int toread = this.chunkSize;
             int chunkLength = 0;
             
-            while((nread = dis.read(buffer, 0, Math.min(toread, bufferSize))) > 0) {
+            while((nread = dis.read(this.buffer, 0, Math.min(toread, this.bufferSize))) > 0) {
                 chunkLength += nread;
                 toread -= nread;
                 if(toread <= 0) {
@@ -147,7 +151,31 @@ public class FixedSizeChunkRecipeDriver extends AbstractRecipeDriver {
             if(chunkLength > 0) {
                 // create a new recipe chunk
                 byte[] hash = messageDigest.digest();
-                return new RecipeChunk(0, chunkLength, hash, null);
+                return new RecipeChunk(offset, chunkLength, hash, null);
+            }
+            
+            return null;
+        } catch (NoSuchAlgorithmException ex) {
+            throw new IOException(ex);
+        } 
+    }
+
+    @Override
+    public RecipeChunk produceRecipeChunk(byte[] buffer, long offset, int len) throws IOException {
+        if(buffer == null) {
+            throw new IllegalArgumentException("buffer is null");
+        }
+        
+        try {
+            MessageDigest messageDigest = MessageDigest.getInstance(this.hashAlgorithm);
+            messageDigest.update(buffer);
+            
+            byte[] digest = messageDigest.digest();
+            
+            if(len > 0) {
+                // create a new recipe chunk
+                byte[] hash = messageDigest.digest();
+                return new RecipeChunk(offset, len, hash, null);
             }
             
             return null;
