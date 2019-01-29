@@ -122,11 +122,19 @@ public class IgniteScheduleDriver extends AbstractScheduleDriver {
         if(task == null) {
             throw new IllegalArgumentException("task is null");
         }
+        
+        if(task.getNodeNames().isEmpty()) {
+            throw new IllegalArgumentException("nodenames is empty");
+        }
 
         try {
             // process task!
             Ignite ignite = this.igniteDriver.getIgnite();
             ClusterGroup group = parseTaskGroup(task.getNodeNames());
+            if(group.nodes() == null || group.nodes().isEmpty()) {
+                throw new IOException("there's no target node");
+            }
+            
             IgniteCompute compute = ignite.compute(group).withAsync();
             compute.broadcast(makeIgniteRunnable(task));
             ComputeTaskFuture<Object> future = compute.future();
@@ -159,6 +167,7 @@ public class IgniteScheduleDriver extends AbstractScheduleDriver {
             List<UUID> nodeIDs = new ArrayList<UUID>();
             for(String nodeName : nodeNames) {
                 UUID uuid = UUID.fromString(nodeName);
+                LOG.info(String.format("parsed UUID of nodeName : %s - %s", nodeName, uuid.toString()));
                 nodeIDs.add(uuid);
             }
             
