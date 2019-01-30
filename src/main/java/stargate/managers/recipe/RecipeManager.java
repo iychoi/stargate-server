@@ -20,6 +20,7 @@ import java.io.InputStream;
 import java.util.ArrayList;
 import java.util.Collection;
 import java.util.Collections;
+import java.util.Comparator;
 import java.util.Iterator;
 import java.util.List;
 import java.util.concurrent.Future;
@@ -776,30 +777,52 @@ public class RecipeManager extends AbstractManager<AbstractRecipeDriver> {
                 nodeId++;
             }
             
-            
             // collect
+            List<RecipeChunk> collectedRecipeChunks = new ArrayList<RecipeChunk>();
+            
             for(RecipeChunkGenerateTask task : recipeChunkGenerateTasks) {
                 Collection<RecipeChunk> recipeChunks = task.getRecipeChunks();
                 for(RecipeChunk recipeChunk : recipeChunks) {
-                    LOG.info(String.format("Received chunk - %s", recipeChunk.toString()));
+                    LOG.debug(String.format("Received chunk - %s", recipeChunk.toString()));
                     
                     Collection<String> blockLocations = dataSourceDriver.listBlockLocations(cluster, sourceMetadata.getURI(), recipeChunk.getOffset(), recipeChunk.getLength());
                     if(blockLocations.contains("*")) {
+                        LOG.debug("block location of recipechunk has *");
                         recipeChunk.setAccessibleFromAllNode();
                     } else {
                         for(String nodeName : blockLocations) {
                             int nodeID = recipe.getNodeID(nodeName);
                             if(nodeID >= 0) {
+                                LOG.debug(String.format("block location of recipechunk is mapped to a node : %d", nodeID));
                                 recipeChunk.addNodeID(nodeID);
                             } else {
+                                LOG.debug("block location of recipechunk cannot be mapped to a node");
                                 recipeChunk.setAccessibleFromAllNode();
                             }
                         }
                     }
 
-                    //TODO: need to add chunks in order
-                    recipe.addChunk(recipeChunk);
+                    collectedRecipeChunks.add(recipeChunk);
                 }
+            }
+            
+            // sort
+            Collections.sort(collectedRecipeChunks, new Comparator<RecipeChunk>() {
+                @Override
+                public int compare(RecipeChunk c1, RecipeChunk c2) {
+                    long diff = c1.getOffset() - c2.getOffset();
+                    if(diff < 0) {
+                        return -1;
+                    } else if(diff == 0) {
+                        return 0;
+                    } else {
+                        return 1;
+                    }
+                } 
+            });
+            
+            for(RecipeChunk recipeChunk : collectedRecipeChunks) {
+                recipe.addChunk(recipeChunk);
             }
             
             return recipe;

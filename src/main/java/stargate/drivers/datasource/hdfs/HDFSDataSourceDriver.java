@@ -397,15 +397,13 @@ public class HDFSDataSourceDriver extends AbstractDataSourceDriver {
                     locations.add(nodeName);
                 } else {
                     LOG.debug(String.format("Cannot convert block location to a stargate node name - %s", location));
-                    locations.clear();
-                    locations.add("*");
-                    break;
                 }
             }
         }
         
+        //TODO: Need to have a separate field to allow access from all nodes
         if(locations.isEmpty()) {
-            throw new IOException("The block cannot be accessed");
+            locations.add("*");
         }
         
         return locations;
