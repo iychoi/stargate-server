@@ -18,13 +18,16 @@ package stargate.managers.recipe;
 import java.io.IOException;
 import java.util.ArrayList;
 import java.util.Collection;
-import java.util.Collections;
 import java.util.List;
+import java.util.concurrent.Callable;
 import java.util.concurrent.Future;
 import org.apache.commons.logging.Log;
 import org.apache.commons.logging.LogFactory;
+import stargate.commons.manager.ManagerNotInstantiatedException;
 import stargate.commons.recipe.RecipeChunk;
 import stargate.commons.schedule.Task;
+import stargate.commons.service.ServiceNotStartedException;
+import stargate.service.StargateService;
 
 /**
  *
@@ -34,45 +37,58 @@ public class RecipeChunkGenerateTask extends Task {
     
     private static final Log LOG = LogFactory.getLog(RecipeChunkGenerateTask.class);
     
-    class RecipeChunkGenerateTaskRunnable implements Runnable {
+    class RecipeChunkGenerateTaskCallable implements Callable<Collection<RecipeChunk>> {
 
         private Collection<RecipeChunkGenerateEvent> events;
-        private List<RecipeChunk> generatedChunks = new ArrayList<RecipeChunk>();
                 
-        RecipeChunkGenerateTaskRunnable(Collection<RecipeChunkGenerateEvent> events) {
+        RecipeChunkGenerateTaskCallable(Collection<RecipeChunkGenerateEvent> events) {
             this.events = events;
         }
 
         @Override
-        public void run() {
+        public Collection<RecipeChunk> call() {
+            List<RecipeChunk> generatedChunks = new ArrayList<RecipeChunk>();
+            
             for(RecipeChunkGenerateEvent event : this.events) {
                 LOG.info(event.toString());
-                
+                try {
+                    StargateService stargateInstance = StargateService.getInstance();
+                    RecipeManager recipeManager = stargateInstance.getRecipeManager();
+                    RecipeChunk recipeChunk = recipeManager.createRecipeChunk(event);
+                    generatedChunks.add(recipeChunk);
+                } catch (ServiceNotStartedException ex) {
+                    LOG.error(ex);
+                } catch (ManagerNotInstantiatedException ex) {
+                    LOG.error(ex);
+                } catch (IOException ex) {
+                    LOG.error(ex);
+                }
             }
-        }
-        
-        public Collection<RecipeChunk> getRecipeChunks() {
-            return Collections.unmodifiableCollection(this.generatedChunks);
+            return generatedChunks;
         }
     }
     
     public RecipeChunkGenerateTask(Collection<String> nodeNames, Collection<RecipeChunkGenerateEvent> events) {
         super("RecipeChunkGenerateTask", null, events, nodeNames);
         
-        RecipeChunkGenerateTaskRunnable runnable = new RecipeChunkGenerateTaskRunnable(events);
-        super.setRunnable(runnable);
+        RecipeChunkGenerateTaskCallable runnable = new RecipeChunkGenerateTaskCallable(events);
+        super.setCallable(runnable);
     }
     
     public Collection<RecipeChunk> getRecipeChunks() throws IOException {
-        Future<Object> future = super.getFuture();
+        Future<?> future = super.getFuture();
         
         try {
             // wait
-            future.get(); // runnable does not return
+            Collection<Collection<RecipeChunk>> chunks = (Collection<Collection<RecipeChunk>>) future.get();
             LOG.info("Finished - future waiting");
             
-            RecipeChunkGenerateTaskRunnable runnable = (RecipeChunkGenerateTaskRunnable) super.getRunnable();
-            return runnable.getRecipeChunks();
+            List<RecipeChunk> generatedChunks = new ArrayList<RecipeChunk>();
+            for(Collection<RecipeChunk> cchunks : chunks) {
+                generatedChunks.addAll(cchunks);
+            }
+            
+            return generatedChunks;
         } catch (Exception ex) {
             throw new IOException(ex);
         }

@@ -22,6 +22,7 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.UUID;
+import java.util.concurrent.Callable;
 import org.apache.commons.logging.Log;
 import org.apache.commons.logging.LogFactory;
 import org.apache.ignite.Ignite;
@@ -30,8 +31,7 @@ import org.apache.ignite.IgniteCompute;
 import org.apache.ignite.cluster.ClusterGroup;
 import org.apache.ignite.cluster.ClusterNode;
 import org.apache.ignite.compute.ComputeTaskFuture;
-import org.apache.ignite.lang.IgniteRunnable;
-import org.apache.ignite.resources.IgniteInstanceResource;
+import org.apache.ignite.lang.IgniteCallable;
 import stargate.commons.driver.AbstractDriverConfig;
 import stargate.commons.schedule.AbstractScheduleDriver;
 import stargate.commons.schedule.AbstractScheduleDriverConfig;
@@ -48,6 +48,22 @@ import stargate.service.StargateService;
 public class IgniteScheduleDriver extends AbstractScheduleDriver {
 
     private static final Log LOG = LogFactory.getLog(IgniteScheduleDriver.class);
+    
+    public static class IgniteCallableWrapper implements IgniteCallable {
+        private Callable callable;
+        
+        IgniteCallableWrapper() {
+        }
+        
+        public IgniteCallableWrapper(Callable callable) {
+            this.callable = callable;
+        }
+        
+        @Override
+        public Object call() throws Exception {
+            return this.callable.call();
+        }
+    }
     
     private IgniteScheduleDriverConfig config;
     private IgniteDriver igniteDriver;
@@ -141,9 +157,9 @@ public class IgniteScheduleDriver extends AbstractScheduleDriver {
             }
             
             IgniteCompute compute = ignite.compute(group).withAsync();
-            compute.broadcast(makeIgniteRunnable(task));
-            ComputeTaskFuture<Object> future = compute.future();
-            IgniteTaskFuture<Object> igniteTaskFuture = new IgniteTaskFuture<Object>(future);
+            compute.broadcast(makeIgniteCallable(task));
+            ComputeTaskFuture future = compute.future();
+            IgniteTaskFuture igniteTaskFuture = new IgniteTaskFuture(future);
             task.setFuture(igniteTaskFuture);
         } catch (Exception ex) {
             throw new IOException(ex);
@@ -207,9 +223,9 @@ public class IgniteScheduleDriver extends AbstractScheduleDriver {
         }
     }
     
-    private IgniteRunnable makeIgniteRunnable(Task task) throws Exception {
-        Runnable r = task.getRunnable();
-        IgniteRunnable igniteRunnable = null;
+    private IgniteCallable makeIgniteCallable(Task task) throws Exception {
+        Callable c = task.getCallable();
+        IgniteCallable igniteCallable = null;
         
         boolean repeat = false;
         long intervalMin = 0;
@@ -239,8 +255,8 @@ public class IgniteScheduleDriver extends AbstractScheduleDriver {
             }
             
             String extendedCronSyntax = String.format("{%d, %d} %s %s * * *", delaySec, 0, min, hour);
-            
-            igniteRunnable = new IgniteRunnable() {
+            /*            
+            igniteRunnable = new IgniteRunnableWrapper(r, extendedCronSyntax) {
                 @IgniteInstanceResource
                 Ignite ignite;
                 
@@ -249,15 +265,11 @@ public class IgniteScheduleDriver extends AbstractScheduleDriver {
                     ignite.scheduler().scheduleLocal(r, extendedCronSyntax);
                 }
             };
+            */
         } else {
-            igniteRunnable = new IgniteRunnable() {
-                @Override
-                public void run() {
-                    r.run();
-                }
-            };
+            igniteCallable = new IgniteCallableWrapper(c);
         }
         
-        return igniteRunnable;
+        return igniteCallable;
     }
 }

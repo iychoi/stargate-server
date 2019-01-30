@@ -622,7 +622,7 @@ public class RecipeManager extends AbstractManager<AbstractRecipeDriver> {
         }
     }
     
-    private RecipeChunk createRecipeChunk(RecipeChunkGenerateEvent event) throws IOException {
+    public RecipeChunk createRecipeChunk(RecipeChunkGenerateEvent event) throws IOException {
         if(!this.started) {
             throw new IllegalStateException("Manager is not started");
         }
@@ -641,6 +641,8 @@ public class RecipeManager extends AbstractManager<AbstractRecipeDriver> {
             InputStream is = dataSourceDriver.openFile(sourceFileMetadata.getURI(), event.getOffset(), event.getLength());
             // create recipe chunks
             RecipeChunk recipeChunk = driver.produceRecipeChunk(is, 0);
+            recipeChunk.setOffset(event.getOffset());
+            
             is.close();
             
             return recipeChunk;
@@ -779,6 +781,8 @@ public class RecipeManager extends AbstractManager<AbstractRecipeDriver> {
             for(RecipeChunkGenerateTask task : recipeChunkGenerateTasks) {
                 Collection<RecipeChunk> recipeChunks = task.getRecipeChunks();
                 for(RecipeChunk recipeChunk : recipeChunks) {
+                    LOG.info(String.format("Received chunk - %s", recipeChunk.toString()));
+                    
                     Collection<String> blockLocations = dataSourceDriver.listBlockLocations(cluster, sourceMetadata.getURI(), recipeChunk.getOffset(), recipeChunk.getLength());
                     if(blockLocations.contains("*")) {
                         recipeChunk.setAccessibleFromAllNode();
