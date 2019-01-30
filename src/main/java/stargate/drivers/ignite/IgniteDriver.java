@@ -103,14 +103,14 @@ public class IgniteDriver {
     
     public synchronized void init() throws IOException {
         if(!this.initialized) {
-            LOG.info("Initializing Ignite Master Driver");
+            LOG.debug("Initializing Ignite Master Driver");
             
             //IGNITE_LOG_DIR 
             IgniteConfiguration igniteConfig = new IgniteConfiguration();
             
             File stargateRoot = ResourceUtils.getStargateRoot();
             igniteConfig.setIgniteHome(stargateRoot.getAbsolutePath());
-            LOG.info(String.format("Setting Ignite HOME = %s", stargateRoot.getAbsolutePath()));
+            LOG.debug(String.format("Setting Ignite HOME = %s", stargateRoot.getAbsolutePath()));
             
             try {
                 File logFile = new File(stargateRoot.getAbsolutePath(), LOG4J_PROPERTY_PATH);
@@ -141,14 +141,13 @@ public class IgniteDriver {
             
             this.igniteInstance = Ignition.start(igniteConfig);
             
-            LOG.info("Stargate is waiting for activating Ignite cluster");
             runChecker();
 
             this.clusterActivationLock.lock();
             try {
                 this.clusterActivationCondition.await();
             } catch (InterruptedException ex) {
-                LOG.error("activation waiting is interrupted");
+                LOG.error("waiting for the activation is interrupted");
             } finally {
                 this.clusterActivationLock.unlock();
             }
@@ -173,10 +172,9 @@ public class IgniteDriver {
                         IgniteCluster cluster = igniteInstance.cluster();
                         boolean active = cluster.active();
                         if(active) {
-                            LOG.info("Detected Ignite cluster is active!");
+                            System.out.println("Detected Ignite cluster activation!");
                             clusterActivationLock.lock();
                             try {
-                                LOG.info("Ignite cluster is active!");
                                 clusterActivationCondition.signal();
                             } finally {
                                 clusterActivationLock.unlock();
@@ -184,7 +182,7 @@ public class IgniteDriver {
                             break;
                         } else {
                             if(first) {
-                                LOG.info("Ignite cluster is inactive!");
+                                System.out.println("Stargate is waiting for Ignite cluster activation...");
                                 first = false;
                             }
                             Thread.sleep(1000);
@@ -218,7 +216,7 @@ public class IgniteDriver {
                 
                 this.initialized = false;
 
-                LOG.info("Ignite Master Driver is uninitialized");
+                LOG.debug("Ignite Master Driver is uninitialized");
             }
         }
     }

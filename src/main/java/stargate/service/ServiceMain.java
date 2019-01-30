@@ -52,7 +52,7 @@ public class ServiceMain {
             
             StargateService instance = StargateService.getInstance(serviceConfig);
             instance.start();
-            LOG.info("press ctrl + c for stopping the service...");
+            System.out.println("press ctrl + c for stopping the service...");
             
             Runtime.getRuntime().addShutdownHook(new Thread() {
                 public void run() {
@@ -85,7 +85,7 @@ public class ServiceMain {
     }
     
     private static void setLogger() {
-        File log_property_file = new File(ResourceUtils.getStargateRoot(), LOG4J_PROPERTY_PATH); //System.out.println("log4j configuration file not found");
+        File log_property_file = new File(ResourceUtils.getStargateRoot(), LOG4J_PROPERTY_PATH);
         LogManager.resetConfiguration();
         DOMConfigurator.configure(log_property_file.getAbsolutePath());
     }

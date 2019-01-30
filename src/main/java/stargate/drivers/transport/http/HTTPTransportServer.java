@@ -81,13 +81,13 @@ public class HTTPTransportServer {
             
             HTTPTransportServlet.setDriver(this.driver);
         
-            LOG.info("Starting HTTP Transport Server");
+            LOG.debug("Starting HTTP Transport Server");
             this.jettyWebServer.start();
             // block until break
-            //LOG.info("Joining HTTP Transport Server");
+            //LOG.debug("Joining HTTP Transport Server");
             //this.jettyWebServer.join();
             this.started = true;
-            LOG.info("HTTP Transport Server is started");
+            LOG.debug("HTTP Transport Server is started");
         } catch (Exception ex) {
             throw new IOException(ex);
         }
@@ -101,11 +101,11 @@ public class HTTPTransportServer {
         // stop web server
         try {
             if(this.jettyWebServer != null) {
-                LOG.info("Stopping HTTP Transport Server");
+                LOG.debug("Stopping HTTP Transport Server");
                 this.jettyWebServer.stop();
             }
             this.started = false;
-            LOG.info("HTTP Transport Server is stopped");
+            LOG.debug("HTTP Transport Server is stopped");
         } catch(Exception ex) {
             LOG.error("Exception occurred while stopping web server", ex);
         }

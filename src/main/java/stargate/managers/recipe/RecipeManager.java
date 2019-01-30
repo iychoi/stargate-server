@@ -23,9 +23,6 @@ import java.util.Collections;
 import java.util.Comparator;
 import java.util.Iterator;
 import java.util.List;
-import java.util.concurrent.Future;
-import java.util.logging.Level;
-import java.util.logging.Logger;
 import org.apache.commons.logging.Log;
 import org.apache.commons.logging.LogFactory;
 import stargate.commons.cluster.AbstractClusterDriver;
@@ -563,6 +560,7 @@ public class RecipeManager extends AbstractManager<AbstractRecipeDriver> {
     }
     
     public Recipe createRecipe(DataExportEntry entry) throws IOException {
+        LOG.info(String.format("createRecipe - %s", entry.getStargatePath()));
         //return createRecipeLocal(entry);
         return createRecipeParallel(entry);
     }
@@ -572,7 +570,6 @@ public class RecipeManager extends AbstractManager<AbstractRecipeDriver> {
             throw new IllegalStateException("Manager is not started");
         }
         
-        LOG.info(String.format("createRecipe - %s", entry.getStargatePath()));
         try {
             StargateService stargateService = getStargateService();
 
@@ -658,7 +655,6 @@ public class RecipeManager extends AbstractManager<AbstractRecipeDriver> {
             throw new IllegalStateException("Manager is not started");
         }
         
-        LOG.info(String.format("createRecipe - %s", entry.getStargatePath()));
         try {
             StargateService stargateService = getStargateService();
 

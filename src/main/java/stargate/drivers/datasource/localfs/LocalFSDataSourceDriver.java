@@ -90,10 +90,10 @@ public class LocalFSDataSourceDriver extends AbstractDataSourceDriver {
     public synchronized void init() throws IOException {
         super.init();
         
-        LOG.info("Initializing LocalFS Data Source Driver");
+        LOG.debug("Initializing LocalFS Data Source Driver");
         
         this.rootPath = this.config.getRootPath();
-        LOG.info("localfs root - " + this.rootPath);
+        LOG.debug("localfs root - " + this.rootPath);
     }
 
     @Override

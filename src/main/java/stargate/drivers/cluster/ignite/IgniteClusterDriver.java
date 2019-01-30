@@ -107,7 +107,7 @@ public class IgniteClusterDriver extends AbstractClusterDriver {
     public synchronized void init() throws IOException {
         super.init();
         
-        LOG.info("Initializing Ignite Cluster Driver");
+        LOG.debug("Initializing Ignite Cluster Driver");
         
         String clusterName = this.config.getClusterName();
         if(clusterName == null || clusterName.isEmpty()) {
@@ -199,7 +199,7 @@ public class IgniteClusterDriver extends AbstractClusterDriver {
             UserInterfaceServiceInfo userInterfaceServiceInfo = userInterfaceManager.getServiceInfo();
             
             Node stargateNode = new Node(nodeName, clusterName, new NodeStatus(), transportServiceInfo, userInterfaceServiceInfo, hostnames);
-            //LOG.info(stargateNode.toJson());
+            LOG.debug(String.format("Local node - %s", stargateNode.toJson()));
             return stargateNode;
         } catch (ManagerNotInstantiatedException ex) {
             LOG.error(ex);

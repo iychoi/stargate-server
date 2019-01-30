@@ -98,7 +98,7 @@ public class HDFSDataSourceDriver extends AbstractDataSourceDriver {
     public synchronized void init() throws IOException {
         super.init();
         
-        LOG.info("Initializing HDFS Data Source Driver");
+        LOG.debug("Initializing HDFS Data Source Driver");
         
         this.hadoopConfig = new Configuration();
         String nameNodeURI = this.config.getNameNodeURI();
@@ -113,7 +113,7 @@ public class HDFSDataSourceDriver extends AbstractDataSourceDriver {
         
         Path rootPath = this.config.getRootPath();
         String hdfsRoot = this.hadoopConfig.get("fs.defaultFS");
-        LOG.info("hdfs root : " + hdfsRoot);
+        LOG.debug("hdfs root : " + hdfsRoot);
         
         // Set HADOOP user
         //String hadoopUser = this.config.getHadoopUsername();

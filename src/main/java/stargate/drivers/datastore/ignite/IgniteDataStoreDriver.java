@@ -78,7 +78,7 @@ public class IgniteDataStoreDriver extends AbstractDataStoreDriver {
     public synchronized void init() throws IOException {
         super.init();
         
-        LOG.info("Initializing Ignite Key Value Store Driver");
+        LOG.debug("Initializing Ignite Key Value Store Driver");
         
         this.igniteDriver = IgniteDriver.getInstance();
         this.igniteDriver.init();

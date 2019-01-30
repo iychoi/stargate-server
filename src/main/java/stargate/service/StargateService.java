@@ -99,7 +99,7 @@ public class StargateService extends AbstractService {
         LOG.info("Starting service...");
         
         // init managers
-        LOG.info("Initializing managers");
+        LOG.debug("Initializing managers");
         try {
             this.clusterManager = ClusterManager.getInstance(this, this.config.getClusterConfig());
             this.dataSourceManager = DataSourceManager.getInstance(this, this.config.getDataSourceConfig());
@@ -114,7 +114,7 @@ public class StargateService extends AbstractService {
         } catch (ManagerNotInstantiatedException ex) {
             throw new IOException(ex);
         }
-        LOG.info("Managers are initialized");
+        LOG.debug("Managers are initialized");
         
         LOG.info("Starting managers");
         this.clusterManager.start();
@@ -129,10 +129,10 @@ public class StargateService extends AbstractService {
         this.volumeManager.start();
         LOG.info("Managers are started");
         
-        LOG.info("Registering event handlers");
+        LOG.debug("Registering event handlers");
         this.dataExportUpdateEventHandler = new DataExportUpdateEventHandler(this.recipeManager, this.volumeManager);
         this.dataExportManager.addDataExportEventHandler(this.dataExportUpdateEventHandler);
-        LOG.info("Event handlers are registered");
+        LOG.debug("Event handlers are registered");
         
         LOG.info("Synchronizing states");
         try {
@@ -158,10 +158,10 @@ public class StargateService extends AbstractService {
         
         LOG.info("Stopping service...");
         
-        LOG.info("Unregistering event handlers");
+        LOG.debug("Unregistering event handlers");
         this.dataExportManager.removeDataExportEventHandler(this.dataExportUpdateEventHandler);
         this.dataExportUpdateEventHandler = null;
-        LOG.info("Event handlers are unregistered");
+        LOG.debug("Event handlers are unregistered");
         
         LOG.info("Stopping managers");
         this.volumeManager.stop();

@@ -81,13 +81,13 @@ public class HTTPUserInterfaceServer {
             
             HTTPUserInterfaceServlet.setDriver(this.driver);
             
-            LOG.info("Starting HTTP User Interface Server");
+            LOG.debug("Starting HTTP User Interface Server");
             this.jettyWebServer.start();
             // block until break
-            //LOG.info("Joining HTTP User Interface Server");
+            //LOG.debug("Joining HTTP User Interface Server");
             //this.jettyWebServer.join();
             this.started = true;
-            LOG.info("HTTP User Interface Server is started");
+            LOG.debug("HTTP User Interface Server is started");
         } catch (Exception ex) {
             throw new IOException(ex);
         }
@@ -100,10 +100,10 @@ public class HTTPUserInterfaceServer {
         
         // stop web server
         try {
-            LOG.info("Stopping HTTP User Interface Server");
+            LOG.debug("Stopping HTTP User Interface Server");
             this.jettyWebServer.stop();
             this.started = false;
-            LOG.info("HTTP User Interface Server is stopped");
+            LOG.debug("HTTP User Interface Server is stopped");
         } catch(Exception ex) {
             LOG.error("Exception occurred while stopping web server", ex);
         }

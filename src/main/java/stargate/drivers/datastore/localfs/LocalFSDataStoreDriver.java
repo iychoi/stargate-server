@@ -86,10 +86,10 @@ public class LocalFSDataStoreDriver extends AbstractDataStoreDriver {
     public synchronized void init() throws IOException {
         super.init();
         
-        LOG.info("Initializing Local File System Persistent Storage Driver");
+        LOG.debug("Initializing Local File System Persistent Storage Driver");
         
         this.rootPath = this.config.getRootPath();
-        LOG.info("localfs root - " + this.rootPath);
+        LOG.debug("localfs root - " + this.rootPath);
     }
 
     @Override

@@ -50,11 +50,12 @@ public class RecipeChunkGenerateTask extends Task {
             List<RecipeChunk> generatedChunks = new ArrayList<RecipeChunk>();
             
             for(RecipeChunkGenerateEvent event : this.events) {
-                LOG.info(event.toString());
+                LOG.debug(String.format("Processing chunk generation request for - %s", event.toString()));
                 try {
                     StargateService stargateInstance = StargateService.getInstance();
                     RecipeManager recipeManager = stargateInstance.getRecipeManager();
                     RecipeChunk recipeChunk = recipeManager.createRecipeChunk(event);
+                    LOG.debug(String.format("Generated chunk %s - %s", event.getDataExportEntry().getSourceURI().toASCIIString(), recipeChunk.getHashString()));
                     generatedChunks.add(recipeChunk);
                 } catch (ServiceNotStartedException ex) {
                     LOG.error(ex);
@@ -81,7 +82,7 @@ public class RecipeChunkGenerateTask extends Task {
         try {
             // wait
             Collection<Collection<RecipeChunk>> chunks = (Collection<Collection<RecipeChunk>>) future.get();
-            LOG.info("Finished - future waiting");
+            LOG.debug("Waiting for the task is done");
             
             List<RecipeChunk> generatedChunks = new ArrayList<RecipeChunk>();
             for(Collection<RecipeChunk> cchunks : chunks) {

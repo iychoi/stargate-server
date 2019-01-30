@@ -105,7 +105,7 @@ public class IgniteScheduleDriver extends AbstractScheduleDriver {
     public synchronized void init() throws IOException {
         super.init();
         
-        LOG.info("Initializing Ignite Schedule Driver");
+        LOG.debug("Initializing Ignite Schedule Driver");
         
         this.igniteDriver = IgniteDriver.getInstance();
         this.igniteDriver.init();
