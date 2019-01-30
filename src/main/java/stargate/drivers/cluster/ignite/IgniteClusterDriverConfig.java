@@ -27,6 +27,7 @@ import org.codehaus.jackson.annotate.JsonIgnore;
 import org.codehaus.jackson.annotate.JsonProperty;
 import stargate.commons.cluster.AbstractClusterDriverConfig;
 import stargate.commons.utils.JsonSerializer;
+import stargate.utils.pkg.ResourceUtils;
 
 /**
  *
@@ -37,10 +38,9 @@ public class IgniteClusterDriverConfig extends AbstractClusterDriverConfig {
     private static final Log LOG = LogFactory.getLog(IgniteClusterDriverConfig.class);
     
     public static final String DEFAULT_CLUSTER_NAME = "StargateCluster";
-    public static final String DEFAULT_STORAGE_ROOT_PATH = "./storage";
     
     private String clusterName = DEFAULT_CLUSTER_NAME;
-    private File storageRootPath = new File(DEFAULT_STORAGE_ROOT_PATH);
+    private File storageRootPath;
     private List<String> clusterNodes = new ArrayList<String>();
     
     public static IgniteClusterDriverConfig createInstance(File file) throws IOException {
@@ -60,6 +60,7 @@ public class IgniteClusterDriverConfig extends AbstractClusterDriverConfig {
     }
     
     public IgniteClusterDriverConfig() {
+        this.storageRootPath = new File(ResourceUtils.getStargateRoot(), "storage");
     }
     
     @JsonProperty("cluster_name")

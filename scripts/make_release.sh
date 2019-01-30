@@ -32,6 +32,9 @@ cp ${BINDIR}/* ${RELBINDIR}/
 LIBS_LINE="DEFAULT_STARGATE_LIBS=\"\${BASEDIR}/libs/*\""
 sed -i 's|^DEFAULT_STARGATE_LIBS.*|'"${LIBS_LINE}"'|g' ${RELBINDIR}/bootstrap.sh
 
+# copy config files
+mkdir -p ${RELCONFDIR}
+cp ${CONFDIR}/* ${RELCONFDIR}/
 
 # copy jar files
 mkdir -p ${RELLIBDIR}
@@ -43,7 +46,7 @@ mkdir -p ${RELSTORAGEDIR}
 
 # copy License and Readme
 cp ${BASEDIR}/LICENSE ${RELDIR}/
-cp ${BASEDIR}/README.md ${RELDIR}/README.md
+cp ${BASEDIR}/README.md ${RELDIR}/
 
 cp -R ${RELDIR} ${BASEDIR}/${RELEASE_NAME}
 tar zcvfP ${RELDIR}/${RELEASE_ARCHIVE_FILENAME} -C ${BASEDIR} ${RELEASE_NAME}

@@ -16,9 +16,16 @@
 package stargate.service;
 
 import java.io.File;
+import java.io.FileInputStream;
 import java.io.IOException;
+import java.io.InputStream;
+import java.util.Properties;
 import org.apache.commons.logging.Log;
 import org.apache.commons.logging.LogFactory;
+import org.apache.log4j.LogManager;
+import org.apache.log4j.PropertyConfigurator;
+import org.apache.log4j.xml.DOMConfigurator;
+import stargate.utils.pkg.ResourceUtils;
 
 /**
  *
@@ -27,8 +34,12 @@ import org.apache.commons.logging.LogFactory;
 public class ServiceMain {
     private static final Log LOG = LogFactory.getLog(ServiceMain.class);
     
+    public static String LOG4J_PROPERTY_PATH = "config/java.util.logging.properties";
+    
     public static void main(String[] args) {
         try {
+            setLogger();
+            
             StargateServiceConfig serviceConfig = null;
             if(args.length != 0) {
                 File serviceConfigFile = new File(args[0]).getAbsoluteFile();
@@ -75,5 +86,11 @@ public class ServiceMain {
             LOG.error(ex);
             ex.printStackTrace();
         }
+    }
+    
+    private static void setLogger() {
+        File log_property_file = new File(ResourceUtils.getStargateRoot(), LOG4J_PROPERTY_PATH); //System.out.println("log4j configuration file not found");
+        LogManager.resetConfiguration();
+        DOMConfigurator.configure(log_property_file.getAbsolutePath());
     }
 }

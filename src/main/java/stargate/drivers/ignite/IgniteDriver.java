@@ -27,18 +27,22 @@ import java.util.concurrent.locks.ReentrantLock;
 import org.apache.commons.logging.Log;
 import org.apache.commons.logging.LogFactory;
 import org.apache.ignite.Ignite;
+import org.apache.ignite.IgniteCheckedException;
 import org.apache.ignite.IgniteCluster;
+import org.apache.ignite.IgniteLogger;
 import org.apache.ignite.Ignition;
 import org.apache.ignite.configuration.DataRegionConfiguration;
 import org.apache.ignite.configuration.DataStorageConfiguration;
 import org.apache.ignite.configuration.IgniteConfiguration;
 import org.apache.ignite.internal.managers.discovery.IgniteDiscoverySpi;
+import org.apache.ignite.logger.log4j.Log4JLogger;
 import org.apache.ignite.spi.collision.CollisionSpi;
 import org.apache.ignite.spi.collision.priorityqueue.PriorityQueueCollisionSpi;
 import org.apache.ignite.spi.discovery.tcp.TcpDiscoverySpi;
 import org.apache.ignite.spi.discovery.tcp.ipfinder.TcpDiscoveryIpFinder;
 import org.apache.ignite.spi.discovery.tcp.ipfinder.multicast.TcpDiscoveryMulticastIpFinder;
 import org.apache.ignite.spi.discovery.tcp.ipfinder.vm.TcpDiscoveryVmIpFinder;
+import stargate.utils.pkg.ResourceUtils;
 
 /**
  *
@@ -47,6 +51,8 @@ import org.apache.ignite.spi.discovery.tcp.ipfinder.vm.TcpDiscoveryVmIpFinder;
 public class IgniteDriver {
 
     private static final Log LOG = LogFactory.getLog(IgniteDriver.class);
+    
+    public static String LOG4J_PROPERTY_PATH = "config/java.util.logging.properties";
     
     public static final String PERSISTENT_REGION_NAME = "PERSISTENT_REGION";
     public static final String VOLATILE_REGION_NAME = "VOLATILE_REGION";
@@ -99,7 +105,20 @@ public class IgniteDriver {
         if(!this.initialized) {
             LOG.info("Initializing Ignite Master Driver");
             
+            //IGNITE_LOG_DIR 
             IgniteConfiguration igniteConfig = new IgniteConfiguration();
+            
+            File stargateRoot = ResourceUtils.getStargateRoot();
+            igniteConfig.setIgniteHome(stargateRoot.getAbsolutePath());
+            LOG.info(String.format("Setting Ignite HOME = %s", stargateRoot.getAbsolutePath()));
+            
+            try {
+                File logFile = new File(stargateRoot.getAbsolutePath(), LOG4J_PROPERTY_PATH);
+                IgniteLogger log = new Log4JLogger(logFile.getAbsolutePath());
+                igniteConfig.setGridLogger(log);
+            } catch (IgniteCheckedException ex) {
+                throw new IOException(ex);
+            }
             
             // discovery
             IgniteDiscoverySpi discoveryConfig = null;
@@ -235,14 +254,16 @@ public class IgniteDriver {
         dsCfg.setDataRegionConfigurations(volatileDataRegConf);
         dsCfg.setDefaultDataRegionConfiguration(persistentDataRegConf);
         
-        if(storageRootPath != null) {
-            File storagePath = new File(storageRootPath, STORAGE_PATH);
-            File walPath = new File(storageRootPath, WAL_PATH);
-            File walArchivePath = new File(storageRootPath, WAL_ARCHIVE_PATH);
-            dsCfg.setStoragePath(storagePath.getAbsolutePath());
-            dsCfg.setWalPath(walPath.getAbsolutePath());
-            dsCfg.setWalArchivePath(walArchivePath.getAbsolutePath());
+        if(this.storageRootPath == null) {
+            this.storageRootPath = new File(ResourceUtils.getStargateRoot(), "storage");
         }
+        
+        File storagePath = new File(this.storageRootPath, STORAGE_PATH);
+        File walPath = new File(this.storageRootPath, WAL_PATH);
+        File walArchivePath = new File(this.storageRootPath, WAL_ARCHIVE_PATH);
+        dsCfg.setStoragePath(storagePath.getAbsolutePath());
+        dsCfg.setWalPath(walPath.getAbsolutePath());
+        dsCfg.setWalArchivePath(walArchivePath.getAbsolutePath());
         return dsCfg;
     }
     

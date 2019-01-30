@@ -32,7 +32,7 @@ import stargate.managers.schedule.ScheduleManager;
 import stargate.managers.transport.TransportManager;
 import stargate.managers.userinterface.UserInterfaceManager;
 import stargate.managers.volume.VolumeManager;
-import stargate.tasks.DataExportUpdateEventHandler;
+import stargate.managers.dataexport.DataExportUpdateEventHandler;
 
 /**
  *

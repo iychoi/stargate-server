@@ -3,11 +3,13 @@
 SCRIPTDIR=$(realpath $(test -L "${BASH_SOURCE}" && readlink -f "${BASH_SOURCE}" || echo "${BASH_SOURCE}"))
 BASEDIR=$(dirname $(dirname ${SCRIPTDIR}))
 BINDIR="${BASEDIR}/bin"
+CONFDIR="${BASEDIR}/config"
 JARDIR="${BASEDIR}/target"
 DEPDIR="${BASEDIR}/target/dependency"
 
 RELDIR="${BASEDIR}/release"
 RELBINDIR="${RELDIR}/bin"
+RELCONFDIR="${RELDIR}/config"
 RELLIBDIR="${RELDIR}/libs"
 RELSTORAGEDIR="${RELDIR}/storage"
 
