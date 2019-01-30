@@ -25,6 +25,7 @@ import org.apache.commons.logging.LogFactory;
 import org.apache.ignite.Ignite;
 import org.apache.ignite.IgniteCompute;
 import org.apache.ignite.cluster.ClusterGroup;
+import org.apache.ignite.cluster.ClusterNode;
 import org.apache.ignite.compute.ComputeTaskFuture;
 import org.apache.ignite.lang.IgniteRunnable;
 import org.apache.ignite.resources.IgniteInstanceResource;
@@ -160,6 +161,10 @@ public class IgniteScheduleDriver extends AbstractScheduleDriver {
         
         Ignite ignite = this.igniteDriver.getIgnite();
         ClusterGroup servers = ignite.cluster().forServers();
+        
+        for(ClusterNode node : servers.nodes()) {
+            LOG.info(String.format("Ignite Cluster Node : %s", node.id().toString()));
+        }
         
         if(all) {
             return servers;
