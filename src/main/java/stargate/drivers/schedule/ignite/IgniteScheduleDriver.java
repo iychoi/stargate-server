@@ -18,11 +18,14 @@ package stargate.drivers.schedule.ignite;
 import java.io.IOException;
 import java.util.ArrayList;
 import java.util.Collection;
+import java.util.HashMap;
 import java.util.List;
+import java.util.Map;
 import java.util.UUID;
 import org.apache.commons.logging.Log;
 import org.apache.commons.logging.LogFactory;
 import org.apache.ignite.Ignite;
+import org.apache.ignite.IgniteCluster;
 import org.apache.ignite.IgniteCompute;
 import org.apache.ignite.cluster.ClusterGroup;
 import org.apache.ignite.cluster.ClusterNode;
@@ -48,6 +51,7 @@ public class IgniteScheduleDriver extends AbstractScheduleDriver {
     
     private IgniteScheduleDriverConfig config;
     private IgniteDriver igniteDriver;
+    private Map<String, UUID> clusterNodeNameMappings = new HashMap<String, UUID>(); // name to ID mappings
     
     public IgniteScheduleDriver(AbstractDriverConfig config) {
         if(config == null) {
@@ -139,14 +143,14 @@ public class IgniteScheduleDriver extends AbstractScheduleDriver {
             IgniteCompute compute = ignite.compute(group).withAsync();
             compute.broadcast(makeIgniteRunnable(task));
             ComputeTaskFuture<Object> future = compute.future();
-            IgniteTaskFuture igniteTaskFuture = new IgniteTaskFuture(future);
+            IgniteTaskFuture<Object> igniteTaskFuture = new IgniteTaskFuture<Object>(future);
             task.setFuture(igniteTaskFuture);
         } catch (Exception ex) {
             throw new IOException(ex);
         }
     }
     
-    private ClusterGroup parseTaskGroup(Collection<String> nodeNames) {
+    private ClusterGroup parseTaskGroup(Collection<String> nodeNames) throws IOException {
         boolean all = false;
         if(nodeNames.isEmpty()) {
             all = true;
@@ -160,22 +164,45 @@ public class IgniteScheduleDriver extends AbstractScheduleDriver {
         }
         
         Ignite ignite = this.igniteDriver.getIgnite();
-        ClusterGroup servers = ignite.cluster().forServers();
-        
-        for(ClusterNode node : servers.nodes()) {
-            LOG.info(String.format("Ignite Cluster Node : %s", node.id().toString()));
-        }
+        IgniteCluster cluster = ignite.cluster();
+        ClusterGroup servers = cluster.forServers();
         
         if(all) {
             return servers;
         } else {
-            List<UUID> nodeIDs = new ArrayList<UUID>();
-            for(String nodeName : nodeNames) {
-                UUID uuid = UUID.fromString(nodeName);
-                LOG.info(String.format("parsed UUID of nodeName : %s - %s", nodeName, uuid.toString()));
-                nodeIDs.add(uuid);
+            if(this.clusterNodeNameMappings.isEmpty()) {
+                // fill mapping
+                for(ClusterNode node : servers.nodes()) {
+                    String consistentNodeName = node.consistentId().toString();
+                    this.clusterNodeNameMappings.put(consistentNodeName, node.id());
+                }
             }
             
+            List<UUID> nodeIDs = new ArrayList<UUID>();
+            for(String nodeName : nodeNames) {
+                UUID nodeID = this.clusterNodeNameMappings.get(nodeName);
+                if(nodeID == null) {
+                    // check if there is a missing node
+                    boolean foundNode = false;
+                    for(ClusterNode node : servers.nodes()) {
+                        String consistentNodeName = node.consistentId().toString();
+                        if(nodeName.equals(consistentNodeName)) {
+                            //found
+                            foundNode = true;
+                            this.clusterNodeNameMappings.put(consistentNodeName, node.id());
+                            nodeIDs.add(node.id());
+                            break;
+                        }
+                    }
+                    
+                    if(!foundNode) {
+                        // error
+                        throw new IOException(String.format("cannot find matching node : %s", nodeName));
+                    }
+                } else {
+                    nodeIDs.add(nodeID);
+                }
+            }
             return servers.forNodeIds(nodeIDs);
         }
     }

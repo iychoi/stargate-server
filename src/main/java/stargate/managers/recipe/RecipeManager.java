@@ -23,6 +23,8 @@ import java.util.Collections;
 import java.util.Iterator;
 import java.util.List;
 import java.util.concurrent.Future;
+import java.util.logging.Level;
+import java.util.logging.Logger;
 import org.apache.commons.logging.Log;
 import org.apache.commons.logging.LogFactory;
 import stargate.commons.cluster.AbstractClusterDriver;
@@ -772,24 +774,28 @@ public class RecipeManager extends AbstractManager<AbstractRecipeDriver> {
                 nodeId++;
             }
             
+            
             // collect
             for(RecipeChunkGenerateTask task : recipeChunkGenerateTasks) {
-                RecipeChunk recipeChunk = task.getRecipeChunk();
-                Collection<String> blockLocations = dataSourceDriver.listBlockLocations(cluster, sourceMetadata.getURI(), recipeChunk.getOffset(), recipeChunk.getLength());
-                if(blockLocations.contains("*")) {
-                    recipeChunk.setAccessibleFromAllNode();
-                } else {
-                    for(String nodeName : blockLocations) {
-                        int nodeID = recipe.getNodeID(nodeName);
-                        if(nodeID >= 0) {
-                            recipeChunk.addNodeID(nodeID);
-                        } else {
-                            recipeChunk.setAccessibleFromAllNode();
+                Collection<RecipeChunk> recipeChunks = task.getRecipeChunks();
+                for(RecipeChunk recipeChunk : recipeChunks) {
+                    Collection<String> blockLocations = dataSourceDriver.listBlockLocations(cluster, sourceMetadata.getURI(), recipeChunk.getOffset(), recipeChunk.getLength());
+                    if(blockLocations.contains("*")) {
+                        recipeChunk.setAccessibleFromAllNode();
+                    } else {
+                        for(String nodeName : blockLocations) {
+                            int nodeID = recipe.getNodeID(nodeName);
+                            if(nodeID >= 0) {
+                                recipeChunk.addNodeID(nodeID);
+                            } else {
+                                recipeChunk.setAccessibleFromAllNode();
+                            }
                         }
                     }
-                }
 
-                recipe.addChunk(recipeChunk);
+                    //TODO: need to add chunks in order
+                    recipe.addChunk(recipeChunk);
+                }
             }
             
             return recipe;

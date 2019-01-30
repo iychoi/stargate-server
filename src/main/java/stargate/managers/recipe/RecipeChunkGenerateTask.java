@@ -16,7 +16,11 @@
 package stargate.managers.recipe;
 
 import java.io.IOException;
+import java.util.ArrayList;
 import java.util.Collection;
+import java.util.Collections;
+import java.util.List;
+import java.util.concurrent.Callable;
 import java.util.concurrent.Future;
 import org.apache.commons.logging.Log;
 import org.apache.commons.logging.LogFactory;
@@ -34,19 +38,23 @@ public class RecipeChunkGenerateTask extends Task {
     class RecipeChunkGenerateTaskRunnable implements Runnable {
 
         private Collection<RecipeChunkGenerateEvent> events;
+        private List<RecipeChunk> generatedChunks = new ArrayList<RecipeChunk>();
                 
         RecipeChunkGenerateTaskRunnable(Collection<RecipeChunkGenerateEvent> events) {
             this.events = events;
         }
-        
+
         @Override
         public void run() {
             for(RecipeChunkGenerateEvent event : this.events) {
                 LOG.info(event.toString());
+                
             }
-            
         }
         
+        public Collection<RecipeChunk> getRecipeChunks() {
+            return Collections.unmodifiableCollection(this.generatedChunks);
+        }
     }
     
     public RecipeChunkGenerateTask(Collection<String> nodeNames, Collection<RecipeChunkGenerateEvent> events) {
@@ -56,11 +64,16 @@ public class RecipeChunkGenerateTask extends Task {
         super.setRunnable(runnable);
     }
     
-    public RecipeChunk getRecipeChunk() throws IOException {
+    public Collection<RecipeChunk> getRecipeChunks() throws IOException {
         Future<Object> future = super.getFuture();
+        
         try {
-            RecipeChunk recipeChunk = (RecipeChunk) future.get();
-            return recipeChunk;
+            // wait
+            future.get(); // runnable does not return
+            LOG.info("Finished - future waiting");
+            
+            RecipeChunkGenerateTaskRunnable runnable = (RecipeChunkGenerateTaskRunnable) super.getRunnable();
+            return runnable.getRecipeChunks();
         } catch (Exception ex) {
             throw new IOException(ex);
         }
