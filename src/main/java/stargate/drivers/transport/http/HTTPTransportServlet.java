@@ -37,10 +37,13 @@ import stargate.commons.dataobject.DataObjectURI;
 import stargate.commons.dataobject.Directory;
 import stargate.commons.manager.AbstractManager;
 import stargate.commons.manager.ManagerNotInstantiatedException;
+import stargate.commons.recipe.AbstractRecipeDriver;
 import stargate.commons.recipe.Recipe;
 import stargate.commons.restful.RestfulResponse;
+import stargate.commons.service.FSServiceInfo;
 import stargate.commons.transport.AbstractTransportServer;
 import stargate.managers.cluster.ClusterManager;
+import stargate.managers.recipe.RecipeManager;
 import stargate.managers.volume.VolumeManager;
 import stargate.service.StargateService;
 
@@ -102,7 +105,8 @@ public class HTTPTransportServlet extends AbstractTransportServer {
     @Produces(MediaType.APPLICATION_JSON)
     public Response isLiveRestful() throws IOException {
         try {
-            RestfulResponse rres = new RestfulResponse(isLive());
+            boolean live = isLive();
+            RestfulResponse rres = new RestfulResponse(live);
             return Response.status(Response.Status.OK).entity(rres).build();
         } catch(Exception ex) {
             RestfulResponse rres = new RestfulResponse(ex);
@@ -115,6 +119,37 @@ public class HTTPTransportServlet extends AbstractTransportServer {
         return true;
     }
 
+    @GET
+    @Path(HTTPTransportRestfulConstants.API_PATH + "/" + HTTPTransportRestfulConstants.API_GET_FS_SERVICE_INFO_PATH)
+    @Produces(MediaType.APPLICATION_JSON)
+    public Response getFSServiceInfoRestful() throws IOException {
+        try {
+            FSServiceInfo info = getFSServiceInfo();
+            RestfulResponse rres = new RestfulResponse(info);
+            return Response.status(Response.Status.OK).entity(rres).build();
+        } catch(Exception ex) {
+            RestfulResponse rres = new RestfulResponse(ex);
+            return Response.status(Response.Status.INTERNAL_SERVER_ERROR).entity(rres).build();
+        }
+    }
+    
+    @Override
+    public FSServiceInfo getFSServiceInfo() throws IOException {
+        try {
+            StargateService stargateService = getStargateService();
+            RecipeManager recipeManager = stargateService.getRecipeManager();
+            AbstractRecipeDriver recipeDriver = recipeManager.getDriver();
+            int chunkSize = recipeDriver.getChunkSize();
+            String hashAlgorithm = recipeDriver.getHashAlgorithm();
+            
+            FSServiceInfo serviceInfo = new FSServiceInfo(chunkSize, hashAlgorithm);
+            return serviceInfo;
+        } catch (ManagerNotInstantiatedException ex) {
+            LOG.error(ex);
+            throw new IOException(ex);
+        }
+    }
+    
     @GET
     @Path(HTTPTransportRestfulConstants.API_PATH + "/" + HTTPTransportRestfulConstants.API_GET_LOCAL_CLUSTER_PATH)
     @Produces(MediaType.APPLICATION_JSON)
@@ -142,7 +177,7 @@ public class HTTPTransportServlet extends AbstractTransportServer {
     }
 
     @GET
-    @Path(HTTPTransportRestfulConstants.GET_METADATA_PATH + "/{path:.*}")
+    @Path(HTTPTransportRestfulConstants.API_PATH + "/" + HTTPTransportRestfulConstants.API_GET_METADATA_PATH + "/{path:.*}")
     @Produces(MediaType.APPLICATION_JSON)
     public Response getDataObjectMetadataRestful(
         @DefaultValue("") @PathParam("path") String path) throws IOException {
@@ -158,7 +193,8 @@ public class HTTPTransportServlet extends AbstractTransportServer {
         }
         
         try {
-            DataObjectURI objectUri = new DataObjectURI(new_path);
+            Cluster cluster = getLocalCluster();
+            DataObjectURI objectUri = new DataObjectURI(cluster.getName(), new_path);
             DataObjectMetadata objectMetadata = getDataObjectMetadata(objectUri);
             RestfulResponse rres = new RestfulResponse(objectMetadata);
             return Response.status(Response.Status.OK).entity(rres).build();
@@ -188,7 +224,7 @@ public class HTTPTransportServlet extends AbstractTransportServer {
     }
     
     @GET
-    @Path(HTTPTransportRestfulConstants.LIST_METADATA_PATH + "/{path:.*}")
+    @Path(HTTPTransportRestfulConstants.API_PATH + "/" + HTTPTransportRestfulConstants.API_LIST_METADATA_PATH + "/{path:.*}")
     @Produces(MediaType.APPLICATION_JSON)
     public Response listDataObjectMetadataRestful(
             @DefaultValue("") @PathParam("path") String path) throws IOException {
@@ -204,7 +240,8 @@ public class HTTPTransportServlet extends AbstractTransportServer {
         }
         
         try {
-            DataObjectURI objectUri = new DataObjectURI(new_path);
+            Cluster cluster = getLocalCluster();
+            DataObjectURI objectUri = new DataObjectURI(cluster.getName(), new_path);
             Collection<DataObjectMetadata> objectMetadataList = listDataObjectMetadata(objectUri);
             RestfulResponse rres = new RestfulResponse(objectMetadataList.toArray(new DataObjectMetadata[0]));
             return Response.status(Response.Status.OK).entity(rres).build();
@@ -232,7 +269,7 @@ public class HTTPTransportServlet extends AbstractTransportServer {
     }
     
     @GET
-    @Path(HTTPTransportRestfulConstants.GET_RECIPE_PATH + "/{path:.*}")
+    @Path(HTTPTransportRestfulConstants.API_PATH + "/" + HTTPTransportRestfulConstants.API_GET_RECIPE_PATH + "/{path:.*}")
     @Produces(MediaType.APPLICATION_JSON)
     public Response getRecipeRestful(
         @DefaultValue("") @PathParam("path") String path) throws IOException {
@@ -241,7 +278,8 @@ public class HTTPTransportServlet extends AbstractTransportServer {
         }
         
         try {
-            DataObjectURI objectUri = new DataObjectURI(path);
+            Cluster cluster = getLocalCluster();
+            DataObjectURI objectUri = new DataObjectURI(cluster.getName(), path);
             Recipe recipe = getRecipe(objectUri);
             RestfulResponse rres = new RestfulResponse(recipe);
             return Response.status(Response.Status.OK).entity(rres).build();
@@ -268,7 +306,7 @@ public class HTTPTransportServlet extends AbstractTransportServer {
     }
     
     @GET
-    @Path(HTTPTransportRestfulConstants.GET_DIRECTORY_PATH + "/{path:.*}")
+    @Path(HTTPTransportRestfulConstants.API_PATH + "/" + HTTPTransportRestfulConstants.API_GET_DIRECTORY_PATH + "/{path:.*}")
     @Produces(MediaType.APPLICATION_JSON)
     public Response getDirectoryRestful(
             @DefaultValue("") @PathParam("path") String path) throws IOException {
@@ -284,7 +322,8 @@ public class HTTPTransportServlet extends AbstractTransportServer {
         }
         
         try {
-            DataObjectURI objectUri = new DataObjectURI(new_path);
+            Cluster cluster = getLocalCluster();
+            DataObjectURI objectUri = new DataObjectURI(cluster.getName(), new_path);
             Directory directory = getDirectory(objectUri);
             RestfulResponse rres = new RestfulResponse(directory);
             return Response.status(Response.Status.OK).entity(rres).build();
@@ -311,7 +350,7 @@ public class HTTPTransportServlet extends AbstractTransportServer {
     }
     
     @GET
-    @Path(HTTPTransportRestfulConstants.GET_DATA_CHUNK_PATH + "/{hash:\\w*}")
+    @Path(HTTPTransportRestfulConstants.API_PATH + "/" + HTTPTransportRestfulConstants.API_GET_DATA_CHUNK_PATH + "/{hash:.*}")
     @Produces(MediaType.APPLICATION_OCTET_STREAM)
     public Response getDataChunkRestful(
             @DefaultValue("") @PathParam("hash") String hash) throws Exception {

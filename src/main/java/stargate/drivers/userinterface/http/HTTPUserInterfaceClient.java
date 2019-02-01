@@ -62,6 +62,7 @@ public class HTTPUserInterfaceClient extends AbstractUserInterfaceClient {
         this.connected = false;
     }
     
+    @Override
     public void connect() throws IOException {
         if(!this.connected) {
             this.restfulClient = new RestfulClient(this.serviceUri, this.username, this.password);

@@ -29,6 +29,7 @@ import stargate.commons.dataobject.DataObjectURI;
 import stargate.commons.dataobject.Directory;
 import stargate.commons.recipe.Recipe;
 import stargate.commons.restful.RestfulClient;
+import stargate.commons.service.FSServiceInfo;
 import stargate.commons.transport.AbstractTransportClient;
 import stargate.commons.transport.TransportServiceInfo;
 import stargate.commons.utils.DateTimeUtils;
@@ -94,24 +95,9 @@ public class HTTPTransportClient extends AbstractTransportClient {
         return PathUtils.concatPath(HTTPTransportRestfulConstants.API_PATH, path);
     }
     
-    private String makeGetMetadataPath(String path) {
-        return PathUtils.concatPath(HTTPTransportRestfulConstants.GET_METADATA_PATH, path);
-    }
-    
-    private String makeListMetadataPath(String path) {
-        return PathUtils.concatPath(HTTPTransportRestfulConstants.LIST_METADATA_PATH, path);
-    }
-    
-    private String makeGetDirectoryPath(String path) {
-        return PathUtils.concatPath(HTTPTransportRestfulConstants.GET_DIRECTORY_PATH, path);
-    }
-    
-    private String makeGetRecipePath(String path) {
-        return PathUtils.concatPath(HTTPTransportRestfulConstants.GET_RECIPE_PATH, path);
-    }
-    
-    private String makeGetDataChunkPath(String hash) {
-        return PathUtils.concatPath(HTTPTransportRestfulConstants.GET_DATA_CHUNK_PATH, hash);
+    private String makeAPIPath(String path1, String path2) {
+        String api_path = PathUtils.concatPath(HTTPTransportRestfulConstants.API_PATH, path1);
+        return PathUtils.concatPath(api_path, path2);
     }
     
     @Override
@@ -142,18 +128,32 @@ public class HTTPTransportClient extends AbstractTransportClient {
         return live;
     }
 
+        @Override
+    public FSServiceInfo getFSServiceInfo() throws IOException {
+        if(!this.connected) {
+            throw new IOException("Client is not connected");
+        }
+        
+        // URL pattern = http://xxx.xxx.xxx.xxx/api/fssvcinfo
+        String url = makeAPIPath(HTTPTransportRestfulConstants.API_GET_FS_SERVICE_INFO_PATH);
+        FSServiceInfo info = (FSServiceInfo) this.restfulClient.get(url);
+
+        updateLastActivetime();
+        return info;
+    }
+    
     @Override
     public Cluster getLocalCluster() throws IOException {
         if(!this.connected) {
             throw new IOException("Client is not connected");
         }
         
-        // URL pattern = http://xxx.xxx.xxx.xxx/api/cluster
+        // URL pattern = http://xxx.xxx.xxx.xxx/api/lcluster
         String url = makeAPIPath(HTTPTransportRestfulConstants.API_GET_LOCAL_CLUSTER_PATH);
-        Cluster response = (Cluster) this.restfulClient.get(url);
+        Cluster cluster = (Cluster) this.restfulClient.get(url);
 
         updateLastActivetime();
-        return response;
+        return cluster;
     }
 
     @Override
@@ -166,8 +166,8 @@ public class HTTPTransportClient extends AbstractTransportClient {
             throw new IllegalArgumentException("uri is null");
         }
         
-        // URL pattern = http://xxx.xxx.xxx.xxx/metadata/path/to/resource
-        String url = makeGetMetadataPath(uri.getPath());
+        // URL pattern = http://xxx.xxx.xxx.xxx/api/metadata/path/to/resource
+        String url = makeAPIPath(HTTPTransportRestfulConstants.API_GET_METADATA_PATH, uri.getPath());
         DataObjectMetadata metadata = (DataObjectMetadata) this.restfulClient.get(url);
 
         updateLastActivetime();
@@ -184,8 +184,8 @@ public class HTTPTransportClient extends AbstractTransportClient {
             throw new IllegalArgumentException("uri is null");
         }
         
-        // URL pattern = http://xxx.xxx.xxx.xxx/lmetadata/path/to/resource
-        String url = makeListMetadataPath(uri.getPath());
+        // URL pattern = http://xxx.xxx.xxx.xxx/api/lmetadata/path/to/resource
+        String url = makeAPIPath(HTTPTransportRestfulConstants.API_LIST_METADATA_PATH, uri.getPath());
         DataObjectMetadata[] metadataList = (DataObjectMetadata[]) this.restfulClient.get(url);
 
         updateLastActivetime();
@@ -202,8 +202,8 @@ public class HTTPTransportClient extends AbstractTransportClient {
             throw new IllegalArgumentException("uri is null");
         }
         
-        // URL pattern = http://xxx.xxx.xxx.xxx/lmetadata/path/to/resource
-        String url = makeGetDirectoryPath(uri.getPath());
+        // URL pattern = http://xxx.xxx.xxx.xxx/api/directory/path/to/resource
+        String url = makeAPIPath(HTTPTransportRestfulConstants.API_GET_DIRECTORY_PATH, uri.getPath());
         Directory directory = (Directory) this.restfulClient.get(url);
 
         updateLastActivetime();
@@ -220,14 +220,14 @@ public class HTTPTransportClient extends AbstractTransportClient {
             throw new IllegalArgumentException("uri is null");
         }
         
-        // URL pattern = http://xxx.xxx.xxx.xxx/recipe/path/to/resource
-        String url = makeGetRecipePath(uri.getPath());
+        // URL pattern = http://xxx.xxx.xxx.xxx/api/recipe/path/to/resource
+        String url = makeAPIPath(HTTPTransportRestfulConstants.API_GET_RECIPE_PATH, uri.getPath());
         Recipe recipe = (Recipe) this.restfulClient.get(url);
 
         updateLastActivetime();
         return recipe;
     }
-
+    
     @Override
     public InputStream getDataChunk(String hash) throws IOException {
         if(!this.connected) {
@@ -238,8 +238,8 @@ public class HTTPTransportClient extends AbstractTransportClient {
             throw new IllegalArgumentException("hash is null or empty");
         }
         
-        // URL pattern = http://xxx.xxx.xxx.xxx/data/hash
-        String url = makeGetDataChunkPath(hash);
+        // URL pattern = http://xxx.xxx.xxx.xxx/api/data/hash
+        String url = makeAPIPath(HTTPTransportRestfulConstants.API_GET_DATA_CHUNK_PATH, hash);
         InputStream is = this.restfulClient.download(url);
 
         updateLastActivetime();

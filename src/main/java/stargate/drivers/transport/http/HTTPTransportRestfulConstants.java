@@ -22,12 +22,14 @@ package stargate.drivers.transport.http;
 public abstract class HTTPTransportRestfulConstants {
     public static final String BASE_PATH = "/";
     public static final String API_PATH = "/api";
-    public static final String GET_METADATA_PATH = "/metadata";
-    public static final String LIST_METADATA_PATH = "/lmetadata";
-    public static final String GET_DIRECTORY_PATH = "/directory";
-    public static final String GET_RECIPE_PATH = "/recipe";
-    public static final String GET_DATA_CHUNK_PATH = "/data";
     
+    public static final String API_GET_METADATA_PATH = "metadata";
+    public static final String API_LIST_METADATA_PATH = "lmetadata";
+    public static final String API_GET_DIRECTORY_PATH = "directory";
+    public static final String API_GET_RECIPE_PATH = "recipe";
+    public static final String API_GET_DATA_CHUNK_PATH = "data";
     public static final String API_CHECK_LIVE_PATH = "live";
+    public static final String API_GET_SERVICE_CONFIG_PATH = "svcconfig";
+    public static final String API_GET_FS_SERVICE_INFO_PATH = "fssvcinfo";
     public static final String API_GET_LOCAL_CLUSTER_PATH = "lcluster";
 }
