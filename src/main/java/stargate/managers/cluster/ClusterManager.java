@@ -144,12 +144,16 @@ public class ClusterManager extends AbstractManager<AbstractClusterDriver> {
     
     private synchronized void safeInitLocalCluster() throws IOException {
         AbstractClusterDriver driver = getDriver();
+        
+        long currentTime = DateTimeUtils.getTimestamp();
         if(this.localCluster == null) {
             this.localCluster = driver.getLocalCluster();
+            this.lastUpdateTime = currentTime;
         }
         
         if(this.localNode == null) {
             this.localNode = driver.getLocalNode();
+            this.lastUpdateTime = currentTime;
         }
     }
     
