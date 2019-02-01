@@ -19,9 +19,18 @@ import java.io.IOException;
 import java.io.InputStream;
 import java.net.URI;
 import java.util.Collection;
+import java.util.Collections;
 import java.util.HashMap;
+import java.util.Iterator;
 import java.util.Map;
-import java.util.Set;
+import java.util.SortedMap;
+import java.util.SortedSet;
+import java.util.TreeMap;
+import java.util.TreeSet;
+import java.util.concurrent.Callable;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
+import java.util.concurrent.Future;
 import org.apache.commons.logging.Log;
 import org.apache.commons.logging.LogFactory;
 import org.apache.hadoop.fs.FSInputStream;
@@ -30,27 +39,30 @@ import stargate.commons.dataobject.DataObjectMetadata;
 import stargate.commons.dataobject.DataObjectURI;
 import stargate.commons.recipe.Recipe;
 import stargate.commons.recipe.RecipeChunk;
-import stargate.commons.utils.IPUtils;
 
 /**
  *
  * @author iychoi
  */
-public class HTTPChunkInputStream extends FSInputStream {
+public class ParallelHTTPChunkInputStream extends FSInputStream {
 
-    private static final Log LOG = LogFactory.getLog(HTTPChunkInputStream.class);
+    private static final Log LOG = LogFactory.getLog(ParallelHTTPChunkInputStream.class);
     
-    public static final String DEFAULT_NODE_NAME = "DEFAULT_NODE";
-    public static final String LOCAL_NODE_NAME = "LOCAL_NODE";
+    public static final String DEFAULT_NODE_NAME = "*";
+    public static final String LOCAL_NODE_NAME = "localhost";
+    public static final Integer PARALLEL_REQUESTS = 20;
+    public static final Integer PARALLEL_DOWNLOADS = 5;
     
     // node-name to client mapping
     private Map<String, HTTPUserInterfaceClient> clients = new HashMap<String, HTTPUserInterfaceClient>();
     private Recipe recipe;
     private long offset;
     private long size;
-    private ChunkData chunkData;
+    private SortedSet<ChunkData> chunkDataList = Collections.synchronizedSortedSet(new TreeSet<ChunkData>());
+    private SortedMap<Long, Future<ChunkData>> chunkRequests = Collections.synchronizedSortedMap(new TreeMap<Long, Future<ChunkData>>());
+    private ExecutorService executor = Executors.newFixedThreadPool(PARALLEL_DOWNLOADS);
     
-    public HTTPChunkInputStream(HTTPUserInterfaceClient client, Recipe recipe) {
+    public ParallelHTTPChunkInputStream(HTTPUserInterfaceClient client, Recipe recipe) {
         if(client == null) {
             throw new IllegalArgumentException("client is null");
         }
@@ -65,7 +77,7 @@ public class HTTPChunkInputStream extends FSInputStream {
         initialize(clients, recipe);
     }
     
-    public HTTPChunkInputStream(Map<String, HTTPUserInterfaceClient> clients, Recipe recipe) {
+    public ParallelHTTPChunkInputStream(Map<String, HTTPUserInterfaceClient> clients, Recipe recipe) {
         if(clients == null) {
             throw new IllegalArgumentException("clients is null");
         }
@@ -87,29 +99,9 @@ public class HTTPChunkInputStream extends FSInputStream {
         }
         
         this.clients.putAll(clients);
-        setLocalClient();
-        
         this.recipe = recipe;
         this.offset = 0;
         this.size = recipe.getMetadata().getSize();
-        this.chunkData = null;
-    }
-    
-    private void setLocalClient() {
-        if(!this.clients.containsKey(LOCAL_NODE_NAME)) {
-            Set<Map.Entry<String, HTTPUserInterfaceClient>> entrySet = this.clients.entrySet();
-            for(Map.Entry<String, HTTPUserInterfaceClient> entry : entrySet) {
-                HTTPUserInterfaceClient client = entry.getValue();
-                URI serviceURI = client.getServiceURI();
-                try {
-                    if(IPUtils.isLocalIPAddress(serviceURI.getHost())) {
-                        this.clients.put(LOCAL_NODE_NAME, client);
-                        break;
-                    }
-                } catch (IOException ex) {
-                }
-            }
-        }
     }
     
     @Override
@@ -119,13 +111,38 @@ public class HTTPChunkInputStream extends FSInputStream {
     
     @Override
     public synchronized int available() throws IOException {
-        if(this.chunkData != null &&
-                this.chunkData.getOffset() <= this.offset &&
-                (this.chunkData.getOffset() + this.chunkData.getSize()) > this.offset) {
-            // safe to reuse
-            return (int) (this.chunkData.getSize() - (this.offset - this.chunkData.getOffset()));
+        int available = 0;
+        boolean foundCurrent = false;
+        long nextOffset = -1;
+        Iterator<ChunkData> iterator = this.chunkDataList.iterator();
+        
+        while(iterator.hasNext()) {
+            ChunkData chunk = iterator.next();
+            if(chunk != null) {
+                // find current
+                long chunkOffset = chunk.getOffset();
+                long chunkSize = chunk.getSize();
+                
+                if(!foundCurrent) {
+                    if(chunkOffset <= this.offset &&
+                        (chunkOffset + chunkSize > this.offset)) {
+                        // safe to reuse
+                        available += (int) (chunkSize - (this.offset - chunkOffset));
+                        foundCurrent = true;
+                        nextOffset = chunkOffset + chunkSize;
+                    }
+                } else {
+                    // we already found current chunk
+                    if(chunkOffset == nextOffset) {
+                        available += (int) chunkSize;
+                        nextOffset = chunkOffset + chunkSize;
+                    } else {
+                        break;
+                    }
+                }
+            }
         }
-        return 0;
+        return available;
     }
     
     @Override
@@ -133,6 +150,8 @@ public class HTTPChunkInputStream extends FSInputStream {
         if(l < 0) {
             throw new IOException("cannot seek to negative offset : " + l);
         }
+        
+        deleteOldChunkData(l);
         
         if(l >= this.size) {
             this.offset = this.size;
@@ -146,6 +165,8 @@ public class HTTPChunkInputStream extends FSInputStream {
         if(l <= 0) {
             return 0;
         }
+        
+        deleteOldChunkData(l);
         
         if(this.offset >= this.size) {
             return 0;
@@ -166,20 +187,53 @@ public class HTTPChunkInputStream extends FSInputStream {
         return false;
     }
     
-    private synchronized void loadChunkData(long offset) throws IOException {
-        if(this.chunkData != null &&
-                this.chunkData.getOffset() <= offset &&
-                (this.chunkData.getOffset() + this.chunkData.getSize()) > offset) {
-            // safe to reuse
-            return;
+    private synchronized void deleteOldChunkData(long offset) throws IOException {
+        Iterator<ChunkData> iterator = this.chunkDataList.iterator();
+        
+        while(iterator.hasNext()) {
+            ChunkData chunk = iterator.next();
+            if(chunk != null) {
+                // find current
+                long chunkOffset = chunk.getOffset();
+                long chunkSize = chunk.getSize();
+                
+                if((chunkOffset + chunkSize) <= offset) {
+                    //past chunks
+                    iterator.remove();
+                } else {
+                    break;
+                }
+            }
         }
-        
-        this.chunkData = null;
-        
+    }
+    
+    private synchronized ChunkData findChunkData(long offset) throws IOException {
+        Iterator<ChunkData> iterator = this.chunkDataList.iterator();
+        while(iterator.hasNext()) {
+            ChunkData chunk = iterator.next();
+            if(chunk != null) {
+                // find
+                long chunkOffset = chunk.getOffset();
+                long chunkSize = chunk.getSize();
+                
+                if(chunkOffset <= offset &&
+                    (chunkOffset + chunkSize > offset)) {
+                    // found
+                    return chunk;
+                } else if(chunkOffset > offset) {
+                    break;
+                }
+            }
+        }
+        return null;
+    }
+    
+    private ChunkData downloadChunkData(long offset) throws IOException {
         if(offset >= this.size) {
-            return;
+            return null;
         }
         
+        // load
         RecipeChunk chunk = this.recipe.getChunk(offset);
         if(chunk == null) {
             throw new IOException(String.format("cannot find chunk for offset %d", offset));
@@ -189,7 +243,7 @@ public class HTTPChunkInputStream extends FSInputStream {
         DataObjectURI uri = metadata.getURI();
         
         Collection<Integer> nodeIDs = chunk.getNodeIDs();
-        Collection<String> nodeNames = this.recipe.getNodeNames(nodeIDs);
+        Collection<String> nodeNames = recipe.getNodeNames(nodeIDs);
         
         HTTPUserInterfaceClient localClient = this.clients.get(LOCAL_NODE_NAME);
         HTTPUserInterfaceClient client = null;
@@ -236,8 +290,71 @@ public class HTTPChunkInputStream extends FSInputStream {
         }
         
         InputStream dataChunkIS = client.getRemoteDataChunk(uri.getClusterName(), chunk.getHashString());
-        this.chunkData = new ChunkData(IOUtils.toByteArray(dataChunkIS), chunk.getOffset(), chunk.getLength());
+        ChunkData newChunkData = new ChunkData(IOUtils.toByteArray(dataChunkIS), chunk.getOffset(), chunk.getLength());
         dataChunkIS.close();
+        return newChunkData;
+    }
+    
+    private synchronized void requestDownload(long offset) throws IOException {
+        if(!this.chunkRequests.containsKey(offset)) {
+            Future<ChunkData> future = (Future) this.executor.submit(new Callable<ChunkData>(){
+                @Override
+                public ChunkData call() throws IOException {
+                    ChunkData chunkData = downloadChunkData(offset);
+                    return chunkData;
+                }
+            });
+            this.chunkRequests.put(offset, future);
+        }
+    }
+    
+    private synchronized void loadChunkData(long offset) throws IOException {
+        if(offset >= this.size) {
+            return;
+        }
+        
+        // check if there already is
+        ChunkData chunkData = findChunkData(offset);
+        if(chunkData != null) {
+            // we found
+            return;
+        }
+        
+        RecipeChunk chunk = this.recipe.getChunk(offset);
+        if(chunk == null) {
+            throw new IOException(String.format("cannot find chunk for offset %d", offset));
+        }
+        
+        long chunkOffset = chunk.getOffset();
+        long chunkSize = chunk.getLength();
+        
+        // make a new requst
+        long requestChunkOffset = chunkOffset;
+        long requestChunkSize = chunkSize;
+        for(int i=0;i<PARALLEL_REQUESTS;i++) {
+            ChunkData requestChunkData = findChunkData(requestChunkOffset);
+            if(requestChunkData == null) {
+                requestDownload(requestChunkOffset);
+                requestChunkOffset += requestChunkSize;
+
+                if(requestChunkOffset >= this.size) {
+                    break;
+                }
+                
+                RecipeChunk requestChunk = this.recipe.getChunk(requestChunkOffset);
+                requestChunkOffset = requestChunk.getOffset();
+                requestChunkSize = requestChunk.getLength();
+            }
+        }
+        
+        Future<ChunkData> future = this.chunkRequests.get(chunkOffset);
+        try {
+            // block until it completes
+            chunkData = future.get();
+            this.chunkDataList.add(chunkData);
+        } catch (Exception ex) {
+            throw new IOException(ex);
+        }
     }
     
     private synchronized boolean isEOF() {
@@ -254,12 +371,15 @@ public class HTTPChunkInputStream extends FSInputStream {
         }
         
         loadChunkData(this.offset);
+        ChunkData chunkData = findChunkData(this.offset);
         
-        int bufferOffset = (int) (this.offset - this.chunkData.getOffset());
-        byte[] data = this.chunkData.getData();
+        int bufferOffset = (int) (this.offset - chunkData.getOffset());
+        byte[] data = chunkData.getData();
         byte ch = data[bufferOffset];
         
         this.offset++;
+        
+        deleteOldChunkData(this.offset);
         return ch;
     }
     
@@ -280,14 +400,18 @@ public class HTTPChunkInputStream extends FSInputStream {
         int outputBufferOffset = off;
         while(remain > 0) {
             loadChunkData(this.offset);
-
-            int bufferOffset = (int) (this.offset - this.chunkData.getOffset());
-            int bufferLength = (int) Math.min(this.chunkData.getSize() - bufferOffset, remain);
             
-            System.arraycopy(this.chunkData.getData(), bufferOffset, bytes, outputBufferOffset, bufferLength);
+            ChunkData chunkData = findChunkData(this.offset);
+
+            int bufferOffset = (int) (this.offset - chunkData.getOffset());
+            int bufferLength = (int) Math.min(chunkData.getSize() - bufferOffset, remain);
+            
+            System.arraycopy(chunkData.getData(), bufferOffset, bytes, outputBufferOffset, bufferLength);
             this.offset += bufferLength;
             outputBufferOffset += bufferLength;
             remain -= bufferLength;
+            
+            deleteOldChunkData(this.offset);
         }
         return copied;
     }
@@ -302,7 +426,8 @@ public class HTTPChunkInputStream extends FSInputStream {
         this.recipe = null;
         this.offset = 0;
         this.size = 0;
-        this.chunkData = null;
+        this.chunkDataList.clear();
+        this.chunkRequests.clear();
     }
     
     @Override

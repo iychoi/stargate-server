@@ -9,6 +9,7 @@ work() {
     scp -r ${RELDIR}/${RELEASE_ARCHIVE_FILENAME} ${node}:${ROOT_DIR}/
     ssh ${node} "rm -rf ${ROOT_DIR}/${RELEASE_NAME}" < /dev/null
     ssh ${node} "tar zxvf ${ROOT_DIR}/${RELEASE_ARCHIVE_FILENAME}" < /dev/null
+    echo "Done ${node}"
 }
 
 while read node; do

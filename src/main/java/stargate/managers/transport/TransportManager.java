@@ -415,7 +415,7 @@ public class TransportManager extends AbstractManager<AbstractTransportDriver> {
         }
     }
 
-    public boolean schedulePrefetch(DataObjectURI uri, String hash) {
+    public Node schedulePrefetch(DataObjectURI uri, String hash) {
         //TODO: implement this
         throw new UnsupportedOperationException("Not supported yet."); //To change body of generated methods, choose Tools | Templates.
     }

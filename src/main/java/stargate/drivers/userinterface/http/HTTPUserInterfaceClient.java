@@ -94,30 +94,6 @@ public class HTTPUserInterfaceClient extends AbstractUserInterfaceClient {
         return PathUtils.concatPath(api_path, path2);
     }
     
-    private String makeGetMetadataPath(DataObjectURI uri) {
-        String path = PathUtils.concatPath(uri.getClusterName(), uri.getPath());
-        return PathUtils.concatPath(HTTPUserInterfaceRestfulConstants.GET_METADATA_PATH, path);
-    }
-    
-    private String makeListMetadataPath(DataObjectURI uri) {
-        String path = PathUtils.concatPath(uri.getClusterName(), uri.getPath());
-        return PathUtils.concatPath(HTTPUserInterfaceRestfulConstants.LIST_METADATAS_PATH, path);
-    }
-    
-    private String makeGetRecipePath(DataObjectURI uri) {
-        String path = PathUtils.concatPath(uri.getClusterName(), uri.getPath());
-        return PathUtils.concatPath(HTTPUserInterfaceRestfulConstants.GET_RECIPE_PATH, path);
-    }
-    
-    private String makeGetDataChunkPath(String hash) {
-        return PathUtils.concatPath(HTTPUserInterfaceRestfulConstants.GET_DATA_CHUNK_PATH, hash);
-    }
-    
-    private String makeGetDataChunkPath(String clusterName, String hash) {
-        String path = PathUtils.concatPath(clusterName, hash);
-        return PathUtils.concatPath(HTTPUserInterfaceRestfulConstants.GET_DATA_CHUNK_PATH, path);
-    }
-    
     @Override
     public URI getServiceURI() {
         return this.serviceUri;
@@ -344,8 +320,9 @@ public class HTTPUserInterfaceClient extends AbstractUserInterfaceClient {
             throw new IllegalArgumentException("uri is null");
         }
         
-        // URL pattern = http://xxx.xxx.xxx.xxx/metadata/path/to/resource
-        String url = makeGetMetadataPath(uri);
+        // URL pattern = http://xxx.xxx.xxx.xxx/api/metadata/path/to/resource
+        String path = PathUtils.concatPath(uri.getClusterName(), uri.getPath());
+        String url = makeAPIPath(HTTPUserInterfaceRestfulConstants.API_GET_METADATA_PATH, path);
         DataObjectMetadata metadata = (DataObjectMetadata) this.restfulClient.get(url);
 
         updateLastActivetime();
@@ -362,8 +339,9 @@ public class HTTPUserInterfaceClient extends AbstractUserInterfaceClient {
             throw new IllegalArgumentException("uri is null");
         }
         
-        // URL pattern = http://xxx.xxx.xxx.xxx/lmetadata/path/to/resource
-        String url = makeListMetadataPath(uri);
+        // URL pattern = http://xxx.xxx.xxx.xxx/api/lmetadata/path/to/resource
+        String path = PathUtils.concatPath(uri.getClusterName(), uri.getPath());
+        String url = makeAPIPath(HTTPUserInterfaceRestfulConstants.API_LIST_METADATA_PATH, path);
         DataObjectMetadata[] metadataList = (DataObjectMetadata[]) this.restfulClient.get(url);
 
         updateLastActivetime();
@@ -380,8 +358,9 @@ public class HTTPUserInterfaceClient extends AbstractUserInterfaceClient {
             throw new IllegalArgumentException("uri is null");
         }
         
-        // URL pattern = http://xxx.xxx.xxx.xxx/recipe/path/to/resource
-        String url = makeGetRecipePath(uri);
+        // URL pattern = http://xxx.xxx.xxx.xxx/api/recipe/path/to/resource
+        String path = PathUtils.concatPath(uri.getClusterName(), uri.getPath());
+        String url = makeAPIPath(HTTPUserInterfaceRestfulConstants.API_GET_RECIPE_PATH, path);
         Recipe recipe = (Recipe) this.restfulClient.get(url);
 
         updateLastActivetime();
@@ -442,8 +421,8 @@ public class HTTPUserInterfaceClient extends AbstractUserInterfaceClient {
             throw new IllegalArgumentException("hash is null or empty");
         }
         
-        // URL pattern = http://xxx.xxx.xxx.xxx/data/hash
-        String url = makeGetDataChunkPath(hash);
+        // URL pattern = http://xxx.xxx.xxx.xxx/api/data/hash
+        String url = makeAPIPath(HTTPUserInterfaceRestfulConstants.API_GET_DATA_CHUNK_PATH, hash);
         InputStream is = this.restfulClient.download(url);
 
         updateLastActivetime();
@@ -451,7 +430,7 @@ public class HTTPUserInterfaceClient extends AbstractUserInterfaceClient {
     }
     
     @Override
-    public InputStream getDataChunk(String clusterName, String hash) throws IOException {
+    public InputStream getRemoteDataChunk(String clusterName, String hash) throws IOException {
         if(!this.connected) {
             throw new IOException("Client is not connected");
         }
@@ -464,8 +443,9 @@ public class HTTPUserInterfaceClient extends AbstractUserInterfaceClient {
             throw new IllegalArgumentException("hash is null or empty");
         }
         
-        // URL pattern = http://xxx.xxx.xxx.xxx/data/clusterName/hash
-        String url = makeGetDataChunkPath(clusterName, hash);
+        // URL pattern = http://xxx.xxx.xxx.xxx/api/rdata/clusterName/hash
+        String path = PathUtils.concatPath(clusterName, hash);
+        String url = makeAPIPath(HTTPUserInterfaceRestfulConstants.API_GET_REMOTE_DATA_CHUNK_PATH, path);
         InputStream is = this.restfulClient.download(url);
 
         updateLastActivetime();
@@ -473,7 +453,7 @@ public class HTTPUserInterfaceClient extends AbstractUserInterfaceClient {
     }
 
     @Override
-    public boolean schedulePrefetch(DataObjectURI uri, String hash) throws IOException {
+    public String schedulePrefetch(DataObjectURI uri, String hash) throws IOException {
         if(!this.connected) {
             throw new IOException("Client is not connected");
         }
@@ -486,12 +466,33 @@ public class HTTPUserInterfaceClient extends AbstractUserInterfaceClient {
             throw new IllegalArgumentException("hash is null or empty");
         }
         
-        // URL pattern = http://xxx.xxx.xxx.xxx/api/prefetch/hash
-        String url = makeAPIPath(HTTPUserInterfaceRestfulConstants.API_SCHEDULE_PREFETCH_PATH, uri.getPath() + "/" + hash);
-        Boolean result = (Boolean) this.restfulClient.get(url);
+        // URL pattern = http://xxx.xxx.xxx.xxx/api/prefetch/path/hash
+        String path = PathUtils.concatPath(uri.getClusterName(), uri.getPath());
+        String pathHash = PathUtils.concatPath(path, hash);
+        String url = makeAPIPath(HTTPUserInterfaceRestfulConstants.API_SCHEDULE_PREFETCH_PATH, pathHash);
+        String assignedNodeName = (String) this.restfulClient.post(url, null);
 
         updateLastActivetime();
-        return result;
+        return assignedNodeName;
+    }
+    
+    @Override
+    public Recipe getRemoteRecipeWithTransferSchedule(DataObjectURI uri) throws IOException {
+        if(!this.connected) {
+            throw new IOException("Client is not connected");
+        }
+        
+        if(uri == null) {
+            throw new IllegalArgumentException("uri is null");
+        }
+        
+        // URL pattern = http://xxx.xxx.xxx.xxx/api/rrecipewts/path/to/file
+        String path = PathUtils.concatPath(uri.getClusterName(), uri.getPath());
+        String url = makeAPIPath(HTTPUserInterfaceRestfulConstants.API_GET_REMOTE_RECIPE_WITH_TRANSFER_SCHEDULE_PATH, path);
+        Recipe recipe = (Recipe) this.restfulClient.post(url, null);
+
+        updateLastActivetime();
+        return recipe;
     }
 
     @Override

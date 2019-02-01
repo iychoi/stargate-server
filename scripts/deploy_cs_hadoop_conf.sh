@@ -10,6 +10,7 @@ INPUT=service_config*.json
 work() {
     local node=$1
     scp ${INPUT} ${node}:${ROOT_DIR}/${RELEASE_NAME}/bin/
+    echo "Done ${node}"
 }
 
 while read node; do

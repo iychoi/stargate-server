@@ -7,6 +7,7 @@ ROOT_DIR=~
 work() {
     local node=$1
     scp ${RELLIBDIR}/stargate* ${node}:${ROOT_DIR}/${RELEASE_NAME}/libs
+    echo "Done ${node}"
 }
 
 while read node; do

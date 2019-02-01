@@ -27,6 +27,7 @@ import java.util.Map;
 import org.apache.commons.logging.Log;
 import org.apache.commons.logging.LogFactory;
 import stargate.commons.cluster.Cluster;
+import stargate.commons.cluster.Node;
 import stargate.commons.dataobject.DataObjectMetadata;
 import stargate.commons.dataobject.DataObjectURI;
 import stargate.commons.dataobject.Directory;
@@ -431,6 +432,45 @@ public class VolumeManager extends AbstractManager<NullDriver> {
         } else {
             // remote
             return getRemoteRecipe(absPath);
+        }
+    }
+    
+    public Recipe getRemoteRecipeWithTransferSchedule(DataObjectURI uri) throws IOException, FileNotFoundException {
+        if(uri == null) {
+            throw new IllegalArgumentException("uri is null");
+        }
+        
+        DataObjectURI absPath = makeAbsolutePath(uri);
+        if(isLocalDataObject(absPath)) {
+            // local
+            return getLocalRecipe(absPath);
+        } else {
+            // remote
+            try {
+                StargateService stargateService = getStargateService();
+                TransportManager transportManager = stargateService.getTransportManager();
+                ClusterManager clusterManager = stargateService.getClusterManager();
+                
+                Recipe remoteRecipe = getRemoteRecipe(absPath);
+                Recipe newRecipe = new Recipe(remoteRecipe.getMetadata(), remoteRecipe.getHashAlgorithm(), remoteRecipe.getChunkSize(), clusterManager.getLocalCluster().getNodeNames());
+                
+                Collection<RecipeChunk> recipeChunks = remoteRecipe.getChunks();
+                for(RecipeChunk chunk : recipeChunks) {
+                    Node assignedNode = transportManager.schedulePrefetch(uri, chunk.getHashString());
+                    String assignedNodeName = assignedNode.getName();
+                    int assignedNodeID = newRecipe.getNodeID(assignedNodeName);
+                    
+                    RecipeChunk newChunk = new RecipeChunk(chunk.getOffset(), chunk.getLength(), chunk.getHash());
+                    newChunk.addNodeID(assignedNodeID);
+                    
+                    newRecipe.addChunk(newChunk);
+                }
+                
+                return newRecipe;
+            } catch (ManagerNotInstantiatedException ex) {
+                LOG.error(ex);
+                throw new IOException(ex);
+            }
         }
     }
     

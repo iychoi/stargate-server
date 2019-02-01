@@ -489,7 +489,7 @@ public class HTTPUserInterfaceServlet extends AbstractUserInterfaceServer {
     }
     
     @GET
-    @Path(HTTPUserInterfaceRestfulConstants.GET_METADATA_PATH + "/{path:.*}")
+    @Path(HTTPUserInterfaceRestfulConstants.API_PATH + "/" + HTTPUserInterfaceRestfulConstants.API_GET_METADATA_PATH + "/{path:.*}")
     @Produces(MediaType.APPLICATION_JSON)
     public Response getDataObjectMetadataRestful(
         @DefaultValue("") @PathParam("path") String path) throws IOException {
@@ -535,7 +535,7 @@ public class HTTPUserInterfaceServlet extends AbstractUserInterfaceServer {
     }
     
     @GET
-    @Path(HTTPUserInterfaceRestfulConstants.LIST_METADATAS_PATH + "/{path:.*}")
+    @Path(HTTPUserInterfaceRestfulConstants.API_PATH + "/" + HTTPUserInterfaceRestfulConstants.API_LIST_METADATA_PATH + "/{path:.*}")
     @Produces(MediaType.APPLICATION_JSON)
     public Response listDataObjectMetadataRestful(
             @DefaultValue("") @PathParam("path") String path) throws IOException {
@@ -579,7 +579,7 @@ public class HTTPUserInterfaceServlet extends AbstractUserInterfaceServer {
     }
     
     @GET
-    @Path(HTTPUserInterfaceRestfulConstants.GET_RECIPE_PATH + "/{path:.*}")
+    @Path(HTTPUserInterfaceRestfulConstants.API_PATH + "/" + HTTPUserInterfaceRestfulConstants.API_GET_RECIPE_PATH + "/{path:.*}")
     @Produces(MediaType.APPLICATION_JSON)
     public Response getRecipeRestful(
         @DefaultValue("") @PathParam("path") String path) throws IOException {
@@ -702,7 +702,7 @@ public class HTTPUserInterfaceServlet extends AbstractUserInterfaceServer {
     }
     
     @GET
-    @Path(HTTPUserInterfaceRestfulConstants.GET_DATA_CHUNK_PATH + "/{hash:\\w*}")
+    @Path(HTTPUserInterfaceRestfulConstants.API_PATH + "/" + HTTPUserInterfaceRestfulConstants.API_GET_DATA_CHUNK_PATH + "/{hash:.*}")
     @Produces(MediaType.APPLICATION_OCTET_STREAM)
     public Response getDataChunkRestful(
             @DefaultValue("") @PathParam("hash") String hash) throws Exception {
@@ -725,13 +725,13 @@ public class HTTPUserInterfaceServlet extends AbstractUserInterfaceServer {
     
     @Override
     public InputStream getDataChunk(String hash) throws IOException {
-        return getDataChunk(DataObjectURI.WILDCARD_LOCAL_CLUSTER_NAME, hash);
+        return getRemoteDataChunk(DataObjectURI.WILDCARD_LOCAL_CLUSTER_NAME, hash);
     }
     
     @GET
-    @Path(HTTPUserInterfaceRestfulConstants.GET_DATA_CHUNK_PATH + "/{cluster:.*}/{hash:\\w+}")
+    @Path(HTTPUserInterfaceRestfulConstants.API_PATH + "/" + HTTPUserInterfaceRestfulConstants.API_GET_REMOTE_DATA_CHUNK_PATH + "/{cluster:.*}/{hash:.+}")
     @Produces(MediaType.APPLICATION_OCTET_STREAM)
-    public Response getDataChunkRestful(
+    public Response getRemoteDataChunkRestful(
             @DefaultValue("") @PathParam("cluster") String cluster,
             @DefaultValue("") @PathParam("hash") String hash) throws Exception {
         if(cluster == null || cluster.isEmpty()) {
@@ -743,7 +743,7 @@ public class HTTPUserInterfaceServlet extends AbstractUserInterfaceServer {
         }
         
         try {
-            final InputStream is = getDataChunk(cluster, hash);
+            final InputStream is = getRemoteDataChunk(cluster, hash);
             if(is == null) {
                 return Response.status(Response.Status.NOT_FOUND).build();
             }
@@ -756,7 +756,7 @@ public class HTTPUserInterfaceServlet extends AbstractUserInterfaceServer {
     }
 
     @Override
-    public InputStream getDataChunk(String clusterName, String hash) throws IOException {
+    public InputStream getRemoteDataChunk(String clusterName, String hash) throws IOException {
         if(clusterName == null || clusterName.isEmpty()) {
             throw new IllegalArgumentException("clusterName is null or empty");
         }
@@ -775,7 +775,7 @@ public class HTTPUserInterfaceServlet extends AbstractUserInterfaceServer {
         }
     }
     
-    @GET
+    @POST
     @Path(HTTPUserInterfaceRestfulConstants.API_PATH + "/" + HTTPUserInterfaceRestfulConstants.API_SCHEDULE_PREFETCH_PATH + "/{path:.*}/{hash:.*}")
     @Produces(MediaType.APPLICATION_JSON)
     public Response schedulePrefetchRestful(
@@ -790,9 +790,9 @@ public class HTTPUserInterfaceServlet extends AbstractUserInterfaceServer {
         }
         
         try {
-            DataObjectURI objectUri = new DataObjectURI("", PathUtils.concatPath("/", path));
-            boolean prefetch = schedulePrefetch(objectUri, hash);
-            RestfulResponse rres = new RestfulResponse(prefetch);
+            DataObjectURI objectUri = new DataObjectURI(PathUtils.concatPath("/", path));
+            String assignedNodeName = schedulePrefetch(objectUri, hash);
+            RestfulResponse rres = new RestfulResponse(assignedNodeName);
             return Response.status(Response.Status.OK).entity(rres).build();
         } catch(Exception ex) {
             RestfulResponse rres = new RestfulResponse(ex);
@@ -801,7 +801,7 @@ public class HTTPUserInterfaceServlet extends AbstractUserInterfaceServer {
     }
     
     @Override
-    public boolean schedulePrefetch(DataObjectURI uri, String hash) throws IOException {
+    public String schedulePrefetch(DataObjectURI uri, String hash) throws IOException {
         if(uri == null) {
             throw new IllegalArgumentException("uri is null");
         }
@@ -813,7 +813,44 @@ public class HTTPUserInterfaceServlet extends AbstractUserInterfaceServer {
         try {
             StargateService service = getStargateService();
             TransportManager transportManager = service.getTransportManager();
-            return transportManager.schedulePrefetch(uri, hash);
+            Node assignedNode = transportManager.schedulePrefetch(uri, hash);
+            return assignedNode.getName();
+        } catch (ManagerNotInstantiatedException ex) {
+            LOG.error(ex);
+            throw new IOException(ex);
+        }
+    }
+    
+    @POST
+    @Path(HTTPUserInterfaceRestfulConstants.API_PATH + "/" + HTTPUserInterfaceRestfulConstants.API_GET_REMOTE_RECIPE_WITH_TRANSFER_SCHEDULE_PATH + "/{path:.*}")
+    @Produces(MediaType.APPLICATION_JSON)
+    public Response getRemoteRecipeWithTransferScheduleRestful(
+        @DefaultValue("") @PathParam("path") String path) throws IOException {
+        if(path == null || path.isEmpty()) {
+            throw new IllegalArgumentException("path is null or empty");
+        }
+        
+        try {
+            DataObjectURI objectUri = new DataObjectURI(PathUtils.concatPath("/", path));
+            Recipe recipe = getRemoteRecipeWithTransferSchedule(objectUri);
+            RestfulResponse rres = new RestfulResponse(recipe);
+            return Response.status(Response.Status.OK).entity(rres).build();
+        } catch(Exception ex) {
+            RestfulResponse rres = new RestfulResponse(ex);
+            return Response.status(Response.Status.INTERNAL_SERVER_ERROR).entity(rres).build();
+        }
+    }
+    
+    @Override
+    public Recipe getRemoteRecipeWithTransferSchedule(DataObjectURI uri) throws IOException {
+        if(uri == null) {
+            throw new IllegalArgumentException("uri is null");
+        }
+        
+        try {
+            StargateService service = getStargateService();
+            VolumeManager volumeManager = service.getVolumeManager();
+            return volumeManager.getRemoteRecipeWithTransferSchedule(uri);
         } catch (ManagerNotInstantiatedException ex) {
             LOG.error(ex);
             throw new IOException(ex);
