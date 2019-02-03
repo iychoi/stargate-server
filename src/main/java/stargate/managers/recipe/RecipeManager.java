@@ -551,14 +551,6 @@ public class RecipeManager extends AbstractManager<AbstractRecipeDriver> {
         }
     }
     
-    public synchronized long getLastUpdateTime() {
-        return this.lastUpdateTime;
-    }
-    
-    public synchronized void setLastUpdateTime(long time) {
-        this.lastUpdateTime = time;
-    }
-    
     public Recipe createRecipe(DataExportEntry entry) throws IOException {
         LOG.info(String.format("createRecipe - %s", entry.getStargatePath()));
         //return createRecipeLocal(entry);
@@ -751,7 +743,6 @@ public class RecipeManager extends AbstractManager<AbstractRecipeDriver> {
             
             //// now launch tasks
             ScheduleManager scheduleManager = stargateService.getScheduleManager();
-            AbstractScheduleDriver scheduleDriver = scheduleManager.getDriver();
             
             Iterator<String> nodeNameIterator = nodeNames.iterator();
             int nodeId = 0;
@@ -765,7 +756,7 @@ public class RecipeManager extends AbstractManager<AbstractRecipeDriver> {
                     nodeNameList.add(nodeName);
 
                     RecipeChunkGenerateTask recipeChunkGenerateTask = new RecipeChunkGenerateTask(nodeNameList, nodeTasks[nodeId]);
-                    scheduleDriver.scheduleTask(recipeChunkGenerateTask);
+                    scheduleManager.scheduleTask(recipeChunkGenerateTask);
 
                     recipeChunkGenerateTasks.add(recipeChunkGenerateTask);
                 }
@@ -826,5 +817,13 @@ public class RecipeManager extends AbstractManager<AbstractRecipeDriver> {
             LOG.error(ex);
             throw new IOException(ex);
         }
+    }
+    
+    public synchronized long getLastUpdateTime() {
+        return this.lastUpdateTime;
+    }
+    
+    public synchronized void setLastUpdateTime(long time) {
+        this.lastUpdateTime = time;
     }
 }

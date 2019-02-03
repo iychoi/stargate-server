@@ -22,9 +22,6 @@ import java.util.Collections;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
-import java.util.concurrent.BlockingQueue;
-import java.util.concurrent.LinkedBlockingDeque;
-import java.util.concurrent.TimeUnit;
 import org.apache.commons.logging.Log;
 import org.apache.commons.logging.LogFactory;
 import stargate.commons.datasource.DataExportEntry;
@@ -35,6 +32,10 @@ import stargate.commons.manager.AbstractManager;
 import stargate.commons.manager.ManagerNotInstantiatedException;
 import stargate.commons.utils.DateTimeUtils;
 import stargate.managers.datastore.DataStoreManager;
+import stargate.managers.event.AbstractStargateEventHandler;
+import stargate.managers.event.EventManager;
+import stargate.managers.event.StargateEvent;
+import stargate.managers.event.StargateEventType;
 import stargate.service.StargateService;
 
 /**
@@ -49,9 +50,6 @@ public class DataExportManager extends AbstractManager<NullDriver> {
     
     private AbstractKeyValueStore dataExportEntryStore;
     private List<AbstractDataExportEventHandler> dataExportEventHandlers = new ArrayList<AbstractDataExportEventHandler>();
-    private BlockingQueue<DataExportEvent> dataExportEventQueue = new LinkedBlockingDeque<DataExportEvent>(1000);
-    private Thread eventDispatchThread;
-    private boolean dispatchEvent = true;
     protected long lastUpdateTime;
     
     private static final String DATA_EXPORT_STORE = "dexport";
@@ -90,43 +88,32 @@ public class DataExportManager extends AbstractManager<NullDriver> {
     public synchronized void start() throws IOException {
         super.start();
         
-        runEventDispatchThread();
+        setEventHandler();
     }
     
     @Override
     public synchronized void stop() throws IOException {
-        this.dispatchEvent = false;
-        this.dataExportEventQueue.clear();
-        if(this.eventDispatchThread != null) {
-            if(this.eventDispatchThread.isAlive()) {
-                this.eventDispatchThread.interrupt();
-            }
-            this.eventDispatchThread = null;
-        }
-        
         this.dataExportEventHandlers.clear();
         
         super.stop();
     }
     
-    private void runEventDispatchThread() {
-        this.dispatchEvent = true;
-        this.eventDispatchThread = new Thread(new Runnable() {
+    private void setEventHandler() {
+        AbstractStargateEventHandler hander = new AbstractStargateEventHandler() {
             @Override
-            public void run() {
-                try {
-                    while(dispatchEvent) {
-                        DataExportEvent event = dataExportEventQueue.poll(1, TimeUnit.SECONDS);
-                        if(event != null) {
-                            processDataExportEntryEvent(event);
-                        }
-                    }
-                } catch (Exception ex) {
-                    LOG.error(ex);
+            public boolean accept(StargateEventType eventType) {
+                if(eventType == StargateEventType.STARGATE_EVENT_TYPE_DATAEXPORT) {
+                    return true;
                 }
+                return false;
             }
-        });
-        this.eventDispatchThread.start();
+
+            @Override
+            public void raised(EventManager manager, StargateEvent event) {
+                DataExportEvent evt = (DataExportEvent) event.getValue();
+                processDataExportEntryEvent(evt);
+            }
+        };
     }
     
     private synchronized void safeInitDataExportEntryStore() throws IOException {
@@ -334,29 +321,63 @@ public class DataExportManager extends AbstractManager<NullDriver> {
     }
     
     public synchronized void addDataExportEventHandler(AbstractDataExportEventHandler eventHandler) {
+        if(eventHandler == null) {
+            throw new IllegalArgumentException("eventHandler is null");
+        }
+        
         this.dataExportEventHandlers.add(eventHandler);
     }
     
     public synchronized void removeDataExportEventHandler(AbstractDataExportEventHandler eventHandler) {
+        if(eventHandler == null) {
+            throw new IllegalArgumentException("eventHandler is null");
+        }
+        
         this.dataExportEventHandlers.remove(eventHandler);
     }
 
     private void raiseEventForDataExportEntryAdded(DataExportEntry entry) throws InterruptedException {
-        DataExportEvent event = new DataExportEvent(DataExportEventType.DATAEXPORT_EVENT_TYPE_ADD, entry);
-        this.dataExportEventQueue.put(event);
+        DataExportEvent dataExportEntry = new DataExportEvent(DataExportEventType.DATAEXPORT_EVENT_TYPE_ADD, entry);
+        
+        try {
+            StargateService stargateService = getStargateService();
+            EventManager eventManager = stargateService.getEventManager();
+            
+            StargateEvent event = new StargateEvent(StargateEventType.STARGATE_EVENT_TYPE_DATAEXPORT, dataExportEntry);
+            eventManager.raiseStargateEvent(event);
+        } catch (ManagerNotInstantiatedException ex) {
+            LOG.error(ex);
+        }
     }
     
-    private synchronized void raiseEventForDataExportEntryRemoved(DataExportEntry entry) throws InterruptedException {
-        DataExportEvent event = new DataExportEvent(DataExportEventType.DATAEXPORT_EVENT_TYPE_REMOVE, entry);
-        this.dataExportEventQueue.put(event);
+    private void raiseEventForDataExportEntryRemoved(DataExportEntry entry) throws InterruptedException {
+        DataExportEvent dataExportEntry = new DataExportEvent(DataExportEventType.DATAEXPORT_EVENT_TYPE_REMOVE, entry);
+        
+        try {
+            StargateService stargateService = getStargateService();
+            EventManager eventManager = stargateService.getEventManager();
+            
+            StargateEvent event = new StargateEvent(StargateEventType.STARGATE_EVENT_TYPE_DATAEXPORT, dataExportEntry);
+            eventManager.raiseStargateEvent(event);
+        } catch (ManagerNotInstantiatedException ex) {
+            LOG.error(ex);
+        }
     }
     
-    private synchronized void raiseEventForDataExportEntryUpdated(DataExportEntry entry)  throws InterruptedException {
-        DataExportEvent event = new DataExportEvent(DataExportEventType.DATAEXPORT_EVENT_TYPE_UPDATE, entry);
-        this.dataExportEventQueue.put(event);
+    private void raiseEventForDataExportEntryUpdated(DataExportEntry entry) throws InterruptedException {
+        DataExportEvent dataExportEntry = new DataExportEvent(DataExportEventType.DATAEXPORT_EVENT_TYPE_UPDATE, entry);
+        try {
+            StargateService stargateService = getStargateService();
+            EventManager eventManager = stargateService.getEventManager();
+            
+            StargateEvent event = new StargateEvent(StargateEventType.STARGATE_EVENT_TYPE_DATAEXPORT, dataExportEntry);
+            eventManager.raiseStargateEvent(event);
+        } catch (ManagerNotInstantiatedException ex) {
+            LOG.error(ex);
+        }
     }
     
-    private void processDataExportEntryEvent(DataExportEvent event) throws IOException {
+    private void processDataExportEntryEvent(DataExportEvent event) {
         DataExportEntry entry = event.getEntry();
         switch(event.getEventType()) {
             case DATAEXPORT_EVENT_TYPE_ADD:
@@ -378,7 +399,8 @@ public class DataExportManager extends AbstractManager<NullDriver> {
                 }
                 break;
             default:
-                throw new IOException(String.format("cannot handle %s", event.getEventType().name()));
+                LOG.error(String.format("cannot handle %s", event.getEventType().name()));
+                break;
         }
     }
     

@@ -25,7 +25,7 @@ import org.apache.commons.logging.Log;
 import org.apache.commons.logging.LogFactory;
 import stargate.commons.manager.ManagerNotInstantiatedException;
 import stargate.commons.recipe.RecipeChunk;
-import stargate.commons.schedule.Task;
+import stargate.commons.schedule.DistributedTask;
 import stargate.commons.service.ServiceNotStartedException;
 import stargate.service.StargateService;
 
@@ -33,7 +33,7 @@ import stargate.service.StargateService;
  *
  * @author iychoi
  */
-public class RecipeChunkGenerateTask extends Task {
+public class RecipeChunkGenerateTask extends DistributedTask {
     
     private static final Log LOG = LogFactory.getLog(RecipeChunkGenerateTask.class);
     

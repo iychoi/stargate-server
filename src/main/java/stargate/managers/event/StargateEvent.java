@@ -13,16 +13,27 @@
    See the License for the specific language governing permissions and
    limitations under the License.
 */
-package stargate.managers.cluster;
-
-import stargate.commons.cluster.Cluster;
+package stargate.managers.event;
 
 /**
  *
  * @author iychoi
  */
-public abstract class AbstractClusterEventHandler {
-    public abstract void added(Cluster cluster);
-    public abstract void removed(Cluster cluster);
-    public abstract void updated(Cluster cluster);
+public class StargateEvent {
+    
+    private StargateEventType eventType;
+    private Object value;
+    
+    public StargateEvent(StargateEventType eventType, Object value) {
+        this.eventType = eventType;
+        this.value = value;
+    }
+    
+    public StargateEventType getEventType() {
+        return this.eventType;
+    }
+    
+    public Object getValue() {
+        return this.value;
+    }
 }

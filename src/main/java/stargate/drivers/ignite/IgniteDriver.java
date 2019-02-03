@@ -34,6 +34,7 @@ import org.apache.ignite.Ignition;
 import org.apache.ignite.configuration.DataRegionConfiguration;
 import org.apache.ignite.configuration.DataStorageConfiguration;
 import org.apache.ignite.configuration.IgniteConfiguration;
+import org.apache.ignite.events.EventType;
 import org.apache.ignite.internal.managers.discovery.IgniteDiscoverySpi;
 import org.apache.ignite.logger.log4j.Log4JLogger;
 import org.apache.ignite.spi.collision.CollisionSpi;
@@ -138,6 +139,9 @@ public class IgniteDriver {
             // task ordering
             CollisionSpi colConfig = getQueueConfig();
             igniteConfig.setCollisionSpi(colConfig);
+            
+            // enable events
+            igniteConfig.setIncludeEventTypes(EventType.EVTS_DISCOVERY);
             
             this.igniteInstance = Ignition.start(igniteConfig);
             

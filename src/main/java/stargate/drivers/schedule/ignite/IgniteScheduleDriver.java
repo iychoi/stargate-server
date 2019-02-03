@@ -35,8 +35,7 @@ import org.apache.ignite.lang.IgniteCallable;
 import stargate.commons.driver.AbstractDriverConfig;
 import stargate.commons.schedule.AbstractScheduleDriver;
 import stargate.commons.schedule.AbstractScheduleDriverConfig;
-import stargate.commons.schedule.Task;
-import stargate.commons.schedule.TaskSchedule;
+import stargate.commons.schedule.DistributedTask;
 import stargate.drivers.ignite.IgniteDriver;
 import stargate.managers.schedule.ScheduleManager;
 import stargate.service.StargateService;
@@ -139,7 +138,7 @@ public class IgniteScheduleDriver extends AbstractScheduleDriver {
     }
     
     @Override
-    public void scheduleTask(Task task) throws IOException {
+    public void scheduleTask(DistributedTask task) throws IOException {
         if(task == null) {
             throw new IllegalArgumentException("task is null");
         }
@@ -223,53 +222,8 @@ public class IgniteScheduleDriver extends AbstractScheduleDriver {
         }
     }
     
-    private IgniteCallable makeIgniteCallable(Task task) throws Exception {
+    private IgniteCallable makeIgniteCallable(DistributedTask task) throws Exception {
         Callable c = task.getCallable();
-        IgniteCallable igniteCallable = null;
-        
-        boolean repeat = false;
-        long intervalMin = 0;
-        long delaySec = 0;
-        if(task instanceof TaskSchedule) {
-            TaskSchedule ts = (TaskSchedule) task;
-            delaySec = Math.max(ts.getDelay(), 1); // in sec
-            intervalMin = Math.max(ts.getInterval() / 60, 1); // in min
-            repeat = ts.isRepeat();
-        }
-        
-        if(repeat) {
-            // ignite does not support interval-based task scheduling.
-            // so we convert the interval-based schedule to a coarse cron style
-            String min = "*";
-            String hour = "*";
-            if(intervalMin <= 30) {
-                min = String.format("*/%d", intervalMin);
-                hour = "*";
-            } else if(intervalMin < 60*12) {
-                long intervalHour = Math.max(intervalMin / 60, 1);
-                min = "0";
-                hour = String.format("*/%d", intervalHour);
-            } else {
-                min = "0";
-                hour = "0";
-            }
-            
-            String extendedCronSyntax = String.format("{%d, %d} %s %s * * *", delaySec, 0, min, hour);
-            /*            
-            igniteRunnable = new IgniteRunnableWrapper(r, extendedCronSyntax) {
-                @IgniteInstanceResource
-                Ignite ignite;
-                
-                @Override
-                public void run() {
-                    ignite.scheduler().scheduleLocal(r, extendedCronSyntax);
-                }
-            };
-            */
-        } else {
-            igniteCallable = new IgniteCallableWrapper(c);
-        }
-        
-        return igniteCallable;
+        return new IgniteCallableWrapper(c);
     }
 }

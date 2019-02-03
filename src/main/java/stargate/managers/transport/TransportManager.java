@@ -318,6 +318,29 @@ public class TransportManager extends AbstractManager<AbstractTransportDriver> {
         this.lastUpdateTime = DateTimeUtils.getTimestamp();
     }
     
+    public Cluster getRemoteCluster(Cluster remoteCluster) throws IOException {
+        if(remoteCluster == null) {
+            throw new IllegalArgumentException("remoteCluster is null");
+        }
+        
+        Node remoteNode = getResponsibleRemoteNode(remoteCluster);
+        if(remoteNode == null) {
+            throw new IOException(String.format("cannot determine a remote node for a remote cluster %s", remoteCluster.getName()));
+        }
+
+        return getRemoteCluster(remoteNode);
+    }
+    
+    public Cluster getRemoteCluster(Node remoteClusterNode) throws IOException {
+        if(remoteClusterNode == null) {
+            throw new IllegalArgumentException("node is null");
+        }
+        
+        AbstractTransportDriver driver = getDriver();
+        AbstractTransportClient client = driver.getClient(remoteClusterNode);
+        return client.getLocalCluster();
+    }
+    
     public InputStream getDataChunk(String clusterName, String hash) throws IOException, IOException, IOException {
         if(clusterName == null || clusterName.isEmpty()) {
             throw new IllegalArgumentException("clusterName is null or empty");

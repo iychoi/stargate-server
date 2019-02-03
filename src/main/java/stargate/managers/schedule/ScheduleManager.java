@@ -19,6 +19,8 @@ import java.io.IOException;
 import java.util.ArrayList;
 import java.util.Collection;
 import java.util.List;
+import java.util.Timer;
+import java.util.TimerTask;
 import org.apache.commons.logging.Log;
 import org.apache.commons.logging.LogFactory;
 import stargate.commons.driver.AbstractDriver;
@@ -27,6 +29,7 @@ import stargate.commons.manager.AbstractManager;
 import stargate.commons.manager.ManagerConfig;
 import stargate.commons.manager.ManagerNotInstantiatedException;
 import stargate.commons.schedule.AbstractScheduleDriver;
+import stargate.commons.schedule.DistributedTask;
 import stargate.service.StargateService;
 
 /**
@@ -38,6 +41,8 @@ public class ScheduleManager extends AbstractManager<AbstractScheduleDriver> {
     private static final Log LOG = LogFactory.getLog(ScheduleManager.class);
     
     private static ScheduleManager instance;
+    
+    private Timer timer;
     
     public static ScheduleManager getInstance(StargateService service, Collection<AbstractScheduleDriver> drivers) throws ManagerNotInstantiatedException {
         synchronized (ScheduleManager.class) {
@@ -107,10 +112,33 @@ public class ScheduleManager extends AbstractManager<AbstractScheduleDriver> {
     @Override
     public synchronized void start() throws IOException {
         super.start();
+        
+        this.timer = new Timer("ScheduleManager Task Timer", false);
     }
     
     @Override
     public synchronized void stop() throws IOException {
+        this.timer.cancel();
+        this.timer.purge();
+        this.timer = null;
+        
         super.stop();
+    }
+    
+    public void scheduleTask(DistributedTask task) throws IOException {
+        if(task == null) {
+            throw new IllegalArgumentException("task is null");
+        }
+        
+        AbstractScheduleDriver driver = getDriver();
+        driver.scheduleTask(task);
+    }
+    
+    public void scheduleTask(TimerTask task, long delay, long period) throws IOException {
+        if(task == null) {
+            throw new IllegalArgumentException("task is null");
+        }
+        
+        this.timer.scheduleAtFixedRate(task, delay, period);
     }
 }

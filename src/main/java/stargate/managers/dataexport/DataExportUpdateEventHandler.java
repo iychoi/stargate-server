@@ -20,8 +20,6 @@ import org.apache.commons.logging.Log;
 import org.apache.commons.logging.LogFactory;
 import stargate.commons.datasource.DataExportEntry;
 import stargate.commons.recipe.Recipe;
-import stargate.managers.dataexport.AbstractDataExportEventHandler;
-import stargate.managers.dataexport.DataExportManager;
 import stargate.managers.recipe.RecipeManager;
 import stargate.managers.volume.VolumeManager;
 

@@ -16,11 +16,13 @@
 package stargate.service;
 
 import java.io.IOException;
+import java.util.concurrent.TimeUnit;
 import org.apache.commons.logging.Log;
 import org.apache.commons.logging.LogFactory;
 import stargate.commons.manager.ManagerNotInstantiatedException;
 import stargate.commons.service.AbstractService;
 import stargate.commons.service.ServiceNotStartedException;
+import stargate.commons.utils.DateTimeUtils;
 import stargate.managers.cluster.ClusterManager;
 import stargate.managers.dataexport.DataExportManager;
 import stargate.managers.datasource.DataSourceManager;
@@ -33,6 +35,8 @@ import stargate.managers.transport.TransportManager;
 import stargate.managers.userinterface.UserInterfaceManager;
 import stargate.managers.volume.VolumeManager;
 import stargate.managers.dataexport.DataExportUpdateEventHandler;
+import stargate.managers.event.EventManager;
+import stargate.tasks.RemoteClusterSyncTask;
 
 /**
  *
@@ -57,6 +61,7 @@ public class StargateService extends AbstractService {
     private UserInterfaceManager userInterfaceManager;
     private PolicyManager policyManager;
     private VolumeManager volumeManager;
+    private EventManager eventManager;
     
     private DataExportUpdateEventHandler dataExportUpdateEventHandler;
     
@@ -101,6 +106,7 @@ public class StargateService extends AbstractService {
         // init managers
         LOG.debug("Initializing managers");
         try {
+            this.eventManager = EventManager.getInstance(this);
             this.clusterManager = ClusterManager.getInstance(this, this.config.getClusterConfig());
             this.dataSourceManager = DataSourceManager.getInstance(this, this.config.getDataSourceConfig());
             this.dataExportManager = DataExportManager.getInstance(this);
@@ -117,6 +123,7 @@ public class StargateService extends AbstractService {
         LOG.debug("Managers are initialized");
         
         LOG.info("Starting managers");
+        this.eventManager.start();
         this.clusterManager.start();
         this.dataStoreManager.start();
         this.dataSourceManager.start();
@@ -144,6 +151,12 @@ public class StargateService extends AbstractService {
             throw new IOException(ex);
         }
         LOG.info("States are synchronized");
+        
+        LOG.info("Scheduling background tasks");
+        RemoteClusterSyncTask remoteClusterSyncTask = new RemoteClusterSyncTask(this.clusterManager, this.transportManager);
+        long tenMin = DateTimeUtils.getMilliseconds(TimeUnit.MINUTES, 10);
+        this.scheduleManager.scheduleTask(remoteClusterSyncTask, tenMin, tenMin);
+        LOG.info("Background tasks are scheduled");
         
         this.started = true;
         
@@ -174,6 +187,7 @@ public class StargateService extends AbstractService {
         this.dataSourceManager.stop();
         this.dataStoreManager.stop();
         this.clusterManager.stop();
+        this.eventManager.stop();
         LOG.info("Managers are stopped");
         
         this.started = false;
@@ -268,5 +282,13 @@ public class StargateService extends AbstractService {
         }
         
         return this.volumeManager;
+    }
+    
+    public EventManager getEventManager() throws ManagerNotInstantiatedException {
+        if(this.eventManager == null || !this.eventManager.isStarted()) {
+            throw new ManagerNotInstantiatedException("EventManager is not started");
+        }
+        
+        return this.eventManager;
     }
 }

@@ -16,9 +16,11 @@
 package stargate.drivers.cluster.ignite;
 
 import java.io.IOException;
+import java.util.ArrayList;
 import java.util.Collection;
 import java.util.HashSet;
 import java.util.Iterator;
+import java.util.List;
 import java.util.Set;
 import javax.cache.Cache;
 import org.apache.commons.logging.Log;
@@ -32,8 +34,12 @@ import org.apache.ignite.cache.CacheWriteSynchronizationMode;
 import org.apache.ignite.cluster.ClusterGroup;
 import org.apache.ignite.cluster.ClusterNode;
 import org.apache.ignite.configuration.CacheConfiguration;
+import org.apache.ignite.events.DiscoveryEvent;
+import org.apache.ignite.events.EventType;
+import org.apache.ignite.lang.IgnitePredicate;
 import stargate.commons.cluster.AbstractClusterDriver;
 import stargate.commons.cluster.AbstractClusterDriverConfig;
+import stargate.commons.cluster.AbstractLocalClusterEventHandler;
 import stargate.commons.cluster.Cluster;
 import stargate.commons.cluster.Node;
 import stargate.commons.cluster.NodeStatus;
@@ -62,6 +68,8 @@ public class IgniteClusterDriver extends AbstractClusterDriver {
     private IgniteDriver igniteDriver;
     private IgniteCache<String, String> nodes;
     private Node localNode;
+    private boolean listenEvent = true;
+    private List<AbstractLocalClusterEventHandler> localClusterEventHandlers = new ArrayList<AbstractLocalClusterEventHandler>();
     
     public IgniteClusterDriver(AbstractDriverConfig config) {
         if(config == null) {
@@ -116,10 +124,16 @@ public class IgniteClusterDriver extends AbstractClusterDriver {
         
         this.igniteDriver = IgniteDriver.getInstance();
         this.igniteDriver.init();
+        
+        setEventHandler();
     }
 
     @Override
     public synchronized void uninit() throws IOException {
+        this.listenEvent = false;
+        this.localClusterEventHandlers.clear();
+        
+        
         if(this.localNode != null) {
             this.localNode = null;
         }
@@ -170,6 +184,37 @@ public class IgniteClusterDriver extends AbstractClusterDriver {
 
             this.nodes = ignite.getOrCreateCache(cc);
         }
+    }
+    
+    private void setEventHandler() throws IOException {
+        this.listenEvent = true;
+        
+        Ignite ignite = this.igniteDriver.getIgnite();
+        IgnitePredicate<DiscoveryEvent> ignitePrediceate = new IgnitePredicate<DiscoveryEvent>() {
+            @Override
+            public boolean apply(DiscoveryEvent event) {
+                ClusterNode eventNode = event.eventNode();
+                String eventNodeName = eventNode.consistentId().toString();
+                
+                switch(event.type()) {
+                    case EventType.EVT_NODE_JOINED:
+                        raiseEventForLocalClusterNodeJoined(eventNodeName);
+                        break;
+                    case EventType.EVT_NODE_FAILED:
+                        raiseEventForLocalClusterNodeFailed(eventNodeName);
+                        break;
+                    case EventType.EVT_NODE_LEFT:
+                        raiseEventForLocalClusterNodeLeft(eventNodeName);
+                        break;
+                    default:
+                        break;
+                }
+                // continue listening
+                return listenEvent;
+            }
+        };
+        
+        ignite.events().localListen(ignitePrediceate, EventType.EVT_NODE_JOINED, EventType.EVT_NODE_FAILED, EventType.EVT_NODE_LEFT);
     }
     
     private synchronized Node makeLocalNode() throws IOException {
@@ -264,7 +309,7 @@ public class IgniteClusterDriver extends AbstractClusterDriver {
         // node crashes.
         ClusterGroup oldestNode = cluster.forOldest();
         ClusterNode node = oldestNode.node();
-        return node.id().toString();
+        return node.consistentId().toString();
     }
 
     @Override
@@ -273,5 +318,39 @@ public class IgniteClusterDriver extends AbstractClusterDriver {
         Node localNode = getLocalNode();
         
         return localNode.getName().equals(leaderNodeName);
+    }
+    
+    @Override
+    public synchronized void addLocalClusterEventHandler(AbstractLocalClusterEventHandler eventHandler) {
+        this.localClusterEventHandlers.add(eventHandler);
+    }
+    
+    @Override
+    public synchronized void removeLocalClusterEventHandler(AbstractLocalClusterEventHandler eventHandler) {
+        this.localClusterEventHandlers.remove(eventHandler);
+    }
+    
+    private synchronized void raiseEventForLocalClusterNodeJoined(String nodeName) {
+        LOG.debug("local node joined : " + nodeName);
+        
+        for(AbstractLocalClusterEventHandler handler: this.localClusterEventHandlers) {
+            handler.nodeJoined(nodeName);
+        }
+    }
+    
+    private synchronized void raiseEventForLocalClusterNodeFailed(String nodeName) {
+        LOG.debug("local node failed : " + nodeName);
+        
+        for(AbstractLocalClusterEventHandler handler: this.localClusterEventHandlers) {
+            handler.nodeFailed(nodeName);
+        }
+    }
+    
+    private synchronized void raiseEventForLocalClusterNodeLeft(String nodeName) {
+        LOG.debug("local node left : " + nodeName);
+        
+        for(AbstractLocalClusterEventHandler handler: this.localClusterEventHandlers) {
+            handler.nodeLeft(nodeName);
+        }
     }
 }
