@@ -39,7 +39,7 @@ public class EventManager extends AbstractManager<NullDriver> {
     
     private static EventManager instance;
     private List<AbstractStargateEventHandler> stargateEventHandlers = new ArrayList<AbstractStargateEventHandler>();
-    private BlockingQueue<StargateEvent> eventQueue = new LinkedBlockingDeque<StargateEvent>(0);
+    private BlockingQueue<StargateEvent> eventQueue = new LinkedBlockingDeque<StargateEvent>();
     private Thread eventDispatchThread;
     private boolean dispatchEvent = true;
     protected long lastUpdateTime;
