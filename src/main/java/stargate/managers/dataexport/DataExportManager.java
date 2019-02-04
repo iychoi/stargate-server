@@ -396,19 +396,19 @@ public class DataExportManager extends AbstractManager<NullDriver> {
         DataExportEntry entry = event.getEntry();
         switch(event.getEventType()) {
             case DATAEXPORT_EVENT_TYPE_ADD:
-                LOG.debug(String.format("data export entry is added : %s" + entry.getStargatePath()));
+                LOG.debug(String.format("data export entry is added : %s", entry.getStargatePath()));
                 for(AbstractDataExportEventHandler handler: this.dataExportEventHandlers) {
                     handler.added(this, entry);
                 }
                 break;
             case DATAEXPORT_EVENT_TYPE_REMOVE:
-                LOG.debug(String.format("data export entry is removed : %s" + entry.getStargatePath()));
+                LOG.debug(String.format("data export entry is removed : %s", entry.getStargatePath()));
                 for(AbstractDataExportEventHandler handler: this.dataExportEventHandlers) {
                     handler.removed(this, entry);
                 }
                 break;
             case DATAEXPORT_EVENT_TYPE_UPDATE:
-                LOG.debug(String.format("data export entry is updated : %s" + entry.getStargatePath()));
+                LOG.debug(String.format("data export entry is updated : %s", entry.getStargatePath()));
                 for(AbstractDataExportEventHandler handler: this.dataExportEventHandlers) {
                     handler.updated(this, entry);
                 }
