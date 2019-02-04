@@ -109,6 +109,7 @@ public class IgniteDriver {
             //IGNITE_LOG_DIR 
             IgniteConfiguration igniteConfig = new IgniteConfiguration();
             
+            // logging
             File stargateRoot = ResourceUtils.getStargateRoot();
             igniteConfig.setIgniteHome(stargateRoot.getAbsolutePath());
             LOG.debug(String.format("Setting Ignite HOME = %s", stargateRoot.getAbsolutePath()));
@@ -120,6 +121,8 @@ public class IgniteDriver {
             } catch (IgniteCheckedException ex) {
                 throw new IOException(ex);
             }
+            
+            igniteConfig.setMetricsLogFrequency(0);
             
             // discovery
             IgniteDiscoverySpi discoveryConfig = null;
