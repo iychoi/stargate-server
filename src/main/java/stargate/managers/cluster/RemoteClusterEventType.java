@@ -13,14 +13,14 @@
    See the License for the specific language governing permissions and
    limitations under the License.
 */
-package stargate.managers.event;
+package stargate.managers.cluster;
 
 /**
  *
  * @author iychoi
  */
-public enum StargateEventType {
-    STARGATE_EVENT_TYPE_DATAEXPORT,
-    STARGATE_EVENT_TYPE_REMOTECLUSTER,
-    STARGATE_EVENT_TYPE_NODE,
+public enum RemoteClusterEventType {
+    REMOTECLUSTER_EVENT_TYPE_ADD,
+    REMOTECLUSTER_EVENT_TYPE_REMOVE,
+    REMOTECLUSTER_EVENT_TYPE_UPDATE
 }

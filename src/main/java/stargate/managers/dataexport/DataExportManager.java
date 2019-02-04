@@ -118,7 +118,7 @@ public class DataExportManager extends AbstractManager<NullDriver> {
         try {
             StargateService stargateService = getStargateService();
             EventManager eventManager = stargateService.getEventManager();
-            eventManager.addExportEventHandler(hander);
+            eventManager.addEventHandler(hander);
         } catch (ManagerNotInstantiatedException ex) {
             LOG.error(ex);
             throw new IOException(ex);
@@ -352,13 +352,13 @@ public class DataExportManager extends AbstractManager<NullDriver> {
     }
 
     private void raiseEventForDataExportEntryAdded(DataExportEntry entry) throws InterruptedException {
-        DataExportEvent dataExportEntry = new DataExportEvent(DataExportEventType.DATAEXPORT_EVENT_TYPE_ADD, entry);
+        DataExportEvent dataExportEvent = new DataExportEvent(DataExportEventType.DATAEXPORT_EVENT_TYPE_ADD, entry);
         
         try {
             StargateService stargateService = getStargateService();
             EventManager eventManager = stargateService.getEventManager();
             
-            StargateEvent event = new StargateEvent(StargateEventType.STARGATE_EVENT_TYPE_DATAEXPORT, dataExportEntry);
+            StargateEvent event = new StargateEvent(StargateEventType.STARGATE_EVENT_TYPE_DATAEXPORT, dataExportEvent);
             eventManager.raiseStargateEvent(event);
         } catch (ManagerNotInstantiatedException ex) {
             LOG.error(ex);
@@ -366,13 +366,13 @@ public class DataExportManager extends AbstractManager<NullDriver> {
     }
     
     private void raiseEventForDataExportEntryRemoved(DataExportEntry entry) throws InterruptedException {
-        DataExportEvent dataExportEntry = new DataExportEvent(DataExportEventType.DATAEXPORT_EVENT_TYPE_REMOVE, entry);
+        DataExportEvent dataExportEvent = new DataExportEvent(DataExportEventType.DATAEXPORT_EVENT_TYPE_REMOVE, entry);
         
         try {
             StargateService stargateService = getStargateService();
             EventManager eventManager = stargateService.getEventManager();
             
-            StargateEvent event = new StargateEvent(StargateEventType.STARGATE_EVENT_TYPE_DATAEXPORT, dataExportEntry);
+            StargateEvent event = new StargateEvent(StargateEventType.STARGATE_EVENT_TYPE_DATAEXPORT, dataExportEvent);
             eventManager.raiseStargateEvent(event);
         } catch (ManagerNotInstantiatedException ex) {
             LOG.error(ex);
@@ -380,12 +380,12 @@ public class DataExportManager extends AbstractManager<NullDriver> {
     }
     
     private void raiseEventForDataExportEntryUpdated(DataExportEntry entry) throws InterruptedException {
-        DataExportEvent dataExportEntry = new DataExportEvent(DataExportEventType.DATAEXPORT_EVENT_TYPE_UPDATE, entry);
+        DataExportEvent dataExportEvent = new DataExportEvent(DataExportEventType.DATAEXPORT_EVENT_TYPE_UPDATE, entry);
         try {
             StargateService stargateService = getStargateService();
             EventManager eventManager = stargateService.getEventManager();
             
-            StargateEvent event = new StargateEvent(StargateEventType.STARGATE_EVENT_TYPE_DATAEXPORT, dataExportEntry);
+            StargateEvent event = new StargateEvent(StargateEventType.STARGATE_EVENT_TYPE_DATAEXPORT, dataExportEvent);
             eventManager.raiseStargateEvent(event);
         } catch (ManagerNotInstantiatedException ex) {
             LOG.error(ex);

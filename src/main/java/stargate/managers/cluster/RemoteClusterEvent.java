@@ -13,14 +13,28 @@
    See the License for the specific language governing permissions and
    limitations under the License.
 */
-package stargate.managers.event;
+package stargate.managers.cluster;
+
+import stargate.commons.cluster.Cluster;
 
 /**
  *
  * @author iychoi
  */
-public enum StargateEventType {
-    STARGATE_EVENT_TYPE_DATAEXPORT,
-    STARGATE_EVENT_TYPE_REMOTECLUSTER,
-    STARGATE_EVENT_TYPE_NODE,
+public class RemoteClusterEvent {
+    private RemoteClusterEventType eventType;
+    private Cluster cluster;
+    
+    RemoteClusterEvent(RemoteClusterEventType eventType, Cluster cluster) {
+        this.eventType = eventType;
+        this.cluster = cluster;
+    }
+    
+    public RemoteClusterEventType getEventType() {
+        return this.eventType;
+    }
+    
+    public Cluster getCluster() {
+        return this.cluster;
+    }
 }

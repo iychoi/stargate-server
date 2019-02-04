@@ -22,7 +22,7 @@ import stargate.commons.cluster.Cluster;
  * @author iychoi
  */
 public abstract class AbstractRemoteClusterEventHandler {
-    public abstract void added(Cluster cluster);
-    public abstract void removed(Cluster cluster);
-    public abstract void updated(Cluster cluster);
+    public abstract void added(ClusterManager manager, Cluster cluster);
+    public abstract void removed(ClusterManager manager, Cluster cluster);
+    public abstract void updated(ClusterManager manager, Cluster cluster);
 }

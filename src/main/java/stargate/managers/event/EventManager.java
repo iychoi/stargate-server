@@ -130,7 +130,7 @@ public class EventManager extends AbstractManager<NullDriver> {
         this.lastUpdateTime = DateTimeUtils.getTimestamp();
     }
     
-    public synchronized void addExportEventHandler(AbstractStargateEventHandler eventHandler) {
+    public synchronized void addEventHandler(AbstractStargateEventHandler eventHandler) {
         if(eventHandler == null) {
             throw new IllegalArgumentException("eventHandler is null");
         }
@@ -138,7 +138,7 @@ public class EventManager extends AbstractManager<NullDriver> {
         this.stargateEventHandlers.add(eventHandler);
     }
     
-    public synchronized void removeDataExportEventHandler(AbstractStargateEventHandler eventHandler) {
+    public synchronized void removeEventHandler(AbstractStargateEventHandler eventHandler) {
         if(eventHandler == null) {
             throw new IllegalArgumentException("eventHandler is null");
         }

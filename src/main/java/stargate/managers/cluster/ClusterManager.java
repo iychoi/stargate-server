@@ -38,6 +38,10 @@ import stargate.commons.manager.ManagerConfig;
 import stargate.commons.manager.ManagerNotInstantiatedException;
 import stargate.commons.utils.DateTimeUtils;
 import stargate.managers.datastore.DataStoreManager;
+import stargate.managers.event.AbstractStargateEventHandler;
+import stargate.managers.event.EventManager;
+import stargate.managers.event.StargateEvent;
+import stargate.managers.event.StargateEventType;
 import stargate.managers.policy.ClusterPolicy;
 import stargate.managers.policy.PolicyManager;
 import stargate.service.StargateService;
@@ -134,6 +138,8 @@ public class ClusterManager extends AbstractManager<AbstractClusterDriver> {
     @Override
     public synchronized void start() throws IOException {
         super.start();
+        
+        setEventHandler();
     }
     
     @Override
@@ -141,6 +147,33 @@ public class ClusterManager extends AbstractManager<AbstractClusterDriver> {
         this.remoteClusterEventHandlers.clear();
         
         super.stop();
+    }
+    
+    private void setEventHandler() throws IOException {
+        AbstractStargateEventHandler hander = new AbstractStargateEventHandler() {
+            @Override
+            public boolean accept(StargateEventType eventType) {
+                if(eventType == StargateEventType.STARGATE_EVENT_TYPE_REMOTECLUSTER) {
+                    return true;
+                }
+                return false;
+            }
+
+            @Override
+            public void raised(EventManager manager, StargateEvent event) {
+                RemoteClusterEvent evt = (RemoteClusterEvent) event.getValue();
+                processRemoteClusterEvent(evt);
+            }
+        };
+        
+        try {
+            StargateService stargateService = getStargateService();
+            EventManager eventManager = stargateService.getEventManager();
+            eventManager.addEventHandler(hander);
+        } catch (ManagerNotInstantiatedException ex) {
+            LOG.error(ex);
+            throw new IOException(ex);
+        }
     }
     
     private synchronized void safeInitLocalCluster() throws IOException {
@@ -382,11 +415,17 @@ public class ClusterManager extends AbstractManager<AbstractClusterDriver> {
             throw new ClusterManagerException("cluster " + cluster.getName() + " is already added");
         }
         
+        LOG.debug(String.format("Adding a new remote cluster : %s", cluster.getName()));
+        
         this.remoteClusterStore.put(cluster.getName(), cluster);
         
         this.lastUpdateTime = DateTimeUtils.getTimestamp();
         
-        raiseEventForRemoteClusterAdded(cluster);
+        try {
+            raiseEventForRemoteClusterAdded(cluster);
+        } catch (InterruptedException ex) {
+            throw new IOException(ex);
+        }
     }
     
     public synchronized void removeRemoteCluster(Cluster cluster) throws IOException {
@@ -416,11 +455,17 @@ public class ClusterManager extends AbstractManager<AbstractClusterDriver> {
         
         Cluster cluster = (Cluster) this.remoteClusterStore.get(name);
         if(cluster != null) {
+            LOG.debug(String.format("Removing a remote cluster : %s", name));
+            
             this.remoteClusterStore.remove(name);
             
             this.lastUpdateTime = DateTimeUtils.getTimestamp();
 
-            raiseEventForRemoteClusterRemoved(cluster);
+            try {
+                raiseEventForRemoteClusterRemoved(cluster);
+            } catch (InterruptedException ex) {
+                throw new IOException(ex);
+            }
         }
     }
     
@@ -451,11 +496,17 @@ public class ClusterManager extends AbstractManager<AbstractClusterDriver> {
         
         safeInitRemoteClusterStore();
         
+        LOG.debug(String.format("Updating a remote cluster : %s", cluster.getName()));
+        
         this.remoteClusterStore.put(cluster.getName(), cluster);
         
         this.lastUpdateTime = DateTimeUtils.getTimestamp();
         
-        raiseEventForRemoteClusterUpdated(cluster);
+        try {
+            raiseEventForRemoteClusterUpdated(cluster);
+        } catch (InterruptedException ex) {
+            throw new IOException(ex);
+        }
     }
     
     public synchronized void addLocalClusterEventHandler(AbstractLocalClusterEventHandler eventHandler) {
@@ -476,27 +527,45 @@ public class ClusterManager extends AbstractManager<AbstractClusterDriver> {
         this.remoteClusterEventHandlers.remove(eventHandler);
     }
 
-    private synchronized void raiseEventForRemoteClusterAdded(Cluster cluster) {
-        LOG.debug("remote cluster is added : " + cluster.getName());
+    private synchronized void raiseEventForRemoteClusterAdded(Cluster cluster) throws InterruptedException {
+        RemoteClusterEvent remoteClusterEvent = new RemoteClusterEvent(RemoteClusterEventType.REMOTECLUSTER_EVENT_TYPE_ADD, cluster);
         
-        for(AbstractRemoteClusterEventHandler handler: this.remoteClusterEventHandlers) {
-            handler.added(cluster);
+        try {
+            StargateService stargateService = getStargateService();
+            EventManager eventManager = stargateService.getEventManager();
+            
+            StargateEvent event = new StargateEvent(StargateEventType.STARGATE_EVENT_TYPE_REMOTECLUSTER, remoteClusterEvent);
+            eventManager.raiseStargateEvent(event);
+        } catch (ManagerNotInstantiatedException ex) {
+            LOG.error(ex);
         }
     }
     
-    private synchronized void raiseEventForRemoteClusterRemoved(Cluster cluster) {
-        LOG.debug("remote cluster is removed : " + cluster.getName());
+    private synchronized void raiseEventForRemoteClusterRemoved(Cluster cluster) throws InterruptedException {
+        RemoteClusterEvent remoteClusterEvent = new RemoteClusterEvent(RemoteClusterEventType.REMOTECLUSTER_EVENT_TYPE_REMOVE, cluster);
         
-        for(AbstractRemoteClusterEventHandler handler: this.remoteClusterEventHandlers) {
-            handler.removed(cluster);
+        try {
+            StargateService stargateService = getStargateService();
+            EventManager eventManager = stargateService.getEventManager();
+            
+            StargateEvent event = new StargateEvent(StargateEventType.STARGATE_EVENT_TYPE_REMOTECLUSTER, remoteClusterEvent);
+            eventManager.raiseStargateEvent(event);
+        } catch (ManagerNotInstantiatedException ex) {
+            LOG.error(ex);
         }
     }
     
-    private synchronized void raiseEventForRemoteClusterUpdated(Cluster cluster) {
-        LOG.debug("remote cluster is updated : " + cluster.getName());
+    private synchronized void raiseEventForRemoteClusterUpdated(Cluster cluster) throws InterruptedException {
+        RemoteClusterEvent remoteClusterEvent = new RemoteClusterEvent(RemoteClusterEventType.REMOTECLUSTER_EVENT_TYPE_UPDATE, cluster);
         
-        for(AbstractRemoteClusterEventHandler handler: this.remoteClusterEventHandlers) {
-            handler.updated(cluster);
+        try {
+            StargateService stargateService = getStargateService();
+            EventManager eventManager = stargateService.getEventManager();
+            
+            StargateEvent event = new StargateEvent(StargateEventType.STARGATE_EVENT_TYPE_REMOTECLUSTER, remoteClusterEvent);
+            eventManager.raiseStargateEvent(event);
+        } catch (ManagerNotInstantiatedException ex) {
+            LOG.error(ex);
         }
     }
     
@@ -569,6 +638,33 @@ public class ClusterManager extends AbstractManager<AbstractClusterDriver> {
                     this.remoteClusterStore.put(clusterName, cluster);
                 }
             }
+        }
+    }
+    
+    private void processRemoteClusterEvent(RemoteClusterEvent event) {
+        Cluster cluster = event.getCluster();
+        switch(event.getEventType()) {
+            case REMOTECLUSTER_EVENT_TYPE_ADD:
+                LOG.debug(String.format("remote cluster is added : %s", cluster.getName()));
+                for(AbstractRemoteClusterEventHandler handler: this.remoteClusterEventHandlers) {
+                    handler.added(this, cluster);
+                }
+                break;
+            case REMOTECLUSTER_EVENT_TYPE_REMOVE:
+                LOG.debug(String.format("remote cluster is removed : %s", cluster.getName()));
+                for(AbstractRemoteClusterEventHandler handler: this.remoteClusterEventHandlers) {
+                    handler.removed(this, cluster);
+                }
+                break;
+            case REMOTECLUSTER_EVENT_TYPE_UPDATE:
+                LOG.debug(String.format("remote cluster is updated : %s", cluster.getName()));
+                for(AbstractRemoteClusterEventHandler handler: this.remoteClusterEventHandlers) {
+                    handler.updated(this, cluster);
+                }
+                break;
+            default:
+                LOG.error(String.format("cannot handle %s", event.getEventType().name()));
+                break;
         }
     }
 

@@ -198,7 +198,7 @@ public class Clusters {
             switch(cmd) {
                 case CMD_LV2_REMOTE_CLUSTER_SHOW:
                     if(positionalArgs.length >= 3) {
-                        process_remote_clusters_show(parser.getServiceURI(), positionalArgs[1]);
+                        process_remote_clusters_show(parser.getServiceURI(), positionalArgs[2]);
                     }
                     break;
                 case CMD_LV2_REMOTE_CLUSTER_LIST:
@@ -206,12 +206,12 @@ public class Clusters {
                     break;
                 case CMD_LV2_REMOTE_CLUSTER_ADD:
                     if(positionalArgs.length >= 3) {
-                        process_remote_clusters_add(parser.getServiceURI(), positionalArgs[1]);
+                        process_remote_clusters_add(parser.getServiceURI(), positionalArgs[2]);
                     }
                     break;
                 case CMD_LV2_REMOTE_CLUSTER_REMOVE:
                     if(positionalArgs.length >= 3) {
-                        process_remote_clusters_remove(parser.getServiceURI(), positionalArgs[1]);
+                        process_remote_clusters_remove(parser.getServiceURI(), positionalArgs[2]);
                     }
                     break;
                 case CMD_LV2_REMOTE_CLUSTER_SYNC:
@@ -334,7 +334,8 @@ public class Clusters {
         try {
             HTTPUserInterfaceClient client = HTTPUIClient.getClient(serviceURI);
             client.connect();
-            Cluster remoteCluster = Cluster.createInstance(new File(jsonPath));
+            File f = (new File(jsonPath)).getAbsoluteFile();
+            Cluster remoteCluster = Cluster.createInstance(f);
             client.addRemoteCluster(remoteCluster);
             String dateTimeString = DateTimeUtils.getDateTimeString(client.getLastActiveTime());
             System.out.println(String.format("<Request processed %s>", dateTimeString));
