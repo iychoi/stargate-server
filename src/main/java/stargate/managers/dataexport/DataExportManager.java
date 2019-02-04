@@ -248,6 +248,8 @@ public class DataExportManager extends AbstractManager<NullDriver> {
             throw new DataExportManagerException("data export entry " + entry.getStargatePath() + " is already added");
         }
         
+        LOG.debug(String.format("Adding a new data export entry : %s", entry.getStargatePath()));
+        
         this.dataExportEntryStore.put(entry.getStargatePath(), entry);
         
         this.lastUpdateTime = DateTimeUtils.getTimestamp();
@@ -286,6 +288,8 @@ public class DataExportManager extends AbstractManager<NullDriver> {
         
         DataExportEntry entry = (DataExportEntry) this.dataExportEntryStore.get(stargatePath);
         if(entry != null) {
+            LOG.debug(String.format("Removing a new data export entry : %s", entry.getStargatePath()));
+            
             this.dataExportEntryStore.remove(stargatePath);
             
             this.lastUpdateTime = DateTimeUtils.getTimestamp();
@@ -308,6 +312,8 @@ public class DataExportManager extends AbstractManager<NullDriver> {
         }
         
         safeInitDataExportEntryStore();
+        
+        LOG.debug(String.format("Updating a new data export entry : %s", entry.getStargatePath()));
         
         this.dataExportEntryStore.put(entry.getStargatePath(), entry);
         
@@ -381,19 +387,19 @@ public class DataExportManager extends AbstractManager<NullDriver> {
         DataExportEntry entry = event.getEntry();
         switch(event.getEventType()) {
             case DATAEXPORT_EVENT_TYPE_ADD:
-                LOG.debug("data export entry is added : " + entry.getStargatePath());
+                LOG.debug(String.format("data export entry is added : %s" + entry.getStargatePath()));
                 for(AbstractDataExportEventHandler handler: this.dataExportEventHandlers) {
                     handler.added(this, entry);
                 }
                 break;
             case DATAEXPORT_EVENT_TYPE_REMOVE:
-                LOG.debug("data export entry is removed : " + entry.getStargatePath());
+                LOG.debug(String.format("data export entry is removed : %s" + entry.getStargatePath()));
                 for(AbstractDataExportEventHandler handler: this.dataExportEventHandlers) {
                     handler.removed(this, entry);
                 }
                 break;
             case DATAEXPORT_EVENT_TYPE_UPDATE:
-                LOG.debug("data export entry is updated : " + entry.getStargatePath());
+                LOG.debug(String.format("data export entry is updated : %s" + entry.getStargatePath()));
                 for(AbstractDataExportEventHandler handler: this.dataExportEventHandlers) {
                     handler.updated(this, entry);
                 }
