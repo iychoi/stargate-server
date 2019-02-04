@@ -98,7 +98,7 @@ public class DataExportManager extends AbstractManager<NullDriver> {
         super.stop();
     }
     
-    private void setEventHandler() {
+    private void setEventHandler() throws IOException {
         AbstractStargateEventHandler hander = new AbstractStargateEventHandler() {
             @Override
             public boolean accept(StargateEventType eventType) {
@@ -114,6 +114,15 @@ public class DataExportManager extends AbstractManager<NullDriver> {
                 processDataExportEntryEvent(evt);
             }
         };
+        
+        try {
+            StargateService stargateService = getStargateService();
+            EventManager eventManager = stargateService.getEventManager();
+            eventManager.addExportEventHandler(hander);
+        } catch (ManagerNotInstantiatedException ex) {
+            LOG.error(ex);
+            throw new IOException(ex);
+        }
     }
     
     private synchronized void safeInitDataExportEntryStore() throws IOException {
