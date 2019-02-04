@@ -102,6 +102,7 @@ public class EventManager extends AbstractManager<NullDriver> {
                     while(dispatchEvent) {
                         StargateEvent event = eventQueue.poll(1, TimeUnit.SECONDS);
                         if(event != null) {
+                            LOG.debug(String.format("Dequeued an event : %s", event.getEventType().toString()));
                             processStargateEvent(event);
                         }
                     }
@@ -122,6 +123,7 @@ public class EventManager extends AbstractManager<NullDriver> {
     }
     
     public synchronized void raiseStargateEvent(StargateEvent event) throws InterruptedException {
+        LOG.debug(String.format("Enqueue an event : %s", event.getEventType().toString()));
         this.eventQueue.put(event);
         
         // update
