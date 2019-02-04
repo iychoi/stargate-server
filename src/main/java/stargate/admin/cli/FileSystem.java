@@ -302,7 +302,7 @@ public class FileSystem {
                         System.out.println(String.format("start copy - %d", startTimeC));
                         
                         FileOutputStream fos = new FileOutputStream(f);
-                        int bufferlen = 1024*4;
+                        int bufferlen = 1024*1024;
                         byte[] buffer = new byte[bufferlen];
                         
                         HTTPChunkInputStream cis = new HTTPChunkInputStream(clients, recipe);
