@@ -61,6 +61,8 @@ public class ReverseRecipeMapping {
         if(hash == null || hash.isEmpty()) {
             throw new IllegalArgumentException("hash is null or empty");
         }
+        
+        this.hash = hash;
     }
     
     @JsonProperty("hash")
