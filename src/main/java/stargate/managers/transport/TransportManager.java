@@ -22,6 +22,9 @@ import java.net.URI;
 import java.util.ArrayList;
 import java.util.Collection;
 import java.util.List;
+import java.util.Map;
+import java.util.concurrent.TimeUnit;
+import org.apache.commons.collections4.map.PassiveExpiringMap;
 import org.apache.commons.logging.Log;
 import org.apache.commons.logging.LogFactory;
 import stargate.commons.cluster.Cluster;
@@ -62,9 +65,10 @@ public class TransportManager extends AbstractManager<AbstractTransportDriver> {
     private static TransportManager instance;
     
     private AbstractKeyValueStore blockCacheStore; // <String, byte[]>
+    private Map<String, String> remoteClusterResponsibleNodeNameCache = new PassiveExpiringMap<String, String>(5, TimeUnit.MINUTES);
     protected long lastUpdateTime;
     
-    private static final String BLOCK_CACHE_STORE = "bcache";
+    private static final String BLOCK_CACHE_STORE = "block_cache";
     
     public static TransportManager getInstance(StargateService service, Collection<AbstractTransportDriver> drivers) throws ManagerNotInstantiatedException {
         synchronized (TransportManager.class) {
@@ -146,6 +150,8 @@ public class TransportManager extends AbstractManager<AbstractTransportDriver> {
     
     @Override
     public synchronized void stop() throws IOException {
+        this.remoteClusterResponsibleNodeNameCache.clear();
+        
         for(AbstractTransportDriver driver : drivers) {
             driver.stopServer();
         }
@@ -172,26 +178,6 @@ public class TransportManager extends AbstractManager<AbstractTransportDriver> {
         }
     }
     
-    public Node getResponsibleRemoteNode(String remoteClusterName) throws IOException {
-        if(remoteClusterName == null || remoteClusterName.isEmpty()) {
-            throw new IllegalArgumentException("remoteClusterName is null or empty");
-        }
-        
-        try {
-            StargateService stargateService = getStargateService();
-            ClusterManager clusterManager = stargateService.getClusterManager();
-            Cluster remoteCluster = clusterManager.getRemoteCluster(remoteClusterName);
-            if(remoteCluster == null) {
-                throw new IOException(String.format("remote cluster %s does not exist", remoteClusterName));
-            }
-            
-            return getResponsibleRemoteNode(remoteCluster);
-        } catch (ManagerNotInstantiatedException ex) {
-            LOG.error(ex);
-            throw new IOException(ex);
-        }
-    }
-    
     public Node getResponsibleRemoteNode(Cluster remoteCluster) throws IOException {
         if(remoteCluster == null) {
             throw new IllegalArgumentException("remoteCluster is null");
@@ -200,16 +186,30 @@ public class TransportManager extends AbstractManager<AbstractTransportDriver> {
         try {
             StargateService stargateService = getStargateService();
             ClusterManager clusterManager = stargateService.getClusterManager();
-            Node localNode = clusterManager.getLocalNode();
-            Cluster localCluster = clusterManager.getLocalCluster();
-            return getResponsibleRemoteNode(remoteCluster, localCluster, localNode);
+            
+            String responsibleNodeName = this.remoteClusterResponsibleNodeNameCache.get(remoteCluster.getName());
+            if(responsibleNodeName != null) {
+                if(!remoteCluster.hasNode(responsibleNodeName)) {
+                    // update
+                    responsibleNodeName = null;
+                }
+            }
+            
+            if(responsibleNodeName == null) {
+                Node localNode = clusterManager.getLocalNode();
+                Cluster localCluster = clusterManager.getLocalCluster();
+                Node responsibleNode = getResponsibleRemoteNode(remoteCluster, localCluster, localNode);
+                responsibleNodeName = responsibleNode.getName();
+                this.remoteClusterResponsibleNodeNameCache.put(remoteCluster.getName(), responsibleNodeName);
+            }
+            return remoteCluster.getNode(responsibleNodeName);
         } catch (ManagerNotInstantiatedException ex) {
             LOG.error(ex);
             throw new IOException(ex);
         }
     }
     
-    public Node getResponsibleRemoteNode(Cluster remoteCluster, Cluster localCluster, Node myNode) throws IOException {
+    private Node getResponsibleRemoteNode(Cluster remoteCluster, Cluster localCluster, Node myNode) throws IOException {
         if(remoteCluster == null) {
             throw new IllegalArgumentException("remoteCluster is null");
         }

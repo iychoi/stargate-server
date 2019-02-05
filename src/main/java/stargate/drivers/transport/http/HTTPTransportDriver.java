@@ -44,7 +44,7 @@ public class HTTPTransportDriver extends AbstractTransportDriver {
 
     private static final Log LOG = LogFactory.getLog(HTTPTransportDriver.class);
     
-    private static final int DEFAULT_LIVECHECK_SECONDS = 60;
+    private static final int DEFAULT_LIVECHECK_SECONDS = 60 * 3;
     
     private HTTPTransportDriverConfig config;
     private HTTPTransportServer server;
@@ -217,19 +217,13 @@ public class HTTPTransportDriver extends AbstractTransportDriver {
             }
         }
         
-        TransportManager transportManager = getTransportManager();
         try {
             LOG.debug(String.format("Get a transport client for %s", transportServiceInfo.getServiceURI().toASCIIString()));
             if(transportServiceInfo.getDriverClass().equals(HTTPTransportDriver.class)) {
                 HTTPTransportClient client = new HTTPTransportClient(transportServiceInfo, null, null);
                 client.connect();
-                if(client.isLive()) {
-                    this.clients.put(node.getName(), client);
-                    return client;
-                } else {
-                    // report
-                    transportManager.reportNodeUnreachable(node);
-                }
+                this.clients.put(node.getName(), client);
+                return client;
             }
         } catch (Exception ex) {
             throw new IOException(ex);
