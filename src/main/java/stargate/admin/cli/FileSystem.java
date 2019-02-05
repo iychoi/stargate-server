@@ -51,6 +51,7 @@ public class FileSystem {
         CMD_LV1_SHOW_INFO("show_info"),
         CMD_LV1_LIST("ls"),
         CMD_LV1_RECIPE("recipe"),
+        CMD_LV1_RECIPE_LOCALIZED("recipe_localized"),
         CMD_LV1_GET("get"),
         CMD_LV1_UNKNOWN("unknown");
         
@@ -96,6 +97,11 @@ public class FileSystem {
                     case CMD_LV1_RECIPE:
                         if(positionalArgs.length >= 2) {
                             process_fs_recipe(parser.getServiceURI(), positionalArgs[1]);
+                        }
+                        break;
+                    case CMD_LV1_RECIPE_LOCALIZED:
+                        if(positionalArgs.length >= 2) {
+                            process_fs_recipe_localized(parser.getServiceURI(), positionalArgs[1]);
                         }
                         break;
                     case CMD_LV1_GET:
@@ -208,6 +214,50 @@ public class FileSystem {
                     System.out.println(String.format("<%s is a directory!>", uri.toString()));
                 } else {
                     Recipe recipe = client.getRecipe(uri);
+                    if(recipe == null) {
+                        System.out.println("<ENTRY DOES NOT EXIST!>");
+                    } else {
+                        String json = JsonSerializer.formatPretty(recipe.toJson());
+                        System.out.println(json);
+                    }
+                }
+            } catch (FileNotFoundException ex) {
+                System.out.println(String.format("<%s not exist!>", uri.toString()));
+            }
+            String dateTimeString = DateTimeUtils.getDateTimeString(client.getLastActiveTime());
+            System.out.println(String.format("<Request processed %s>", dateTimeString));
+            client.disconnect();
+            System.exit(0);
+        } catch (IOException ex) {
+            ex.printStackTrace();
+            System.exit(1);
+        }
+    }
+    
+    private static void process_fs_recipe_localized(URI serviceURI, String stargatePath) {
+        DataObjectURI uri = new DataObjectURI(stargatePath);
+        
+        try {
+            HTTPUserInterfaceClient client = HTTPUIClient.getClient(serviceURI);
+            client.connect();
+            try {
+                Cluster localCluster = client.getLocalCluster();
+                
+                DataObjectMetadata metadata = client.getDataObjectMetadata(uri);
+                if(metadata == null) {
+                    System.out.println(String.format("<%s not exist!>", uri.toString()));
+                } else if(metadata.isDirectory()) {
+                    System.out.println(String.format("<%s is a directory!>", uri.toString()));
+                } else {
+                    Recipe recipe = null;
+                    if(uri.getClusterName().equals(localCluster.getName())) {
+                        // local
+                        recipe = client.getRecipe(uri);
+                    } else {
+                        // remote
+                        recipe = client.getRemoteRecipeWithTransferSchedule(uri);
+                    }
+                    
                     if(recipe == null) {
                         System.out.println("<ENTRY DOES NOT EXIST!>");
                     } else {
