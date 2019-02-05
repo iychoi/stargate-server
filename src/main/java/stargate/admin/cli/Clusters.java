@@ -18,8 +18,11 @@ package stargate.admin.cli;
 import java.io.File;
 import java.io.IOException;
 import java.net.URI;
+import java.net.URISyntaxException;
 import java.util.Arrays;
 import java.util.Collection;
+import java.util.logging.Level;
+import java.util.logging.Logger;
 import org.apache.commons.logging.Log;
 import org.apache.commons.logging.LogFactory;
 import org.apache.ignite.internal.commandline.CommandHandler;
@@ -330,12 +333,31 @@ public class Clusters {
         }
     }
     
-    private static void process_remote_clusters_add(URI serviceURI, String jsonPath) {
+    private static void process_remote_clusters_add(URI serviceURI, String argument) {
         try {
+            Cluster remoteCluster = null;
+            if(argument.startsWith("http://") || argument.startsWith("https://")) {
+                try {
+                    URI remoteClusterServiceURI = new URI(argument);
+                    HTTPUserInterfaceClient remoteClient = HTTPUIClient.getClient(remoteClusterServiceURI);
+                    remoteClient.connect();
+                    remoteCluster = remoteClient.getLocalCluster();
+                    remoteClient.disconnect();
+                } catch (URISyntaxException ex) {
+                    ex.printStackTrace();
+                    System.exit(1);
+                }
+            } else {
+                File f = (new File(argument)).getAbsoluteFile();
+                remoteCluster = Cluster.createInstance(f);
+            }
+            
+            if(remoteCluster == null) {
+                System.out.println("Cannot retrieve remote cluster");
+                System.exit(1);
+            }
             HTTPUserInterfaceClient client = HTTPUIClient.getClient(serviceURI);
             client.connect();
-            File f = (new File(jsonPath)).getAbsoluteFile();
-            Cluster remoteCluster = Cluster.createInstance(f);
             client.addRemoteCluster(remoteCluster);
             String dateTimeString = DateTimeUtils.getDateTimeString(client.getLastActiveTime());
             System.out.println(String.format("<Request processed %s>", dateTimeString));
