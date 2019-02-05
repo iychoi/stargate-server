@@ -194,6 +194,8 @@ public class HTTPTransportDriver extends AbstractTransportDriver {
             throw new IllegalArgumentException("node is null");
         }
         
+        TransportServiceInfo transportServiceInfo = node.getTransportServiceInfo();
+        
         HTTPTransportClient existingClient = (HTTPTransportClient) this.clients.get(node.getName());
         if(existingClient != null) {
             boolean isLive = true;
@@ -205,6 +207,7 @@ public class HTTPTransportDriver extends AbstractTransportDriver {
             
             if(isLive) {
                 // use existing
+                LOG.debug(String.format("Reuse an existing transport client for %s", transportServiceInfo.getServiceURI().toASCIIString()));
                 return existingClient;
             } else {
                 if(existingClient.isConnected()) {
@@ -215,10 +218,11 @@ public class HTTPTransportDriver extends AbstractTransportDriver {
         }
         
         TransportManager transportManager = getTransportManager();
-        TransportServiceInfo transportServiceInfo = node.getTransportServiceInfo();
         try {
+            LOG.debug(String.format("Get a transport client for %s", transportServiceInfo.getServiceURI().toASCIIString()));
             if(transportServiceInfo.getDriverClass().equals(HTTPTransportDriver.class)) {
                 HTTPTransportClient client = new HTTPTransportClient(transportServiceInfo, null, null);
+                client.connect();
                 if(client.isLive()) {
                     this.clients.put(node.getName(), client);
                     return client;

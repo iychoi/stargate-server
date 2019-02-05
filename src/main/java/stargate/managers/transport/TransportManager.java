@@ -222,28 +222,28 @@ public class TransportManager extends AbstractManager<AbstractTransportDriver> {
             throw new IllegalArgumentException("myNode is null");
         }
         
-        Collection<Node> localNodes = localCluster.getNodes();
-        Collection<Node> remoteNodes = remoteCluster.getNodes();
+        List<Node> localNodes = new ArrayList<Node>();
+        localNodes.addAll(localCluster.getNodes());
+        List<Node> remoteNodes = new ArrayList<Node>();
+        remoteNodes.addAll(remoteCluster.getNodes());
+        
+        if(remoteNodes.size() == 1) {
+            return remoteNodes.get(0);
+        } else if(remoteCluster.getNodeNum() == 0) {
+            throw new IOException(String.format("There's no node in a remote cluster : %s", remoteCluster.getName()));
+        }
         
         // simple mapping
-        int idxMyNode = 0;
-        for(Node node : localNodes) {
-            if(node.getName().equals(myNode.getName())) {
-                // my node
-                break;
-            }
-            idxMyNode++;
+        int idxMyNode = localNodes.indexOf(myNode);
+        if(idxMyNode < 0 || idxMyNode >= localNodes.size()) {
+            throw new IOException(String.format("Local node index %d exceeds the size of the cluster : %s, %d", idxMyNode, localCluster.getName(), localNodes.size()));
         }
         
         int idxRemoteNode = idxMyNode % remoteNodes.size();
-        int idx = 0;
-        for(Node node : remoteNodes) {
-            if(idx == idxRemoteNode) {
-                return node;
-            }
-            idx++;
-        }
-        return null;
+        Node responsibleNode = remoteNodes.get(idxRemoteNode);
+        LOG.debug(String.format("Determined a responsible node of %s -> %s", myNode.getName(), responsibleNode.getName()));
+        
+        return responsibleNode;
     }
     
     public synchronized byte[] getDataChunkCache(String hash) throws IOException {
