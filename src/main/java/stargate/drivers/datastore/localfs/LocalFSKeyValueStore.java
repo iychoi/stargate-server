@@ -19,10 +19,12 @@ import java.io.IOException;
 import java.util.Collection;
 import java.util.HashMap;
 import java.util.Map;
+import java.util.concurrent.TimeUnit;
 import org.apache.commons.logging.Log;
 import org.apache.commons.logging.LogFactory;
 import stargate.commons.datastore.AbstractKeyValueStore;
 import stargate.commons.datastore.EnumDataStoreProperty;
+import stargate.commons.utils.DateTimeUtils;
 import stargate.commons.utils.ObjectSerializer;
 
 /**
@@ -37,12 +39,25 @@ public class LocalFSKeyValueStore extends AbstractKeyValueStore {
     private String name;
     private Class valueClass;
     private EnumDataStoreProperty property;
+    private TimeUnit expiryTimeUnit;
+    private long expiryTimeVal;
     
     LocalFSKeyValueStore(LocalFSDataStoreDriver driver, String name, Class valueClass, EnumDataStoreProperty property) {
         this.driver = driver;
         this.name = name;
         this.valueClass = valueClass;
         this.property = property;
+        this.expiryTimeUnit = TimeUnit.SECONDS;
+        this.expiryTimeVal = 0;
+    }
+
+    LocalFSKeyValueStore(LocalFSDataStoreDriver driver, String name, Class valueClass, EnumDataStoreProperty property, TimeUnit timeunit, long timeval) {
+        this.driver = driver;
+        this.name = name;
+        this.valueClass = valueClass;
+        this.property = property;
+        this.expiryTimeUnit = timeunit;
+        this.expiryTimeVal = timeval;
     }
     
     @Override
@@ -60,9 +75,34 @@ public class LocalFSKeyValueStore extends AbstractKeyValueStore {
         return this.property;
     }
     
+    private void cleanUp() throws IOException {
+        Collection<String> keys = this.driver.listKeys(this.name);
+        long currentTimestamp = DateTimeUtils.getTimestamp();
+        long expirationMS = DateTimeUtils.getMilliseconds(this.expiryTimeUnit, this.expiryTimeVal);
+        
+        for(String key : keys) {
+            byte[] bytes = this.driver.getBytes(this.name, key);
+            if(bytes == null) {
+                this.driver.remove(this.name, key);
+            }
+            
+            if(bytes.length > 8) {
+                long timestamp = byteArrayToLong(bytes);
+                
+                if(DateTimeUtils.timeElapsed(timestamp, currentTimestamp, expirationMS)) {
+                    // expired
+                    this.driver.remove(this.name, key);
+                }
+            } else {
+                this.driver.remove(this.name, key);
+            }
+        }
+    }
+    
     @Override
     public int size() {
         try {
+            cleanUp();
             return this.driver.listKeys(this.name).size();
         } catch (IOException ex) {
             LOG.error(ex);
@@ -73,7 +113,8 @@ public class LocalFSKeyValueStore extends AbstractKeyValueStore {
     @Override
     public boolean isEmpty() {
         try {
-            return (this.driver.listKeys(this.name).size() == 0);
+            cleanUp();
+            return (this.driver.listKeys(this.name).isEmpty());
         } catch (IOException ex) {
             LOG.error(ex);
             return true;
@@ -83,34 +124,87 @@ public class LocalFSKeyValueStore extends AbstractKeyValueStore {
     @Override
     public boolean containsKey(String key) {
         try {
+            cleanUp();
             return this.driver.existKey(this.name, key);
         } catch (IOException ex) {
             LOG.error(ex);
             return false;
         }
     }
+    
+    private void longToByteArray(long data, byte[] bytes) {
+        bytes[0] = (byte) ((data >> 56) & 0x000000FF);
+        bytes[1] = (byte) ((data >> 48) & 0x000000FF);
+        bytes[2] = (byte) ((data >> 40) & 0x000000FF);
+        bytes[3] = (byte) ((data >> 32) & 0x000000FF);
+        bytes[4] = (byte) ((data >> 24) & 0x000000FF);
+        bytes[5] = (byte) ((data >> 16) & 0x000000FF);
+        bytes[6] = (byte) ((data >> 8) & 0x000000FF);
+        bytes[7] = (byte) ((data >> 0) & 0x000000FF);
+    }
+    
+    private long byteArrayToLong(byte[] bytes) {
+        long value = 0;
+        value += (long) (bytes[0] & 0x000000FF) << 56;
+        value += (long) (bytes[1] & 0x000000FF) << 48;
+        value += (long) (bytes[2] & 0x000000FF) << 40;
+        value += (long) (bytes[3] & 0x000000FF) << 32;
+        value += (bytes[4] & 0x000000FF) << 24;
+        value += (bytes[5] & 0x000000FF) << 16;
+        value += (bytes[6] & 0x000000FF) << 8;
+        value += (bytes[7] & 0x000000FF);
+        return value;
+    }
 
     @Override
     public Object get(String key) throws IOException {
         byte[] bytes = this.driver.getBytes(this.name, key);
         if(bytes == null) {
+            this.driver.remove(this.name, key);
             return null;
         }
-        return ObjectSerializer.fromByteArray(bytes, this.valueClass);
+        
+        if(bytes.length > 8) {
+            long timestamp = byteArrayToLong(bytes);
+            long currentTimestamp = DateTimeUtils.getTimestamp();
+            long expirationMS = DateTimeUtils.getMilliseconds(this.expiryTimeUnit, this.expiryTimeVal);
+            
+            if(DateTimeUtils.timeElapsed(timestamp, currentTimestamp, expirationMS)) {
+                // expired
+                this.driver.remove(this.name, key);
+                return null;
+            } else {
+                byte[] data = new byte[bytes.length - 8];
+                System.arraycopy(bytes, 8, data, 0, bytes.length - 8);
+                return ObjectSerializer.fromByteArray(data, this.valueClass);
+            }
+        } else {
+            return null;
+        }
+        
     }
 
     @Override
     public void put(String key, Object value) throws IOException {
-        byte[] bytes = ObjectSerializer.toByteArray(value);
+        byte[] data = ObjectSerializer.toByteArray(value);
+        byte[] bytes = new byte[data.length + 8];
+        long currentTimestamp = DateTimeUtils.getTimestamp();
+        
+        longToByteArray(currentTimestamp, bytes);
+        System.arraycopy(data, 0, bytes, 8, data.length);
+        
         this.driver.putBytes(this.name, key, bytes);
     }
 
     @Override
     public boolean putIfAbsent(String key, Object value) throws IOException {
-        if(!this.driver.existKey(name, key)) {
+        this.cleanUp();
+        
+        if(!this.driver.existKey(this.name, key)) {
             put(key, value);
             return true;
         }
+        
         return false;
     }
 
@@ -121,6 +215,8 @@ public class LocalFSKeyValueStore extends AbstractKeyValueStore {
 
     @Override
     public Collection<String> keys() throws IOException {
+        this.cleanUp();
+        
         return this.driver.listKeys(this.name);
     }
 
@@ -131,6 +227,8 @@ public class LocalFSKeyValueStore extends AbstractKeyValueStore {
 
     @Override
     public Map<String, Object> toMap() throws IOException {
+        this.cleanUp();
+        
         Map<String, Object> map = new HashMap<String, Object>();
         Collection<String> keys = this.driver.listKeys(this.name);
         for(String key : keys) {

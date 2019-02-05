@@ -18,6 +18,7 @@ package stargate.drivers.datastore.ignite;
 import java.io.IOException;
 import java.util.HashMap;
 import java.util.Map;
+import java.util.concurrent.TimeUnit;
 import org.apache.commons.logging.Log;
 import org.apache.commons.logging.LogFactory;
 import org.apache.ignite.Ignite;
@@ -111,6 +112,26 @@ public class IgniteDataStoreDriver extends AbstractDataStoreDriver {
         if(store == null) {
             Ignite ignite = this.igniteDriver.getIgnite();
             store = new IgniteKeyValueStore(this, ignite, name, valueClass, property);
+            this.kvStores.put(name, store);
+        }
+        
+        return store;
+    }
+    
+    @Override
+    public AbstractKeyValueStore getKeyValueStore(String name, Class valueClass, EnumDataStoreProperty property, TimeUnit timeunit, long timeval) throws IOException {
+        if(name == null || name.isEmpty()) {
+            throw new IllegalArgumentException("name is null or empty");
+        }
+        
+        if(valueClass == null) {
+            throw new IllegalArgumentException("valueClass is null");
+        }
+        
+        IgniteKeyValueStore store = this.kvStores.get(name);
+        if(store == null) {
+            Ignite ignite = this.igniteDriver.getIgnite();
+            store = new IgniteKeyValueStore(this, ignite, name, valueClass, property, timeunit, timeval);
             this.kvStores.put(name, store);
         }
         

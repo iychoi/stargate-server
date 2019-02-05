@@ -198,7 +198,7 @@ public class HTTPTransportDriver extends AbstractTransportDriver {
         
         HTTPTransportClient existingClient = (HTTPTransportClient) this.clients.get(node.getName());
         if(existingClient != null) {
-            boolean isLive = true;
+            boolean isLive;
             if(DateTimeUtils.timeElapsedSec(existingClient.getLastActiveTime(), DateTimeUtils.getTimestamp(), DEFAULT_LIVECHECK_SECONDS)) {
                 isLive = existingClient.isLive();
             } else {

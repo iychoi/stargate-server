@@ -22,7 +22,10 @@ import java.util.Iterator;
 import java.util.List;
 import java.util.ArrayList;
 import java.util.Map;
+import java.util.concurrent.TimeUnit;
 import javax.cache.Cache;
+import javax.cache.expiry.CreatedExpiryPolicy;
+import javax.cache.expiry.Duration;
 import org.apache.commons.logging.Log;
 import org.apache.commons.logging.LogFactory;
 import org.apache.ignite.Ignite;
@@ -50,6 +53,8 @@ public class IgniteKeyValueStore extends AbstractKeyValueStore {
     private String name;
     private Class valueClass;
     private EnumDataStoreProperty property;
+    private TimeUnit expiryTimeUnit;
+    private long expiryTimeValue;
     
     private IgniteCache<String, byte[]> store;
     
@@ -59,6 +64,8 @@ public class IgniteKeyValueStore extends AbstractKeyValueStore {
         this.name = name;
         this.valueClass = valueClass;
         this.property = property;
+        this.expiryTimeUnit = TimeUnit.SECONDS;
+        this.expiryTimeValue = 0;
         
         CacheConfiguration<String, byte[]> cc = new CacheConfiguration<String, byte[]>();
         if(EnumDataStoreProperty.isDistributed(property)) {
@@ -82,6 +89,41 @@ public class IgniteKeyValueStore extends AbstractKeyValueStore {
         cc.setName(name);
         
         this.store = this.ignite.getOrCreateCache(cc);
+    }
+    
+    IgniteKeyValueStore(IgniteDataStoreDriver driver, Ignite ignite, String name, Class valueClass, EnumDataStoreProperty property,TimeUnit timeunit, long timeval) {
+        this.driver = driver;
+        this.ignite = ignite;
+        this.name = name;
+        this.valueClass = valueClass;
+        this.property = property;
+        this.expiryTimeUnit = timeunit;
+        this.expiryTimeValue = timeval;
+        
+        CacheConfiguration<String, byte[]> cc = new CacheConfiguration<String, byte[]>();
+        if(EnumDataStoreProperty.isDistributed(property)) {
+            cc.setCacheMode(CacheMode.PARTITIONED);
+        } else if(EnumDataStoreProperty.isReplciated(property)) {
+            cc.setCacheMode(CacheMode.REPLICATED);
+        }
+        
+        if(EnumDataStoreProperty.isPersistent(property)) {
+            cc.setDataRegionName(IgniteDriver.PERSISTENT_REGION_NAME);
+        } else if(EnumDataStoreProperty.isVolatile(property)) {
+            cc.setDataRegionName(IgniteDriver.VOLATILE_REGION_NAME);
+        }
+        
+        cc.setWriteSynchronizationMode(CacheWriteSynchronizationMode.FULL_SYNC);
+        cc.setAtomicityMode(CacheAtomicityMode.ATOMIC);
+        cc.setEvictionPolicy(null);
+        cc.setCopyOnRead(false);
+        cc.setOnheapCacheEnabled(true);
+        cc.setReadFromBackup(true);
+        cc.setName(name);
+        
+        Duration duration = new Duration(timeunit, timeval);
+        CreatedExpiryPolicy expiryPolicy = new CreatedExpiryPolicy(duration);
+        this.store = this.ignite.getOrCreateCache(cc).withExpiryPolicy(expiryPolicy);
     }
     
     @Override

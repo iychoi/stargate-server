@@ -26,6 +26,7 @@ import java.util.Collections;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.concurrent.TimeUnit;
 import org.apache.commons.logging.Log;
 import org.apache.commons.logging.LogFactory;
 import stargate.commons.driver.AbstractDriverConfig;
@@ -310,6 +311,20 @@ public class LocalFSDataStoreDriver extends AbstractDataStoreDriver {
             }
             
             s = new LocalFSKeyValueStore(this, name, valueClass, property);
+            this.kvStores.put(name, s);
+        }
+        return s;
+    }
+    
+    @Override
+    public AbstractKeyValueStore getKeyValueStore(String name, Class valueClass, EnumDataStoreProperty property, TimeUnit timeunit, long timeval) throws IOException {
+        LocalFSKeyValueStore s = this.kvStores.get(name);
+        if(s == null) {
+            if(!makeStore(name)) {
+                throw new IOException("Cannot create a kv store (" + name + ")");
+            }
+            
+            s = new LocalFSKeyValueStore(this, name, valueClass, property, timeunit, timeval);
             this.kvStores.put(name, s);
         }
         return s;

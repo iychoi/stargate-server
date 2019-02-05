@@ -24,6 +24,7 @@ import java.util.Collection;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.concurrent.TimeUnit;
 import org.apache.commons.logging.Log;
 import org.apache.commons.logging.LogFactory;
 import stargate.commons.cluster.Cluster;
@@ -67,7 +68,12 @@ public class VolumeManager extends AbstractManager<NullDriver> {
     private Directory rootDirectoryCache = null;
     private long lastUpdateTimeRootDirectoryCache = 0;
     
+    private AbstractKeyValueStore remoteDirectoryCacheStore; // <DataObjectURI, Directory>
+    private AbstractKeyValueStore remoteRecipeCacheStore; // <DataObjectURI, Recipe>
+    
     private static final String VOLUME_STORE = "volume";
+    private static final String REMOTE_DIRECTORY_CACHE_STORE = "remote_dir_cache";
+    private static final String REMOTE_RECIPE_CACHE_STORE = "remote_recipe_cache";
     
     public static VolumeManager getInstance(StargateService service) throws ManagerNotInstantiatedException {
         synchronized (VolumeManager.class) {
@@ -115,6 +121,32 @@ public class VolumeManager extends AbstractManager<NullDriver> {
                 StargateService stargateService = getStargateService();
                 DataStoreManager keyValueStoreManager = stargateService.getDataStoreManager();
                 this.localVolumeStore = keyValueStoreManager.getDriver().getKeyValueStore(VOLUME_STORE, Directory.class, EnumDataStoreProperty.DATASTORE_PROP_PERSISTENT_REPLICATED);
+            } catch (ManagerNotInstantiatedException ex) {
+                LOG.error(ex);
+                throw new IOException(ex);
+            }
+        }
+    }
+    
+    private synchronized void safeInitRemoteDirectoryCacheStore() throws IOException {
+        if(this.remoteDirectoryCacheStore == null) {
+            try {
+                StargateService stargateService = getStargateService();
+                DataStoreManager keyValueStoreManager = stargateService.getDataStoreManager();
+                this.remoteDirectoryCacheStore = keyValueStoreManager.getDriver().getKeyValueStore(REMOTE_DIRECTORY_CACHE_STORE, Directory.class, EnumDataStoreProperty.DATASTORE_PROP_VOLATILE_REPLICATED, TimeUnit.MINUTES, 5);
+            } catch (ManagerNotInstantiatedException ex) {
+                LOG.error(ex);
+                throw new IOException(ex);
+            }
+        }
+    }
+    
+    private synchronized void safeInitRemoteRecipeCacheStore() throws IOException {
+        if(this.remoteRecipeCacheStore == null) {
+            try {
+                StargateService stargateService = getStargateService();
+                DataStoreManager keyValueStoreManager = stargateService.getDataStoreManager();
+                this.remoteRecipeCacheStore = keyValueStoreManager.getDriver().getKeyValueStore(REMOTE_RECIPE_CACHE_STORE, Recipe.class, EnumDataStoreProperty.DATASTORE_PROP_VOLATILE_REPLICATED, TimeUnit.MINUTES, 5);
             } catch (ManagerNotInstantiatedException ex) {
                 LOG.error(ex);
                 throw new IOException(ex);
@@ -320,18 +352,26 @@ public class VolumeManager extends AbstractManager<NullDriver> {
     }
     
     private Directory getRemoteDirectory(DataObjectURI uri) throws IOException, FileNotFoundException {
-        try {
-            StargateService stargateService = getStargateService();
-            TransportManager transportManager = stargateService.getTransportManager();
-            Directory directory = transportManager.getDirectory(uri);
-            if(directory == null) {
-                throw new FileNotFoundException(String.format("cannot find a remote directory (%s)", uri.toString()));
+        safeInitRemoteDirectoryCacheStore();
+        
+        Directory cachedDirectory = (Directory) this.remoteDirectoryCacheStore.get(uri.toUri().toASCIIString());
+        if(cachedDirectory == null) {
+            try {
+                StargateService stargateService = getStargateService();
+                TransportManager transportManager = stargateService.getTransportManager();
+                Directory directory = transportManager.getDirectory(uri);
+                if(directory == null) {
+                    throw new FileNotFoundException(String.format("cannot find a remote directory (%s)", uri.toString()));
+                }
+                
+                this.remoteDirectoryCacheStore.put(uri.toUri().toASCIIString(), directory);
+                cachedDirectory = directory;
+            } catch (ManagerNotInstantiatedException ex) {
+                LOG.error(ex);
+                throw new IOException(ex);
             }
-            return directory;
-        } catch (ManagerNotInstantiatedException ex) {
-            LOG.error(ex);
-            throw new IOException(ex);
         }
+        return cachedDirectory;
     }
     
     public Directory getDirectory(DataObjectURI uri) throws IOException, FileNotFoundException {
@@ -406,18 +446,26 @@ public class VolumeManager extends AbstractManager<NullDriver> {
     }
     
     private Recipe getRemoteRecipe(DataObjectURI uri) throws IOException, FileNotFoundException {
-        try {
-            StargateService stargateService = getStargateService();
-            TransportManager transportManager = stargateService.getTransportManager();
-            Recipe recipe = transportManager.getRecipe(uri);
-            if(recipe == null) {
-                throw new FileNotFoundException(String.format("cannot find a remote recipe (%s)", uri.toString()));
+        safeInitRemoteRecipeCacheStore();
+        
+        Recipe cachedRecipe = (Recipe) this.remoteRecipeCacheStore.get(uri.toUri().toASCIIString());
+        if(cachedRecipe == null) {
+            try {
+                StargateService stargateService = getStargateService();
+                TransportManager transportManager = stargateService.getTransportManager();
+                Recipe recipe = transportManager.getRecipe(uri);
+                if(recipe == null) {
+                    throw new FileNotFoundException(String.format("cannot find a remote recipe (%s)", uri.toString()));
+                }
+                
+                this.remoteRecipeCacheStore.put(uri.toUri().toASCIIString(), recipe);
+                cachedRecipe = recipe;
+            } catch (ManagerNotInstantiatedException ex) {
+                LOG.error(ex);
+                throw new IOException(ex);
             }
-            return recipe;
-        } catch (ManagerNotInstantiatedException ex) {
-            LOG.error(ex);
-            throw new IOException(ex);
         }
+        return cachedRecipe;
     }
     
     public Recipe getRecipe(DataObjectURI uri) throws IOException, FileNotFoundException {
