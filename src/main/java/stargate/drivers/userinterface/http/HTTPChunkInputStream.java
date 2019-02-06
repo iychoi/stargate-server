@@ -235,7 +235,7 @@ public class HTTPChunkInputStream extends FSInputStream {
             client.connect();
         }
         
-        InputStream dataChunkIS = client.getRemoteDataChunk(uri.getClusterName(), chunk.getHashString());
+        InputStream dataChunkIS = client.getRemoteDataChunk(uri.getClusterName(), chunk.getHash());
         this.chunkData = new ChunkData(IOUtils.toByteArray(dataChunkIS), chunk.getOffset(), chunk.getLength());
         dataChunkIS.close();
     }

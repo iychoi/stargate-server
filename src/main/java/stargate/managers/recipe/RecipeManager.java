@@ -176,7 +176,7 @@ public class RecipeManager extends AbstractManager<AbstractRecipeDriver> {
         Collection<RecipeChunk> chunks = recipe.getChunks();
         
         for(RecipeChunk chunk : chunks) {
-            String hash = chunk.getHashString();
+            String hash = chunk.getHash();
             
             ReverseRecipeMapping mapping = (ReverseRecipeMapping) this.hashStore.get(hash);
             if(mapping == null) {
@@ -194,7 +194,7 @@ public class RecipeManager extends AbstractManager<AbstractRecipeDriver> {
         Collection<RecipeChunk> chunks = recipe.getChunks();
         
         for(RecipeChunk chunk : chunks) {
-            String hash = chunk.getHashString();
+            String hash = chunk.getHash();
             
             ReverseRecipeMapping mapping = (ReverseRecipeMapping) this.hashStore.get(hash);
             if(mapping != null) {
@@ -211,7 +211,7 @@ public class RecipeManager extends AbstractManager<AbstractRecipeDriver> {
     private Collection<String> getHashes(Collection<RecipeChunk> recipeChunks) {
         List<String> hashes = new ArrayList<String>();
         for(RecipeChunk chunk : recipeChunks) {
-            hashes.add(chunk.getHashString());
+            hashes.add(chunk.getHash());
         }
         return hashes;
     }

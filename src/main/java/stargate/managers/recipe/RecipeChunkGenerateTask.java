@@ -55,7 +55,7 @@ public class RecipeChunkGenerateTask extends DistributedTask {
                     StargateService stargateInstance = StargateService.getInstance();
                     RecipeManager recipeManager = stargateInstance.getRecipeManager();
                     RecipeChunk recipeChunk = recipeManager.createRecipeChunk(event);
-                    LOG.debug(String.format("Generated chunk %s - %s", event.getDataExportEntry().getSourceURI().toASCIIString(), recipeChunk.getHashString()));
+                    LOG.debug(String.format("Generated chunk %s - %s", event.getDataExportEntry().getSourceURI().toASCIIString(), recipeChunk.getHash()));
                     generatedChunks.add(recipeChunk);
                 } catch (ServiceNotStartedException ex) {
                     LOG.error(ex);

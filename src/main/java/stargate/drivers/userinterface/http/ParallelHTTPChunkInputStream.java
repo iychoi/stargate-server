@@ -289,7 +289,7 @@ public class ParallelHTTPChunkInputStream extends FSInputStream {
             client.connect();
         }
         
-        InputStream dataChunkIS = client.getRemoteDataChunk(uri.getClusterName(), chunk.getHashString());
+        InputStream dataChunkIS = client.getRemoteDataChunk(uri.getClusterName(), chunk.getHash());
         ChunkData newChunkData = new ChunkData(IOUtils.toByteArray(dataChunkIS), chunk.getOffset(), chunk.getLength());
         dataChunkIS.close();
         return newChunkData;
