@@ -238,6 +238,8 @@ public class TransportManager extends AbstractManager<AbstractTransportDriver> {
                 int remoteNodeNum = remoteNodes.size();
                 
                 // round-robin mapping
+                mappings = new ResponsibleNodeMapping(remoteCluster.getName());
+                
                 for(int i=0;i<localNodeNum;i++) {
                     Node localNode = localNodes.get(i);
                     Node remoteNode = remoteNodes.get(i % remoteNodeNum);
