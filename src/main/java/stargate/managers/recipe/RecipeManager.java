@@ -42,7 +42,6 @@ import stargate.commons.manager.ManagerNotInstantiatedException;
 import stargate.commons.recipe.AbstractRecipeDriver;
 import stargate.commons.recipe.Recipe;
 import stargate.commons.recipe.RecipeChunk;
-import stargate.commons.schedule.AbstractScheduleDriver;
 import stargate.commons.utils.DateTimeUtils;
 import stargate.managers.cluster.ClusterManager;
 import stargate.managers.dataexport.DataExportManager;
