@@ -200,9 +200,16 @@ public class TransportManager extends AbstractManager<AbstractTransportDriver> {
             Node localNode = clusterManager.getLocalNode();
             ResponsibleNodeMapping responsibleNodeMappings = getResponsibleNodeMappings(remoteCluster);
             
-            NodeMapping mapping = responsibleNodeMappings.findForwardMapping(localNode.getName());
-            Node remoteNode = remoteCluster.getNode(mapping.getNodeName2());
-            return remoteNode;
+            NodeMapping mapping = responsibleNodeMappings.getNodeMapping(localNode.getName());
+            Collection<String> targetNodeNames = mapping.getTargetNodeNames();
+            
+            for(String targetNodeName : targetNodeNames) {
+                Node remoteNode = remoteCluster.getNode(targetNodeName);
+                if(remoteNode != null) {
+                    return remoteNode;
+                }
+            }
+            throw new IOException("Could not find a responsible node");
         } catch (ManagerNotInstantiatedException ex) {
             LOG.error(ex);
             throw new IOException(ex);
@@ -240,14 +247,24 @@ public class TransportManager extends AbstractManager<AbstractTransportDriver> {
                 // round-robin mapping
                 mappings = new ResponsibleNodeMapping(remoteCluster.getName());
                 
-                for(int i=0;i<localNodeNum;i++) {
-                    Node localNode = localNodes.get(i);
-                    Node remoteNode = remoteNodes.get(i % remoteNodeNum);
-                    
-                    LOG.debug(String.format("Determined a responsible node of %s -> %s", localNode.getName(), remoteNode.getName()));
-                    
-                    NodeMapping mapping = new NodeMapping(localNode.getName(), remoteNode.getName());
-                    mappings.addNodeMapping(mapping);
+                if(localNodeNum >= remoteNodeNum) {
+                    for(int i=0;i<localNodeNum;i++) {
+                        Node localNode = localNodes.get(i);
+                        Node remoteNode = remoteNodes.get(i % remoteNodeNum);
+
+                        LOG.debug(String.format("Determined a responsible node of %s -> %s", localNode.getName(), remoteNode.getName()));
+
+                        mappings.addNodeMapping(localNode.getName(), remoteNode.getName());
+                    }
+                } else {
+                    for(int i=0;i<remoteNodeNum;i++) {
+                        Node localNode = localNodes.get(i % localNodeNum);
+                        Node remoteNode = remoteNodes.get(i);
+
+                        LOG.debug(String.format("Determined a responsible node of %s -> %s", localNode.getName(), remoteNode.getName()));
+
+                        mappings.addNodeMapping(localNode.getName(), remoteNode.getName());
+                    }
                 }
                 
                 this.responsibleNodeMappingStore.put(remoteCluster.getName(), mappings);

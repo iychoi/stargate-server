@@ -17,7 +17,11 @@ package stargate.managers.transport;
 
 import java.io.File;
 import java.io.IOException;
+import java.util.Collection;
+import java.util.Collections;
+import java.util.HashSet;
 import java.util.Objects;
+import java.util.Set;
 import org.codehaus.jackson.annotate.JsonIgnore;
 import org.codehaus.jackson.annotate.JsonProperty;
 import stargate.commons.utils.JsonSerializer;
@@ -28,8 +32,8 @@ import stargate.commons.utils.JsonSerializer;
  */
 public class NodeMapping {
 
-    private String nodeName1;
-    private String nodeName2;
+    private String sourceNodeName;
+    private Set<String> targetNodeNames = new HashSet<String>();
     
     public static NodeMapping createInstance(File file) throws IOException {
         if(file == null) {
@@ -50,45 +54,69 @@ public class NodeMapping {
     NodeMapping() {
     }
     
-    public NodeMapping(String nodeName1, String nodeName2) {
-        if(nodeName1 == null || nodeName1.isEmpty()) {
-            throw new IllegalArgumentException("nodeName1 is null or empty");
+    public NodeMapping(String sourceNodeName, Collection<String> targetNodeNames) {
+        if(sourceNodeName == null || sourceNodeName.isEmpty()) {
+            throw new IllegalArgumentException("sourceNodeName is null or empty");
         }
         
-        if(nodeName2 == null || nodeName2.isEmpty()) {
-            throw new IllegalArgumentException("nodeName2 is null or empty");
+        if(targetNodeNames == null || targetNodeNames.isEmpty()) {
+            throw new IllegalArgumentException("targetNodeNames is null or empty");
         }
         
-        this.nodeName1 = nodeName1;
-        this.nodeName2 = nodeName2;
+        this.sourceNodeName = sourceNodeName;
+        this.targetNodeNames.addAll(targetNodeNames);
     }
     
-    @JsonProperty("node_name_1")
-    public String getNodeName1() {
-        return this.nodeName1;
+    public NodeMapping(String sourceNodeName, String targetNodeName) {
+        if(sourceNodeName == null || sourceNodeName.isEmpty()) {
+            throw new IllegalArgumentException("sourceNodeName is null or empty");
+        }
+        
+        if(targetNodeName == null || targetNodeName.isEmpty()) {
+            throw new IllegalArgumentException("targetNodeName is null or empty");
+        }
+        
+        this.sourceNodeName = sourceNodeName;
+        this.targetNodeNames.add(targetNodeName);
     }
     
-    @JsonProperty("node_name_1")
-    public void setNodeName1(String nodeName1) {
-        this.nodeName1 = nodeName1;
+    @JsonProperty("source_node_name")
+    public String getSourceNodeName() {
+        return this.sourceNodeName;
     }
     
-    @JsonProperty("node_name_2")
-    public String getNodeName2() {
-        return this.nodeName2;
+    @JsonProperty("source_node_name")
+    public void setSourceNodeName(String sourceNodeName) {
+        this.sourceNodeName = sourceNodeName;
     }
     
-    @JsonProperty("node_name_2")
-    public void setNodeName2(String nodeName2) {
-        this.nodeName2 = nodeName2;
+    @JsonProperty("target_node_names")
+    public Collection<String> getTargetNodeNames() {
+        return Collections.unmodifiableCollection(this.targetNodeNames);
+    }
+    
+    @JsonProperty("target_node_names")
+    public void addTargetNodeNames(Collection<String> targetNodeNames) {
+        for(String targetNodeName : targetNodeNames) {
+            addTargetNodeName(targetNodeName);
+        }
+    }
+    
+    @JsonIgnore
+    public void addTargetNodeName(String targetNodeName) {
+        if(!this.targetNodeNames.contains(targetNodeName)) {
+            this.targetNodeNames.add(targetNodeName);
+        }
     }
     
     @Override
     @JsonIgnore
     public int hashCode() {
         int hash = 5;
-        hash = 17 * hash + Objects.hashCode(this.nodeName1);
-        hash = 17 * hash + Objects.hashCode(this.nodeName2);
+        hash = 17 * hash + Objects.hashCode(this.sourceNodeName);
+        for(String targetNodeName : this.targetNodeNames) {
+            hash = 17 * hash + Objects.hashCode(targetNodeName);
+        }
         return hash;
     }
 
@@ -105,10 +133,10 @@ public class NodeMapping {
             return false;
         }
         final NodeMapping other = (NodeMapping) obj;
-        if (!Objects.equals(this.nodeName1, other.nodeName1)) {
+        if (!Objects.equals(this.sourceNodeName, other.sourceNodeName)) {
             return false;
         }
-        if (!Objects.equals(this.nodeName2, other.nodeName2)) {
+        if (!Objects.equals(this.targetNodeNames, other.targetNodeNames)) {
             return false;
         }
         return true;
@@ -117,7 +145,7 @@ public class NodeMapping {
     @Override
     @JsonIgnore
     public String toString() {
-        return "NodeMapping{" + "node1=" + nodeName1 + ", node2=" + nodeName2 + '}';
+        return "NodeMapping{" + "sourceNodeName=" + sourceNodeName + '}';
     }
     
     @JsonIgnore

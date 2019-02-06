@@ -37,7 +37,6 @@ public class ResponsibleNodeMapping {
     
     private String clusterName;
     private Map<String, NodeMapping> forwardMappings = new HashMap<String, NodeMapping>(); // forward, local to remote
-    private Map<String, NodeMapping> reverseMappings = new HashMap<String, NodeMapping>(); // reverse, remote to local
     
     public static ResponsibleNodeMapping createInstance(File file) throws IOException {
         if(file == null) {
@@ -81,34 +80,46 @@ public class ResponsibleNodeMapping {
     }
     
     @JsonIgnore
-    public NodeMapping findForwardMapping(String nodeName1) {
-        return this.forwardMappings.get(nodeName1);
-    }
-    
-    @JsonIgnore
-    public NodeMapping findReverseMapping(String nodeName2) {
-        return this.reverseMappings.get(nodeName2);
+    public NodeMapping getNodeMapping(String localNodeName) {
+        return this.forwardMappings.get(localNodeName);
     }
     
     @JsonProperty("node_mappings")
     public void addNodeMappings(Collection<NodeMapping> mappings) {
         for(NodeMapping mapping : mappings) {
-            this.forwardMappings.put(mapping.getNodeName1(), mapping);
-            this.reverseMappings.put(mapping.getNodeName2(), mapping);
+            addNodeMapping(mapping);
         }
     }
     
     @JsonIgnore
     public void addNodeMapping(NodeMapping mapping) {
-        this.forwardMappings.put(mapping.getNodeName1(), mapping);
-        this.reverseMappings.put(mapping.getNodeName2(), mapping);
+        NodeMapping existingForwardMapping = this.forwardMappings.get(mapping.getSourceNodeName());
+        if(existingForwardMapping != null) {
+            // add
+            existingForwardMapping.addTargetNodeNames(mapping.getTargetNodeNames());
+        } else {
+            // create a new
+            this.forwardMappings.put(mapping.getSourceNodeName(), mapping);
+        }
     }
     
     @JsonIgnore
-    public boolean removeNodeMappingForward(String nodeName1) {
-        NodeMapping mapping = this.forwardMappings.remove(nodeName1);
+    public void addNodeMapping(String sourcecNodeName, String targetNodeName) {
+        NodeMapping existingForwardMapping = this.forwardMappings.get(sourcecNodeName);
+        if(existingForwardMapping != null) {
+            // add
+            existingForwardMapping.addTargetNodeName(targetNodeName);
+        } else {
+            // create a new
+            NodeMapping mapping = new NodeMapping(sourcecNodeName, targetNodeName);
+            this.forwardMappings.put(sourcecNodeName, mapping);
+        }
+    }
+    
+    @JsonIgnore
+    public boolean removeNodeMapping(String sourceNameName) {
+        NodeMapping mapping = this.forwardMappings.remove(sourceNameName);
         if(mapping != null) {
-            this.reverseMappings.remove(mapping.getNodeName2());
             return true;
         }
         return false;
@@ -117,7 +128,6 @@ public class ResponsibleNodeMapping {
     @JsonIgnore
     public void clearNodeMappings() {
         this.forwardMappings.clear();
-        this.reverseMappings.clear();
     }
     
     @Override
