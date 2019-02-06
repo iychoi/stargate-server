@@ -15,8 +15,12 @@
 */
 package stargate.managers.transport;
 
+import java.io.File;
+import java.io.IOException;
 import java.util.Objects;
+import org.codehaus.jackson.annotate.JsonIgnore;
 import org.codehaus.jackson.annotate.JsonProperty;
+import stargate.commons.utils.JsonSerializer;
 
 /**
  *
@@ -26,6 +30,25 @@ public class NodeMapping {
 
     private String nodeName1;
     private String nodeName2;
+    
+    public static NodeMapping createInstance(File file) throws IOException {
+        if(file == null) {
+            throw new IllegalArgumentException("file is null");
+        }
+
+        return (NodeMapping) JsonSerializer.fromJsonFile(file, NodeMapping.class);
+    }
+    
+    public static NodeMapping createInstance(String json) throws IOException {
+        if(json == null || json.isEmpty()) {
+            throw new IllegalArgumentException("json is null or empty");
+        }
+        
+        return (NodeMapping) JsonSerializer.fromJson(json, NodeMapping.class);
+    }
+    
+    NodeMapping() {
+    }
     
     public NodeMapping(String nodeName1, String nodeName2) {
         if(nodeName1 == null || nodeName1.isEmpty()) {
@@ -61,6 +84,7 @@ public class NodeMapping {
     }
     
     @Override
+    @JsonIgnore
     public int hashCode() {
         int hash = 5;
         hash = 17 * hash + Objects.hashCode(this.nodeName1);
@@ -69,6 +93,7 @@ public class NodeMapping {
     }
 
     @Override
+    @JsonIgnore
     public boolean equals(Object obj) {
         if (this == obj) {
             return true;
@@ -90,7 +115,22 @@ public class NodeMapping {
     }
     
     @Override
+    @JsonIgnore
     public String toString() {
         return "NodeMapping{" + "node1=" + nodeName1 + ", node2=" + nodeName2 + '}';
+    }
+    
+    @JsonIgnore
+    public String toJson() throws IOException {
+        return JsonSerializer.toJson(this);
+    }
+    
+    @JsonIgnore
+    public void saveTo(File file) throws IOException {
+        if(file == null) {
+            throw new IllegalArgumentException("file is null");
+        }
+        
+        JsonSerializer.toJsonFile(file, this);
     }
 }
