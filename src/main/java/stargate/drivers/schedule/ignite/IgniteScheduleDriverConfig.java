@@ -17,8 +17,6 @@ package stargate.drivers.schedule.ignite;
 
 import java.io.File;
 import java.io.IOException;
-import org.apache.commons.logging.Log;
-import org.apache.commons.logging.LogFactory;
 import stargate.commons.schedule.AbstractScheduleDriverConfig;
 import stargate.commons.utils.JsonSerializer;
 
@@ -27,8 +25,6 @@ import stargate.commons.utils.JsonSerializer;
  * @author iychoi
  */
 public class IgniteScheduleDriverConfig extends AbstractScheduleDriverConfig {
-    
-    private static final Log LOG = LogFactory.getLog(IgniteScheduleDriverConfig.class);
     
     public static IgniteScheduleDriverConfig createInstance(File file) throws IOException {
         if(file == null) {

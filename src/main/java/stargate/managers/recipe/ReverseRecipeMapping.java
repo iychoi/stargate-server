@@ -21,8 +21,6 @@ import java.util.Collection;
 import java.util.Collections;
 import java.util.HashSet;
 import java.util.Set;
-import org.apache.commons.logging.Log;
-import org.apache.commons.logging.LogFactory;
 import org.codehaus.jackson.annotate.JsonIgnore;
 import org.codehaus.jackson.annotate.JsonProperty;
 import stargate.commons.utils.JsonSerializer;
@@ -32,8 +30,6 @@ import stargate.commons.utils.JsonSerializer;
  * @author iychoi
  */
 public class ReverseRecipeMapping {
-    
-    private static final Log LOG = LogFactory.getLog(ReverseRecipeMapping.class);
     
     private String hash;
     private Set<String> recipeNames = new HashSet<String>();
@@ -93,6 +89,11 @@ public class ReverseRecipeMapping {
     @JsonIgnore
     public boolean removeRecipeName(String recipeName) {
         return this.recipeNames.remove(recipeName);
+    }
+    
+    @JsonIgnore
+    public int getRecipeNameCount() {
+        return this.recipeNames.size();
     }
     
     @JsonIgnore

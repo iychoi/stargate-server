@@ -15,7 +15,12 @@
 */
 package stargate.managers.dataexport;
 
+import java.io.File;
+import java.io.IOException;
+import org.codehaus.jackson.annotate.JsonIgnore;
+import org.codehaus.jackson.annotate.JsonProperty;
 import stargate.commons.datasource.DataExportEntry;
+import stargate.commons.utils.JsonSerializer;
 
 /**
  *
@@ -23,18 +28,79 @@ import stargate.commons.datasource.DataExportEntry;
  */
 public class DataExportEvent {
     private DataExportEventType eventType;
-    private DataExportEntry entry;
+    private DataExportEntry dataExportEntry;
     
-    DataExportEvent(DataExportEventType eventType, DataExportEntry entry) {
-        this.eventType = eventType;
-        this.entry = entry;
+    public static DataExportEvent createInstance(File file) throws IOException {
+        if(file == null) {
+            throw new IllegalArgumentException("file is null");
+        }
+
+        return (DataExportEvent) JsonSerializer.fromJsonFile(file, DataExportEvent.class);
     }
     
+    public static DataExportEvent createInstance(String json) throws IOException {
+        if(json == null || json.isEmpty()) {
+            throw new IllegalArgumentException("json is null or empty");
+        }
+        
+        return (DataExportEvent) JsonSerializer.fromJson(json, DataExportEvent.class);
+    }
+    
+    DataExportEvent() {
+    }
+    
+    public DataExportEvent(DataExportEventType eventType, DataExportEntry entry) {
+        if(eventType == null) {
+            throw new IllegalArgumentException("eventType is null");
+        }
+        
+        if(entry == null) {
+            throw new IllegalArgumentException("entry is null");
+        }
+        
+        this.eventType = eventType;
+        this.dataExportEntry = entry;
+    }
+    
+    @JsonProperty("event_type")
     public DataExportEventType getEventType() {
         return this.eventType;
     }
     
-    public DataExportEntry getEntry() {
-        return this.entry;
+    @JsonProperty("event_type")
+    public void setEventType(DataExportEventType eventType) {
+        if(eventType == null) {
+            throw new IllegalArgumentException("eventType is null");
+        }
+        
+        this.eventType = eventType;
+    }
+    
+    @JsonProperty("data_export_entry")
+    public DataExportEntry getDataExportEntry() {
+        return this.dataExportEntry;
+    }
+    
+    @JsonProperty("data_export_entry")
+    public void setDataExportEntry(DataExportEntry dataExportEntry) {
+        if(dataExportEntry == null) {
+            throw new IllegalArgumentException("dataExportEntry is null");
+        }
+        
+        this.dataExportEntry = dataExportEntry;
+    }
+    
+    @JsonIgnore
+    public String toJson() throws IOException {
+        return JsonSerializer.toJson(this);
+    }
+    
+    @JsonIgnore
+    public void saveTo(File file) throws IOException {
+        if(file == null) {
+            throw new IllegalArgumentException("file is null");
+        }
+        
+        JsonSerializer.toJsonFile(file, this);
     }
 }

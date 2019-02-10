@@ -87,6 +87,10 @@ public class NodeMapping {
     
     @JsonProperty("source_node_name")
     public void setSourceNodeName(String sourceNodeName) {
+        if(sourceNodeName == null || sourceNodeName.isEmpty()) {
+            throw new IllegalArgumentException("sourceNodeName is null or empty");
+        }
+        
         this.sourceNodeName = sourceNodeName;
     }
     
@@ -97,6 +101,10 @@ public class NodeMapping {
     
     @JsonProperty("target_node_names")
     public void addTargetNodeNames(Collection<String> targetNodeNames) {
+        if(targetNodeNames == null) {
+            throw new IllegalArgumentException("targetNodeNames is null");
+        }
+        
         for(String targetNodeName : targetNodeNames) {
             addTargetNodeName(targetNodeName);
         }
@@ -104,9 +112,11 @@ public class NodeMapping {
     
     @JsonIgnore
     public void addTargetNodeName(String targetNodeName) {
-        if(!this.targetNodeNames.contains(targetNodeName)) {
-            this.targetNodeNames.add(targetNodeName);
+        if(targetNodeName == null || targetNodeName.isEmpty()) {
+            throw new IllegalArgumentException("targetNodeName is null or empty");
         }
+        
+        this.targetNodeNames.add(targetNodeName);
     }
     
     @Override

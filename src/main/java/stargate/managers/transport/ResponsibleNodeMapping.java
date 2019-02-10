@@ -21,8 +21,7 @@ import java.util.Collection;
 import java.util.Collections;
 import java.util.HashMap;
 import java.util.Map;
-import org.apache.commons.logging.Log;
-import org.apache.commons.logging.LogFactory;
+import java.util.Objects;
 import org.codehaus.jackson.annotate.JsonIgnore;
 import org.codehaus.jackson.annotate.JsonProperty;
 import stargate.commons.utils.JsonSerializer;
@@ -32,8 +31,6 @@ import stargate.commons.utils.JsonSerializer;
  * @author iychoi
  */
 public class ResponsibleNodeMapping {
-    
-    private static final Log LOG = LogFactory.getLog(ResponsibleNodeMapping.class);
     
     private String clusterName;
     private Map<String, NodeMapping> forwardMappings = new HashMap<String, NodeMapping>(); // forward, local to remote
@@ -61,6 +58,7 @@ public class ResponsibleNodeMapping {
         if(clusterName == null || clusterName.isEmpty()) {
             throw new IllegalArgumentException("clusterName is null or empty");
         }
+        
         this.clusterName = clusterName;
     }
     
@@ -71,9 +69,13 @@ public class ResponsibleNodeMapping {
     
     @JsonProperty("cluster_name")
     public void setClusterName(String clusterName) {
+        if(clusterName == null || clusterName.isEmpty()) {
+            throw new IllegalArgumentException("clusterName is null or empty");
+        }
+        
         this.clusterName = clusterName;
     }
-    
+
     @JsonProperty("node_mappings")
     public Collection<NodeMapping> getNodeMappings() {
         return Collections.unmodifiableCollection(this.forwardMappings.values());
@@ -81,11 +83,19 @@ public class ResponsibleNodeMapping {
     
     @JsonIgnore
     public NodeMapping getNodeMapping(String localNodeName) {
+        if(localNodeName == null || localNodeName.isEmpty()) {
+            throw new IllegalArgumentException("localNodeName is null or empty");
+        }
+        
         return this.forwardMappings.get(localNodeName);
     }
     
     @JsonProperty("node_mappings")
     public void addNodeMappings(Collection<NodeMapping> mappings) {
+        if(mappings == null) {
+            throw new IllegalArgumentException("mappings is null");
+        }
+        
         for(NodeMapping mapping : mappings) {
             addNodeMapping(mapping);
         }
@@ -93,6 +103,10 @@ public class ResponsibleNodeMapping {
     
     @JsonIgnore
     public void addNodeMapping(NodeMapping mapping) {
+        if(mapping == null) {
+            throw new IllegalArgumentException("mapping is null");
+        }
+        
         NodeMapping existingForwardMapping = this.forwardMappings.get(mapping.getSourceNodeName());
         if(existingForwardMapping != null) {
             // add
@@ -105,6 +119,14 @@ public class ResponsibleNodeMapping {
     
     @JsonIgnore
     public void addNodeMapping(String sourcecNodeName, String targetNodeName) {
+        if(sourcecNodeName == null || sourcecNodeName.isEmpty()) {
+            throw new IllegalArgumentException("sourcecNodeName is null or empty");
+        }
+        
+        if(targetNodeName == null || targetNodeName.isEmpty()) {
+            throw new IllegalArgumentException("targetNodeName is null or empty");
+        }
+        
         NodeMapping existingForwardMapping = this.forwardMappings.get(sourcecNodeName);
         if(existingForwardMapping != null) {
             // add
@@ -117,8 +139,12 @@ public class ResponsibleNodeMapping {
     }
     
     @JsonIgnore
-    public boolean removeNodeMapping(String sourceNameName) {
-        NodeMapping mapping = this.forwardMappings.remove(sourceNameName);
+    public boolean removeNodeMapping(String sourcecNodeName) {
+        if(sourcecNodeName == null || sourcecNodeName.isEmpty()) {
+            throw new IllegalArgumentException("sourcecNodeName is null or empty");
+        }
+        
+        NodeMapping mapping = this.forwardMappings.remove(sourcecNodeName);
         if(mapping != null) {
             return true;
         }
@@ -128,6 +154,33 @@ public class ResponsibleNodeMapping {
     @JsonIgnore
     public void clearNodeMappings() {
         this.forwardMappings.clear();
+    }
+    
+    @Override
+    @JsonIgnore
+    public int hashCode() {
+        int hash = 7;
+        hash = 29 * hash + Objects.hashCode(this.clusterName);
+        return hash;
+    }
+
+    @Override
+    @JsonIgnore
+    public boolean equals(Object obj) {
+        if (this == obj) {
+            return true;
+        }
+        if (obj == null) {
+            return false;
+        }
+        if (getClass() != obj.getClass()) {
+            return false;
+        }
+        final ResponsibleNodeMapping other = (ResponsibleNodeMapping) obj;
+        if (!Objects.equals(this.clusterName, other.clusterName)) {
+            return false;
+        }
+        return true;
     }
     
     @Override

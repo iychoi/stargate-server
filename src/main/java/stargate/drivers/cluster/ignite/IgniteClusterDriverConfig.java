@@ -21,21 +21,17 @@ import java.util.ArrayList;
 import java.util.Collection;
 import java.util.Collections;
 import java.util.List;
-import org.apache.commons.logging.Log;
-import org.apache.commons.logging.LogFactory;
 import org.codehaus.jackson.annotate.JsonIgnore;
 import org.codehaus.jackson.annotate.JsonProperty;
 import stargate.commons.cluster.AbstractClusterDriverConfig;
 import stargate.commons.utils.JsonSerializer;
-import stargate.utils.pkg.ResourceUtils;
+import stargate.commons.utils.ResourceUtils;
 
 /**
  *
  * @author iychoi
  */
 public class IgniteClusterDriverConfig extends AbstractClusterDriverConfig {
-    
-    private static final Log LOG = LogFactory.getLog(IgniteClusterDriverConfig.class);
     
     public static final String DEFAULT_CLUSTER_NAME = "StargateCluster";
     
@@ -93,7 +89,7 @@ public class IgniteClusterDriverConfig extends AbstractClusterDriverConfig {
     @JsonIgnore
     public void setStorageRootPath(File storageRootPath) {
         if(storageRootPath == null) {
-            throw new IllegalArgumentException("storageRootPath is null or empty");
+            throw new IllegalArgumentException("storageRootPath is null");
         }
         
         super.checkMutableAndRaiseException();
@@ -113,11 +109,26 @@ public class IgniteClusterDriverConfig extends AbstractClusterDriverConfig {
     
     @JsonProperty("cluster_nodes")
     public void addClusterNodes(Collection<String> nodes) {
-        if(nodes != null) {
-            for(String node : nodes) {
-                this.clusterNodes.add(node);
-            }
+        if(nodes == null) {
+            throw new IllegalArgumentException("nodes is null");
         }
+        
+        super.checkMutableAndRaiseException();
+        
+        for(String node : nodes) {
+            addClusterNode(node);
+        }
+    }
+    
+    @JsonIgnore
+    public void addClusterNode(String node) {
+        if(node == null || node.isEmpty()) {
+            throw new IllegalArgumentException("node is null or empty");
+        }
+        
+        super.checkMutableAndRaiseException();
+        
+        this.clusterNodes.add(node);
     }
     
     @JsonProperty("cluster_nodes")

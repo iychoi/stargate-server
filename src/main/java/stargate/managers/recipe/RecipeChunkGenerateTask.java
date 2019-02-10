@@ -42,6 +42,10 @@ public class RecipeChunkGenerateTask extends DistributedTask {
         private Collection<RecipeChunkGenerateEvent> events;
                 
         RecipeChunkGenerateTaskCallable(Collection<RecipeChunkGenerateEvent> events) {
+            if(events == null) {
+                throw new IllegalArgumentException("events is null");
+            }
+            
             this.events = events;
         }
 
@@ -70,7 +74,7 @@ public class RecipeChunkGenerateTask extends DistributedTask {
     }
     
     public RecipeChunkGenerateTask(Collection<String> nodeNames, Collection<RecipeChunkGenerateEvent> events) {
-        super("RecipeChunkGenerateTask", null, events, nodeNames);
+        super("RecipeChunkGenerateTask", events, nodeNames);
         
         RecipeChunkGenerateTaskCallable runnable = new RecipeChunkGenerateTaskCallable(events);
         super.setCallable(runnable);

@@ -45,25 +45,45 @@ public class CacheableInputStream extends InputStream {
     }
     
     @Override
-    public int read(byte[] bytes) throws IOException {
-        int b = this.inputStream.read(bytes);
-        this.cacheData.write(bytes, 0, b);
+    public int read(byte[] buf) throws IOException {
+        if(buf == null) {
+            throw new IllegalArgumentException("buf is null");
+        }
+        
+        int b = this.inputStream.read(buf);
+        this.cacheData.write(buf, 0, b);
         return b;
     }
 
     @Override
-    public int read(byte[] bytes, int i, int i1) throws IOException {
-        int b = this.inputStream.read(bytes, i, i1);
-        this.cacheData.write(bytes, i, b);
+    public int read(byte[] buf, int offset, int len) throws IOException {
+        if(buf == null) {
+            throw new IllegalArgumentException("buf is null");
+        }
+        
+        if(offset < 0) {
+            throw new IllegalArgumentException("offset is negative");
+        }
+        
+        if(len < 0) {
+            throw new IllegalArgumentException("len is negative");
+        }
+        
+        int b = this.inputStream.read(buf, offset, len);
+        this.cacheData.write(buf, offset, b);
         return b;
     }
 
     @Override
-    public long skip(long l) throws IOException {
+    public long skip(long len) throws IOException {
+        if(len < 0) {
+            throw new IllegalArgumentException("len is negative");
+        }
+        
         // don't skip
         //return this.inputStream.skip(l);
         byte[] buffer = new byte[4096];
-        long remaining = l;
+        long remaining = len;
         long skipped = 0;
         while(remaining > 0) {
             int toRead = (int) Math.min(remaining, 4096);
@@ -105,12 +125,12 @@ public class CacheableInputStream extends InputStream {
     }
 
     @Override
-    public synchronized void mark(int i) {
+    public void mark(int i) {
         this.inputStream.mark(i);
     }
 
     @Override
-    public synchronized void reset() throws IOException {
+    public void reset() throws IOException {
         this.inputStream.reset();
         this.cacheData.reset();
     }

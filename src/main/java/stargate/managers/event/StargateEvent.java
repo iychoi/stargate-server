@@ -15,6 +15,12 @@
 */
 package stargate.managers.event;
 
+import java.io.File;
+import java.io.IOException;
+import org.codehaus.jackson.annotate.JsonIgnore;
+import org.codehaus.jackson.annotate.JsonProperty;
+import stargate.commons.utils.JsonSerializer;
+
 /**
  *
  * @author iychoi
@@ -24,16 +30,77 @@ public class StargateEvent {
     private StargateEventType eventType;
     private Object value;
     
+    public static StargateEvent createInstance(File file) throws IOException {
+        if(file == null) {
+            throw new IllegalArgumentException("file is null");
+        }
+
+        return (StargateEvent) JsonSerializer.fromJsonFile(file, StargateEvent.class);
+    }
+    
+    public static StargateEvent createInstance(String json) throws IOException {
+        if(json == null || json.isEmpty()) {
+            throw new IllegalArgumentException("json is null or empty");
+        }
+        
+        return (StargateEvent) JsonSerializer.fromJson(json, StargateEvent.class);
+    }
+    
+    StargateEvent() {
+    }
+    
     public StargateEvent(StargateEventType eventType, Object value) {
+        if(eventType == null) {
+            throw new IllegalArgumentException("eventType is null");
+        }
+        
+        if(value == null) {
+            throw new IllegalArgumentException("value is null");
+        }
+        
         this.eventType = eventType;
         this.value = value;
     }
     
+    @JsonProperty("event_type")
     public StargateEventType getEventType() {
         return this.eventType;
     }
     
+    @JsonProperty("event_type")
+    public void setEventType(StargateEventType eventType) {
+        if(eventType == null) {
+            throw new IllegalArgumentException("eventType is null");
+        }
+        
+        this.eventType = eventType;
+    }
+    
+    @JsonProperty("value")
     public Object getValue() {
         return this.value;
+    }
+    
+    @JsonProperty("value")
+    public void setValue(Object value) {
+        if(value == null) {
+            throw new IllegalArgumentException("value is null");
+        }
+        
+        this.value = value;
+    }
+    
+    @JsonIgnore
+    public String toJson() throws IOException {
+        return JsonSerializer.toJson(this);
+    }
+    
+    @JsonIgnore
+    public void saveTo(File file) throws IOException {
+        if(file == null) {
+            throw new IllegalArgumentException("file is null");
+        }
+        
+        JsonSerializer.toJsonFile(file, this);
     }
 }

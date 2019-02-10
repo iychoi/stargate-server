@@ -36,7 +36,7 @@ import stargate.managers.userinterface.UserInterfaceManager;
 import stargate.managers.volume.VolumeManager;
 import stargate.managers.dataexport.DataExportUpdateEventHandler;
 import stargate.managers.event.EventManager;
-import stargate.tasks.RemoteClusterSyncTask;
+import stargate.managers.cluster.RemoteClusterSyncTask;
 
 /**
  *

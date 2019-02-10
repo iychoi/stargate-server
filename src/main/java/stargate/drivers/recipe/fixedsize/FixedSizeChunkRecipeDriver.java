@@ -107,14 +107,14 @@ public class FixedSizeChunkRecipeDriver extends AbstractRecipeDriver {
     }
     
     @Override
-    public byte[] calculateHash(byte[] buffer) throws IOException {
-        if(buffer == null) {
-            throw new IllegalArgumentException("buffer is null");
+    public byte[] calculateHash(byte[] buf) throws IOException {
+        if(buf == null) {
+            throw new IllegalArgumentException("buf is null");
         }
         
         try {    
             MessageDigest messageDigest = MessageDigest.getInstance(this.hashAlgorithm);
-            messageDigest.update(buffer);
+            messageDigest.update(buf);
             
             byte[] digest = messageDigest.digest();
             return digest;
@@ -127,6 +127,10 @@ public class FixedSizeChunkRecipeDriver extends AbstractRecipeDriver {
     public RecipeChunk produceRecipeChunk(InputStream is, long offset) throws IOException {
         if(is == null) {
             throw new IllegalArgumentException("is is null");
+        }
+        
+        if(offset < 0) {
+            throw new IllegalArgumentException("offset is negative");
         }
         
         try {
@@ -161,14 +165,22 @@ public class FixedSizeChunkRecipeDriver extends AbstractRecipeDriver {
     }
 
     @Override
-    public RecipeChunk produceRecipeChunk(byte[] buffer, long offset, int len) throws IOException {
-        if(buffer == null) {
-            throw new IllegalArgumentException("buffer is null");
+    public RecipeChunk produceRecipeChunk(byte[] buf, long offset, int len) throws IOException {
+        if(buf == null) {
+            throw new IllegalArgumentException("buf is null");
+        }
+        
+        if(offset < 0) {
+            throw new IllegalArgumentException("offset is negative");
+        }
+        
+        if(len < 0) {
+            throw new IllegalArgumentException("len is negative");
         }
         
         try {
             MessageDigest messageDigest = MessageDigest.getInstance(this.hashAlgorithm);
-            messageDigest.update(buffer);
+            messageDigest.update(buf);
             
             byte[] digest = messageDigest.digest();
             

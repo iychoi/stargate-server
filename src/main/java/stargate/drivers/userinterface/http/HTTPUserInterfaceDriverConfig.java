@@ -17,8 +17,6 @@ package stargate.drivers.userinterface.http;
 
 import java.io.File;
 import java.io.IOException;
-import org.apache.commons.logging.Log;
-import org.apache.commons.logging.LogFactory;
 import org.codehaus.jackson.annotate.JsonProperty;
 import stargate.commons.utils.JsonSerializer;
 import stargate.commons.userinterface.AbstractUserInterfaceDriverConfig;
@@ -28,8 +26,6 @@ import stargate.commons.userinterface.AbstractUserInterfaceDriverConfig;
  * @author iychoi
  */
 public class HTTPUserInterfaceDriverConfig extends AbstractUserInterfaceDriverConfig {
-    
-    private static final Log LOG = LogFactory.getLog(HTTPUserInterfaceDriverConfig.class);
     
     public static final String DEFAULT_SERVICE_HOSTNAME_PATTERN = ".*";
     public static final int DEFAULT_SERVICE_PORT = 41010;

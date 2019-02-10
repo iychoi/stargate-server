@@ -19,8 +19,6 @@ import java.io.File;
 import java.io.FileInputStream;
 import java.io.IOException;
 import java.io.InputStream;
-import org.apache.commons.logging.Log;
-import org.apache.commons.logging.LogFactory;
 
 /**
  *
@@ -28,24 +26,22 @@ import org.apache.commons.logging.LogFactory;
  */
 public class LocalFSChunkReader extends InputStream {
 
-    private static final Log LOG = LogFactory.getLog(LocalFSChunkReader.class);
-    
     private InputStream is;
     private long offset;
     private int size;
     private long currentOffset;
     
-    LocalFSChunkReader(File resourcePath, long offset, int size) throws IOException {
+    public LocalFSChunkReader(File resourcePath, long offset, int size) throws IOException {
         if(resourcePath == null) {
             throw new IllegalArgumentException("resourcePath is null");
         }
         
         if(offset < 0) {
-            throw new IllegalArgumentException("offset is invalid");
+            throw new IllegalArgumentException("offset is negative");
         }
         
         if(size < 0) {
-            throw new IllegalArgumentException("size is invalid");
+            throw new IllegalArgumentException("size is negative");
         }
         
         FileInputStream is = new FileInputStream(resourcePath);
@@ -53,17 +49,17 @@ public class LocalFSChunkReader extends InputStream {
         initialize(is, offset, size);
     }
     
-    LocalFSChunkReader(FileInputStream is, long offset, int size) throws IOException {
+    public LocalFSChunkReader(FileInputStream is, long offset, int size) throws IOException {
         if(is == null) {
             throw new IllegalArgumentException("is is null");
         }
         
         if(offset < 0) {
-            throw new IllegalArgumentException("offset is invalid");
+            throw new IllegalArgumentException("offset is negative");
         }
         
         if(size < 0) {
-            throw new IllegalArgumentException("size is invalid");
+            throw new IllegalArgumentException("size is negative");
         }
         
         initialize(is, offset, size);
@@ -73,11 +69,13 @@ public class LocalFSChunkReader extends InputStream {
         this.is = is;
         this.offset = offset;
         this.size = size;
+        
         // do skip because there's no seek api
         long skippedBytes = is.skip(offset);
         if(skippedBytes != this.offset) {
             throw new IOException(String.format("failed to move offset to %d (moved to %d)", this.offset, skippedBytes));
         }
+        
         this.currentOffset = offset;
     }
     
@@ -103,13 +101,17 @@ public class LocalFSChunkReader extends InputStream {
     }
 
     @Override
-    public int read(byte[] bytes) throws IOException {
-        int availableBytes = availableBytes(bytes.length);
+    public int read(byte[] buf) throws IOException {
+        if(buf == null) {
+            throw new IllegalArgumentException("buf is null");
+        }
+        
+        int availableBytes = availableBytes(buf.length);
         if(availableBytes <= 0) {
             return -1;
         }
         
-        int read = this.is.read(bytes, 0, availableBytes);
+        int read = this.is.read(buf, 0, availableBytes);
         if(read >= 0) {
             this.currentOffset += read;
         }
@@ -117,13 +119,25 @@ public class LocalFSChunkReader extends InputStream {
     }
 
     @Override
-    public int read(byte[] bytes, int offset, int len) throws IOException {
+    public int read(byte[] buf, int offset, int len) throws IOException {
+        if(buf == null) {
+            throw new IllegalArgumentException("buf is null");
+        }
+        
+        if(offset < 0) {
+            throw new IllegalArgumentException("offset is negative");
+        }
+        
+        if(len < 0) {
+            throw new IllegalArgumentException("len is negative");
+        }
+        
         int availableBytes = availableBytes(len);
         if(availableBytes <= 0) {
             return -1;
         }
         
-        int read = this.is.read(bytes, offset, availableBytes);
+        int read = this.is.read(buf, offset, availableBytes);
         if(read >= 0) {
             this.currentOffset += read;
         }
@@ -132,6 +146,10 @@ public class LocalFSChunkReader extends InputStream {
 
     @Override
     public long skip(long len) throws IOException {
+        if(len < 0) {
+            throw new IllegalArgumentException("len is negative");
+        }
+        
         int availableBytes = availableBytes((int) len);
         if(availableBytes <= 0) {
             return -1;
@@ -160,11 +178,11 @@ public class LocalFSChunkReader extends InputStream {
     }
 
     @Override
-    public synchronized void mark(int i) {
+    public void mark(int i) {
     }
 
     @Override
-    public synchronized void reset() throws IOException {
+    public void reset() throws IOException {
         this.is.reset();
         long skip = this.is.skip(this.offset);
         if(skip != this.offset) {

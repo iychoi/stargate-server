@@ -13,21 +13,13 @@
    See the License for the specific language governing permissions and
    limitations under the License.
 */
-package stargate.managers.cluster;
-
-import stargate.commons.cluster.Cluster;
+package stargate.managers.transport;
 
 /**
  *
  * @author iychoi
  */
-public abstract class AbstractRemoteClusterEventHandler {
-    public void added(ClusterManager manager, Cluster cluster) {
-    }
-    
-    public void removed(ClusterManager manager, Cluster cluster) {
-    }
-    
-    public void updated(ClusterManager manager, Cluster cluster) {
-    }
+public enum TransferEventType {
+    TRANSFER_EVENT_TYPE_ONDEMAND,
+    TRANSFER_EVENT_TYPE_PREFETCH
 }

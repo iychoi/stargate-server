@@ -43,7 +43,7 @@ import org.apache.ignite.spi.discovery.tcp.TcpDiscoverySpi;
 import org.apache.ignite.spi.discovery.tcp.ipfinder.TcpDiscoveryIpFinder;
 import org.apache.ignite.spi.discovery.tcp.ipfinder.multicast.TcpDiscoveryMulticastIpFinder;
 import org.apache.ignite.spi.discovery.tcp.ipfinder.vm.TcpDiscoveryVmIpFinder;
-import stargate.utils.pkg.ResourceUtils;
+import stargate.commons.utils.ResourceUtils;
 
 /**
  *
@@ -85,15 +85,19 @@ public class IgniteDriver {
     
     public static void setStorageRootPath(File path) {
         if(path == null) {
-            throw new IllegalArgumentException("path is null or empty");
+            throw new IllegalArgumentException("path is null");
         }
         
         storageRootPath = path;
     }
     
     public static void addClusterNodes(Collection<String> nodes) {
-        if(nodes != null) {
-            for(String node : nodes) {
+        if(nodes == null) {
+            throw new IllegalArgumentException("nodes is null");
+        }
+        
+        for(String node : nodes) {
+            if(node != null) {
                 clusterNodes.add(node);
             }
         }

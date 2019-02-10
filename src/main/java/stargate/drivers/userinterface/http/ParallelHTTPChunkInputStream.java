@@ -31,8 +31,6 @@ import java.util.concurrent.Callable;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.concurrent.Future;
-import org.apache.commons.logging.Log;
-import org.apache.commons.logging.LogFactory;
 import org.apache.hadoop.fs.FSInputStream;
 import stargate.commons.utils.IOUtils;
 import stargate.commons.dataobject.DataObjectMetadata;
@@ -41,13 +39,11 @@ import stargate.commons.recipe.Recipe;
 import stargate.commons.recipe.RecipeChunk;
 
 /**
- *
+ * NEED TO REWORK THIS CODE
  * @author iychoi
  */
 public class ParallelHTTPChunkInputStream extends FSInputStream {
 
-    private static final Log LOG = LogFactory.getLog(ParallelHTTPChunkInputStream.class);
-    
     public static final String DEFAULT_NODE_NAME = "*";
     public static final String LOCAL_NODE_NAME = "localhost";
     public static final Integer PARALLEL_REQUESTS = 20;
@@ -183,7 +179,7 @@ public class ParallelHTTPChunkInputStream extends FSInputStream {
     }
     
     @Override
-    public synchronized boolean seekToNewSource(long targetPos) throws IOException {
+    public boolean seekToNewSource(long targetPos) throws IOException {
         return false;
     }
     
@@ -235,9 +231,6 @@ public class ParallelHTTPChunkInputStream extends FSInputStream {
         
         // load
         RecipeChunk chunk = this.recipe.getChunk(offset);
-        if(chunk == null) {
-            throw new IOException(String.format("cannot find chunk for offset %d", offset));
-        }
         
         DataObjectMetadata metadata = this.recipe.getMetadata();
         DataObjectURI uri = metadata.getURI();
@@ -289,7 +282,7 @@ public class ParallelHTTPChunkInputStream extends FSInputStream {
             client.connect();
         }
         
-        InputStream dataChunkIS = client.getRemoteDataChunk(uri.getClusterName(), chunk.getHash());
+        InputStream dataChunkIS = client.getDataChunk(uri, chunk.getHash());
         ChunkData newChunkData = new ChunkData(IOUtils.toByteArray(dataChunkIS), chunk.getOffset(), chunk.getLength());
         dataChunkIS.close();
         return newChunkData;
@@ -321,9 +314,6 @@ public class ParallelHTTPChunkInputStream extends FSInputStream {
         }
         
         RecipeChunk chunk = this.recipe.getChunk(offset);
-        if(chunk == null) {
-            throw new IOException(String.format("cannot find chunk for offset %d", offset));
-        }
         
         long chunkOffset = chunk.getOffset();
         long chunkSize = chunk.getLength();
@@ -431,17 +421,17 @@ public class ParallelHTTPChunkInputStream extends FSInputStream {
     }
     
     @Override
-    public synchronized boolean markSupported() {
+    public boolean markSupported() {
         return false;
     }
 
     @Override
-    public synchronized void mark(int readLimit) {
+    public void mark(int readLimit) {
         // Do nothing
     }
 
     @Override
-    public synchronized void reset() throws IOException {
+    public void reset() throws IOException {
         throw new IOException("Mark not supported");
     }
 }

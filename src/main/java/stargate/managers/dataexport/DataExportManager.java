@@ -393,7 +393,7 @@ public class DataExportManager extends AbstractManager<NullDriver> {
     }
     
     private void processDataExportEntryEvent(DataExportEvent event) {
-        DataExportEntry entry = event.getEntry();
+        DataExportEntry entry = event.getDataExportEntry();
         switch(event.getEventType()) {
             case DATAEXPORT_EVENT_TYPE_ADD:
                 LOG.debug(String.format("data export entry is added : %s", entry.getStargatePath()));

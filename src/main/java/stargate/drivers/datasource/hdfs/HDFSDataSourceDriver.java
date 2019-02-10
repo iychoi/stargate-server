@@ -58,6 +58,7 @@ public class HDFSDataSourceDriver extends AbstractDataSourceDriver {
     private FileSystem filesystem;
     
     private Map<String, String> cachedNodeNameConvTable = new HashMap<String, String>();
+    private Object cachedNodeNameConvTableSyncObj = new Object();
     
     public HDFSDataSourceDriver(AbstractDriverConfig config) {
         if(config == null) {
@@ -158,7 +159,7 @@ public class HDFSDataSourceDriver extends AbstractDataSourceDriver {
         
         if(source.startsWith(root)) {
             String relativePath = source.substring(root.length());
-            String driverPath = PathUtils.concatPath("/", relativePath);
+            String driverPath = PathUtils.makeAbsolutePath(relativePath);
             return new URI(String.format("%s://%s", this.scheme, driverPath));
         } else {
             throw new IOException(String.format("cannot convert sourcefs URI to driver URI - %s (root: %s)", source, root));
@@ -312,11 +313,11 @@ public class HDFSDataSourceDriver extends AbstractDataSourceDriver {
         }
         
         if(offset < 0) {
-            throw new IllegalArgumentException("offset is invalid");
+            throw new IllegalArgumentException("offset is negative");
         }
         
-        if(size <= 0) {
-            throw new IllegalArgumentException("size is invalid");
+        if(size < 0) {
+            throw new IllegalArgumentException("size is negative");
         }
         
         Path hdfsPath = getSourcePath(uri);
@@ -343,11 +344,11 @@ public class HDFSDataSourceDriver extends AbstractDataSourceDriver {
         }
         
         if(offset < 0) {
-            throw new IllegalArgumentException("offset is invalid");
+            throw new IllegalArgumentException("offset is negative");
         }
         
-        if(size <= 0) {
-            throw new IllegalArgumentException("size is invalid");
+        if(size < 0) {
+            throw new IllegalArgumentException("size is negative");
         }
         
         Path hdfsPath = getSourcePath(uri);
@@ -410,35 +411,37 @@ public class HDFSDataSourceDriver extends AbstractDataSourceDriver {
     }
     
     private String convToStargateNodeName(Cluster stargateCluster, String hadoopNode) {
-        String nodeName = this.cachedNodeNameConvTable.get(hadoopNode);
-        if(nodeName != null) {
-            return nodeName;
-        }
-        
-        Collection<Node> clusterNodes = stargateCluster.getNodes();
-        for(Node node : clusterNodes) {
-            if(node.getName().equals(hadoopNode)) {
-                nodeName = node.getName();
-                this.cachedNodeNameConvTable.put(hadoopNode, nodeName);
+        synchronized (this.cachedNodeNameConvTableSyncObj) {
+            String nodeName = this.cachedNodeNameConvTable.get(hadoopNode);
+            if(nodeName != null) {
                 return nodeName;
             }
-        }
 
-        for(Node node : clusterNodes) {
-            Collection<String> hostnames = node.getHostnames();
-            for(String hostname : hostnames) {
-                if(hostname.equals(hadoopNode)) {
+            Collection<Node> clusterNodes = stargateCluster.getNodes();
+            for(Node node : clusterNodes) {
+                if(node.getName().equals(hadoopNode)) {
                     nodeName = node.getName();
                     this.cachedNodeNameConvTable.put(hadoopNode, nodeName);
                     return nodeName;
                 }
-                
-                // compare IP part
-                String location_hostname = extractHostname(hadoopNode);
-                if(hostname.equals(location_hostname)) {
-                    nodeName = node.getName();
-                    this.cachedNodeNameConvTable.put(hadoopNode, nodeName);
-                    return nodeName;
+            }
+
+            for(Node node : clusterNodes) {
+                Collection<String> hostnames = node.getHostnames();
+                for(String hostname : hostnames) {
+                    if(hostname.equals(hadoopNode)) {
+                        nodeName = node.getName();
+                        this.cachedNodeNameConvTable.put(hadoopNode, nodeName);
+                        return nodeName;
+                    }
+
+                    // compare IP part
+                    String location_hostname = extractHostname(hadoopNode);
+                    if(hostname.equals(location_hostname)) {
+                        nodeName = node.getName();
+                        this.cachedNodeNameConvTable.put(hadoopNode, nodeName);
+                        return nodeName;
+                    }
                 }
             }
         }

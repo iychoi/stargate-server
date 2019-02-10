@@ -113,7 +113,7 @@ public class Recipes {
     
     private static void process_recipe_get(URI serviceURI, String stargatePath) {
         try {
-            String concatPath = PathUtils.concatPath("/", stargatePath);
+            String concatPath = PathUtils.makeAbsolutePath(stargatePath);
             
             HTTPUserInterfaceClient client = HTTPUIClient.getClient(serviceURI);
             client.connect();
@@ -159,7 +159,7 @@ public class Recipes {
 
     private static void process_recipe_remove(URI serviceURI, String stargatePath) {
         try {
-            String concatPath = PathUtils.concatPath("/", stargatePath);
+            String concatPath = PathUtils.makeAbsolutePath(stargatePath);
             
             HTTPUserInterfaceClient client = HTTPUIClient.getClient(serviceURI);
             client.connect();

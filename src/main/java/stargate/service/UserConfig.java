@@ -21,8 +21,6 @@ import java.util.Collection;
 import java.util.Collections;
 import java.util.HashMap;
 import java.util.Map;
-import org.apache.commons.logging.Log;
-import org.apache.commons.logging.LogFactory;
 import org.codehaus.jackson.annotate.JsonIgnore;
 import org.codehaus.jackson.annotate.JsonProperty;
 import stargate.commons.cluster.Cluster;
@@ -36,8 +34,6 @@ import stargate.commons.utils.JsonSerializer;
  * @author iychoi
  */
 public class UserConfig extends AbstractImmutableConfig {
-    
-    private static final Log LOG = LogFactory.getLog(UserConfig.class);
     
     private Map<String, Cluster> remoteClusters = new HashMap<String, Cluster>();
     private Map<String, DataExportEntry> dataExportEntries = new HashMap<String, DataExportEntry>();

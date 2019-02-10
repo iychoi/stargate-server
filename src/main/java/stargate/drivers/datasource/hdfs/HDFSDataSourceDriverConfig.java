@@ -17,8 +17,6 @@ package stargate.drivers.datasource.hdfs;
 
 import java.io.File;
 import java.io.IOException;
-import org.apache.commons.logging.Log;
-import org.apache.commons.logging.LogFactory;
 import org.apache.hadoop.fs.Path;
 import org.codehaus.jackson.annotate.JsonIgnore;
 import org.codehaus.jackson.annotate.JsonProperty;
@@ -30,8 +28,6 @@ import stargate.commons.datasource.AbstractDataSourceDriverConfig;
  * @author iychoi
  */
 public class HDFSDataSourceDriverConfig extends AbstractDataSourceDriverConfig {
-    
-    private static final Log LOG = LogFactory.getLog(HDFSDataSourceDriverConfig.class);
     
     public static final String DEFAULT_SCHEME = "hdfs";
     

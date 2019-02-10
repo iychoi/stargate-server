@@ -21,8 +21,6 @@ import java.io.InputStream;
 import java.net.URI;
 import java.util.Arrays;
 import java.util.Collection;
-import org.apache.commons.logging.Log;
-import org.apache.commons.logging.LogFactory;
 import stargate.commons.cluster.Cluster;
 import stargate.commons.cluster.Node;
 import stargate.commons.dataobject.DataObjectMetadata;
@@ -41,8 +39,6 @@ import stargate.commons.utils.PathUtils;
  */
 public class HTTPUserInterfaceClient extends AbstractUserInterfaceClient {
 
-    private static final Log LOG = LogFactory.getLog(HTTPUserInterfaceClient.class);
-    
     private URI serviceUri;
     private String username;
     private String password;
@@ -56,6 +52,8 @@ public class HTTPUserInterfaceClient extends AbstractUserInterfaceClient {
             throw new IllegalArgumentException("serviceURI is null");
         }
         
+        // username and password can be null
+        
         this.serviceUri = serviceURI;
         this.username = username;
         this.password = password;
@@ -63,7 +61,7 @@ public class HTTPUserInterfaceClient extends AbstractUserInterfaceClient {
     }
     
     @Override
-    public void connect() throws IOException {
+    public synchronized void connect() throws IOException {
         if(!this.connected) {
             this.restfulClient = new RestfulClient(this.serviceUri, this.username, this.password);
 
@@ -74,7 +72,7 @@ public class HTTPUserInterfaceClient extends AbstractUserInterfaceClient {
     }
     
     @Override
-    public void disconnect() {
+    public synchronized void disconnect() {
         if(this.connected) {
             this.restfulClient.close();
             this.connected = false;
@@ -413,46 +411,29 @@ public class HTTPUserInterfaceClient extends AbstractUserInterfaceClient {
     }
 
     @Override
-    public InputStream getDataChunk(String hash) throws IOException {
+    public InputStream getDataChunk(DataObjectURI uri, String hash) throws IOException {
         if(!this.connected) {
             throw new IOException("Client is not connected");
+        }
+        
+        if(uri == null) {
+            throw new IllegalArgumentException("uri is null");
         }
         
         if(hash == null || hash.isEmpty()) {
             throw new IllegalArgumentException("hash is null or empty");
         }
         
-        // URL pattern = http://xxx.xxx.xxx.xxx/api/data/hash
-        String url = makeAPIPath(HTTPUserInterfaceRestfulConstants.API_GET_DATA_CHUNK_PATH, hash);
+        // URL pattern = http://xxx.xxx.xxx.xxx/api/data/path/hash
+        String path = PathUtils.concatPath(uri.getClusterName(), uri.getPath());
+        String pathHash = PathUtils.concatPath(path, hash);
+        String url = makeAPIPath(HTTPUserInterfaceRestfulConstants.API_GET_DATA_CHUNK_PATH, pathHash);
         InputStream is = this.restfulClient.download(url);
 
         updateLastActivetime();
         return is;
     }
     
-    @Override
-    public InputStream getRemoteDataChunk(String clusterName, String hash) throws IOException {
-        if(!this.connected) {
-            throw new IOException("Client is not connected");
-        }
-        
-        if(clusterName == null || clusterName.isEmpty()) {
-            throw new IllegalArgumentException("clusterName is null or empty");
-        }
-        
-        if(hash == null || hash.isEmpty()) {
-            throw new IllegalArgumentException("hash is null or empty");
-        }
-        
-        // URL pattern = http://xxx.xxx.xxx.xxx/api/rdata/clusterName/hash
-        String path = PathUtils.concatPath(clusterName, hash);
-        String url = makeAPIPath(HTTPUserInterfaceRestfulConstants.API_GET_REMOTE_DATA_CHUNK_PATH, path);
-        InputStream is = this.restfulClient.download(url);
-
-        updateLastActivetime();
-        return is;
-    }
-
     @Override
     public String schedulePrefetch(DataObjectURI uri, String hash) throws IOException {
         if(!this.connected) {

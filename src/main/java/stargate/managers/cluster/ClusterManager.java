@@ -62,6 +62,7 @@ public class ClusterManager extends AbstractManager<AbstractClusterDriver> {
     private Cluster localCluster;
     private AbstractKeyValueStore remoteClusterStore;
     private List<AbstractRemoteClusterEventHandler> remoteClusterEventHandlers = new ArrayList<AbstractRemoteClusterEventHandler>();
+    private Object remoteClusterEventHandlersSyncObj = new Object();
     protected long lastUpdateTime;
     
     private static final String REMOTE_CLUSTER_STORE = "rcluster";
@@ -176,7 +177,7 @@ public class ClusterManager extends AbstractManager<AbstractClusterDriver> {
         }
     }
     
-    private synchronized void safeInitLocalCluster() throws IOException {
+    private void safeInitLocalCluster() throws IOException {
         AbstractClusterDriver driver = getDriver();
         
         long currentTime = DateTimeUtils.getTimestamp();
@@ -191,7 +192,7 @@ public class ClusterManager extends AbstractManager<AbstractClusterDriver> {
         }
     }
     
-    private synchronized void safeInitRemoteClusterStore() throws IOException {
+    private void safeInitRemoteClusterStore() throws IOException {
         if(this.remoteClusterStore == null) {
             try {
                 StargateService stargateService = getStargateService();
@@ -205,7 +206,7 @@ public class ClusterManager extends AbstractManager<AbstractClusterDriver> {
         }
     }
     
-    private synchronized void safeInitClusterPolicy() throws IOException {
+    private void safeInitClusterPolicy() throws IOException {
         if(this.policy == null) {
             try {
                 StargateService stargateService = getStargateService();
@@ -272,7 +273,7 @@ public class ClusterManager extends AbstractManager<AbstractClusterDriver> {
         return this.localCluster.getName();
     }
     
-    public boolean isLocalNode(String name) throws IOException {
+    public synchronized boolean isLocalNode(String name) throws IOException {
         if(!this.started) {
             throw new IllegalStateException("Manager is not started");
         }
@@ -509,25 +510,45 @@ public class ClusterManager extends AbstractManager<AbstractClusterDriver> {
         }
     }
     
-    public synchronized void addLocalClusterEventHandler(AbstractLocalClusterEventHandler eventHandler) {
+    public void addLocalClusterEventHandler(AbstractLocalClusterEventHandler eventHandler) {
+        if(eventHandler == null) {
+            throw new IllegalArgumentException("eventHandler is null");
+        }
+        
         AbstractClusterDriver driver = getDriver();
         driver.addLocalClusterEventHandler(eventHandler);
     }
     
-    public synchronized void removeLocalClusterEventHandler(AbstractLocalClusterEventHandler eventHandler) {
+    public void removeLocalClusterEventHandler(AbstractLocalClusterEventHandler eventHandler) {
+        if(eventHandler == null) {
+            throw new IllegalArgumentException("eventHandler is null");
+        }
+        
         AbstractClusterDriver driver = getDriver();
         driver.removeLocalClusterEventHandler(eventHandler);
     }
     
-    public synchronized void addRemoteClusterEventHandler(AbstractRemoteClusterEventHandler eventHandler) {
-        this.remoteClusterEventHandlers.add(eventHandler);
+    public void addRemoteClusterEventHandler(AbstractRemoteClusterEventHandler eventHandler) {
+        if(eventHandler == null) {
+            throw new IllegalArgumentException("eventHandler is null");
+        }
+        
+        synchronized(this.remoteClusterEventHandlersSyncObj) {
+            this.remoteClusterEventHandlers.add(eventHandler);
+        }
     }
     
-    public synchronized void removeRemoteClusterEventHandler(AbstractRemoteClusterEventHandler eventHandler) {
-        this.remoteClusterEventHandlers.remove(eventHandler);
+    public void removeRemoteClusterEventHandler(AbstractRemoteClusterEventHandler eventHandler) {
+        if(eventHandler == null) {
+            throw new IllegalArgumentException("eventHandler is null");
+        }
+        
+        synchronized(this.remoteClusterEventHandlersSyncObj) {
+            this.remoteClusterEventHandlers.remove(eventHandler);
+        }
     }
 
-    private synchronized void raiseEventForRemoteClusterAdded(Cluster cluster) throws InterruptedException {
+    private void raiseEventForRemoteClusterAdded(Cluster cluster) throws InterruptedException {
         RemoteClusterEvent remoteClusterEvent = new RemoteClusterEvent(RemoteClusterEventType.REMOTECLUSTER_EVENT_TYPE_ADD, cluster);
         
         try {
@@ -541,7 +562,7 @@ public class ClusterManager extends AbstractManager<AbstractClusterDriver> {
         }
     }
     
-    private synchronized void raiseEventForRemoteClusterRemoved(Cluster cluster) throws InterruptedException {
+    private void raiseEventForRemoteClusterRemoved(Cluster cluster) throws InterruptedException {
         RemoteClusterEvent remoteClusterEvent = new RemoteClusterEvent(RemoteClusterEventType.REMOTECLUSTER_EVENT_TYPE_REMOVE, cluster);
         
         try {
@@ -555,7 +576,7 @@ public class ClusterManager extends AbstractManager<AbstractClusterDriver> {
         }
     }
     
-    private synchronized void raiseEventForRemoteClusterUpdated(Cluster cluster) throws InterruptedException {
+    private void raiseEventForRemoteClusterUpdated(Cluster cluster) throws InterruptedException {
         RemoteClusterEvent remoteClusterEvent = new RemoteClusterEvent(RemoteClusterEventType.REMOTECLUSTER_EVENT_TYPE_UPDATE, cluster);
         
         try {
@@ -601,13 +622,6 @@ public class ClusterManager extends AbstractManager<AbstractClusterDriver> {
     }
     
     public synchronized void reportRemoteNodeUnreachable(String clusterName, String nodeName) throws IOException {
-        if(!this.started) {
-            throw new IllegalStateException("Manager is not started");
-        }
-        
-        safeInitClusterPolicy();
-        safeInitRemoteClusterStore();
-        
         if(clusterName == null || clusterName.isEmpty()) {
             throw new IllegalArgumentException("clusterName is null or empty");
         }
@@ -615,6 +629,13 @@ public class ClusterManager extends AbstractManager<AbstractClusterDriver> {
         if(nodeName == null || nodeName.isEmpty()) {
             throw new IllegalArgumentException("nodeName is null or empty");
         }
+        
+        if(!this.started) {
+            throw new IllegalStateException("Manager is not started");
+        }
+        
+        safeInitClusterPolicy();
+        safeInitRemoteClusterStore();
         
         Cluster cluster = (Cluster) this.remoteClusterStore.get(clusterName);
         if(cluster != null) {
@@ -646,20 +667,26 @@ public class ClusterManager extends AbstractManager<AbstractClusterDriver> {
         switch(event.getEventType()) {
             case REMOTECLUSTER_EVENT_TYPE_ADD:
                 LOG.debug(String.format("remote cluster is added : %s", cluster.getName()));
-                for(AbstractRemoteClusterEventHandler handler: this.remoteClusterEventHandlers) {
-                    handler.added(this, cluster);
+                synchronized(this.remoteClusterEventHandlersSyncObj) {
+                    for(AbstractRemoteClusterEventHandler handler: this.remoteClusterEventHandlers) {
+                        handler.added(this, cluster);
+                    }
                 }
                 break;
             case REMOTECLUSTER_EVENT_TYPE_REMOVE:
                 LOG.debug(String.format("remote cluster is removed : %s", cluster.getName()));
-                for(AbstractRemoteClusterEventHandler handler: this.remoteClusterEventHandlers) {
-                    handler.removed(this, cluster);
+                synchronized(this.remoteClusterEventHandlersSyncObj) {
+                    for(AbstractRemoteClusterEventHandler handler: this.remoteClusterEventHandlers) {
+                        handler.removed(this, cluster);
+                    }
                 }
                 break;
             case REMOTECLUSTER_EVENT_TYPE_UPDATE:
                 LOG.debug(String.format("remote cluster is updated : %s", cluster.getName()));
-                for(AbstractRemoteClusterEventHandler handler: this.remoteClusterEventHandlers) {
-                    handler.updated(this, cluster);
+                synchronized(this.remoteClusterEventHandlersSyncObj) {
+                    for(AbstractRemoteClusterEventHandler handler: this.remoteClusterEventHandlers) {
+                        handler.updated(this, cluster);
+                    }
                 }
                 break;
             default:
@@ -668,11 +695,15 @@ public class ClusterManager extends AbstractManager<AbstractClusterDriver> {
         }
     }
 
-    public synchronized long getLastUpdateTime() {
+    public long getLastUpdateTime() {
         return this.lastUpdateTime;
     }
     
-    public synchronized void setLastUpdateTime(long time) {
+    public void setLastUpdateTime(long time) {
+        if(time < 0) {
+            throw new IllegalArgumentException("time is negative");
+        }
+        
         this.lastUpdateTime = time;
     }
 }

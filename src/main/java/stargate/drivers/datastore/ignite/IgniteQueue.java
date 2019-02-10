@@ -19,8 +19,6 @@ import java.io.IOException;
 import java.util.Iterator;
 import java.util.List;
 import java.util.ArrayList;
-import org.apache.commons.logging.Log;
-import org.apache.commons.logging.LogFactory;
 import org.apache.ignite.Ignite;
 import org.apache.ignite.cache.CacheAtomicityMode;
 import org.apache.ignite.cache.CacheMode;
@@ -35,8 +33,6 @@ import stargate.commons.utils.ObjectSerializer;
  */
 public class IgniteQueue extends AbstractQueue {
 
-    private static final Log LOG = LogFactory.getLog(IgniteQueue.class);
-    
     private IgniteDataStoreDriver driver;
     private Ignite ignite;
     private String name;
@@ -45,7 +41,27 @@ public class IgniteQueue extends AbstractQueue {
     
     private org.apache.ignite.IgniteQueue<byte[]> store;
     
-    IgniteQueue(IgniteDataStoreDriver driver, Ignite ignite, String name, Class valueClass, EnumDataStoreProperty property) {
+    public IgniteQueue(IgniteDataStoreDriver driver, Ignite ignite, String name, Class valueClass, EnumDataStoreProperty property) {
+        if(driver == null) {
+            throw new IllegalArgumentException("driver is null");
+        }
+        
+        if(ignite == null) {
+            throw new IllegalArgumentException("ignite is null");
+        }
+        
+        if(name == null || name.isEmpty()) {
+            throw new IllegalArgumentException("name is null or empty");
+        }
+        
+        if(valueClass == null) {
+            throw new IllegalArgumentException("valueClass is null");
+        }
+        
+        if(property == null) {
+            throw new IllegalArgumentException("property is null");
+        }
+        
         this.driver = driver;
         this.ignite = ignite;
         this.name = name;
@@ -75,18 +91,18 @@ public class IgniteQueue extends AbstractQueue {
     }
     
     @Override
-    public int size() {
+    public synchronized int size() {
         return this.store.size();
     }
 
     @Override
-    public boolean isEmpty() {
+    public synchronized boolean isEmpty() {
         return this.store.isEmpty();
     }
 
     
     @Override
-    public Object dequeue() throws IOException {
+    public synchronized Object dequeue() throws IOException {
         byte[] bytes = this.store.take();
         if(bytes == null) {
             return null;
@@ -96,18 +112,22 @@ public class IgniteQueue extends AbstractQueue {
     }
 
     @Override
-    public void enqueue(Object value) throws IOException {
+    public synchronized void enqueue(Object value) throws IOException {
+        if(value == null) {
+            throw new IllegalArgumentException("value is null");
+        }
+        
         byte[] valueBytes = ObjectSerializer.toByteArray(value);
         this.store.put(valueBytes);
     }
     
     @Override
-    public void clear() {
+    public synchronized void clear() {
         this.store.clear();
     }
 
     @Override
-    public List<Object> toList() throws IOException {
+    public synchronized List<Object> toList() throws IOException {
         List<Object> list = new ArrayList<Object>();
         
         Iterator<byte[]> iterator = this.store.iterator();

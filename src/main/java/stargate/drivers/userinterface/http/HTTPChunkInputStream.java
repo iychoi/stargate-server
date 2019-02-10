@@ -22,8 +22,6 @@ import java.util.Collection;
 import java.util.HashMap;
 import java.util.Map;
 import java.util.Set;
-import org.apache.commons.logging.Log;
-import org.apache.commons.logging.LogFactory;
 import org.apache.hadoop.fs.FSInputStream;
 import stargate.commons.utils.IOUtils;
 import stargate.commons.dataobject.DataObjectMetadata;
@@ -38,8 +36,6 @@ import stargate.commons.utils.IPUtils;
  */
 public class HTTPChunkInputStream extends FSInputStream {
 
-    private static final Log LOG = LogFactory.getLog(HTTPChunkInputStream.class);
-    
     public static final String DEFAULT_NODE_NAME = "DEFAULT_NODE";
     public static final String LOCAL_NODE_NAME = "LOCAL_NODE";
     
@@ -129,21 +125,21 @@ public class HTTPChunkInputStream extends FSInputStream {
     }
     
     @Override
-    public synchronized void seek(long l) throws IOException {
-        if(l < 0) {
-            throw new IOException("cannot seek to negative offset : " + l);
+    public synchronized void seek(long offset) throws IOException {
+        if(offset < 0) {
+            throw new IOException("cannot seek to negative offset : " + offset);
         }
         
-        if(l >= this.size) {
+        if(offset >= this.size) {
             this.offset = this.size;
         } else {
-            this.offset = l;
+            this.offset = offset;
         }
     }
     
     @Override
-    public synchronized long skip(long l) throws IOException {
-        if(l <= 0) {
+    public synchronized long skip(long size) throws IOException {
+        if(size <= 0) {
             return 0;
         }
         
@@ -152,21 +148,21 @@ public class HTTPChunkInputStream extends FSInputStream {
         }
         
         long lavailable = this.size - this.offset;
-        if(l >= lavailable) {
+        if(size >= lavailable) {
             this.offset = this.size;
             return lavailable;
         } else {
-            this.offset += l;
-            return l;
+            this.offset += size;
+            return size;
         }
     }
     
     @Override
-    public synchronized boolean seekToNewSource(long targetPos) throws IOException {
+    public boolean seekToNewSource(long targetPos) throws IOException {
         return false;
     }
     
-    private synchronized void loadChunkData(long offset) throws IOException {
+    private void loadChunkData(long offset) throws IOException {
         if(this.chunkData != null &&
                 this.chunkData.getOffset() <= offset &&
                 (this.chunkData.getOffset() + this.chunkData.getSize()) > offset) {
@@ -181,9 +177,6 @@ public class HTTPChunkInputStream extends FSInputStream {
         }
         
         RecipeChunk chunk = this.recipe.getChunk(offset);
-        if(chunk == null) {
-            throw new IOException(String.format("cannot find chunk for offset %d", offset));
-        }
         
         DataObjectMetadata metadata = this.recipe.getMetadata();
         DataObjectURI uri = metadata.getURI();
@@ -235,7 +228,7 @@ public class HTTPChunkInputStream extends FSInputStream {
             client.connect();
         }
         
-        InputStream dataChunkIS = client.getRemoteDataChunk(uri.getClusterName(), chunk.getHash());
+        InputStream dataChunkIS = client.getDataChunk(uri, chunk.getHash());
         this.chunkData = new ChunkData(IOUtils.toByteArray(dataChunkIS), chunk.getOffset(), chunk.getLength());
         dataChunkIS.close();
     }
@@ -267,6 +260,18 @@ public class HTTPChunkInputStream extends FSInputStream {
     public synchronized int read(byte[] bytes, int off, int len) throws IOException {
         if(isEOF()) {
             return -1;
+        }
+            
+        if(bytes == null) {
+            throw new IllegalArgumentException("bytes is null");
+        }
+        
+        if(off < 0) {
+            throw new IllegalArgumentException("off is negative");
+        }
+        
+        if(len < 0) {
+            throw new IllegalArgumentException("len is negative");
         }
             
         long lavailable = this.size - this.offset;
@@ -306,17 +311,17 @@ public class HTTPChunkInputStream extends FSInputStream {
     }
     
     @Override
-    public synchronized boolean markSupported() {
+    public boolean markSupported() {
         return false;
     }
 
     @Override
-    public synchronized void mark(int readLimit) {
+    public void mark(int readLimit) {
         // Do nothing
     }
 
     @Override
-    public synchronized void reset() throws IOException {
+    public void reset() throws IOException {
         throw new IOException("Mark not supported");
     }
 }

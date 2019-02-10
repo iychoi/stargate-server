@@ -21,7 +21,7 @@ import org.apache.commons.logging.Log;
 import org.apache.commons.logging.LogFactory;
 import org.apache.log4j.LogManager;
 import org.apache.log4j.xml.DOMConfigurator;
-import stargate.utils.pkg.ResourceUtils;
+import stargate.commons.utils.ResourceUtils;
 
 /**
  *

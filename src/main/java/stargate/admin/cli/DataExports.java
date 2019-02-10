@@ -116,7 +116,7 @@ public class DataExports {
     
     private static void process_data_exports_get(URI serviceURI, String stargatePath) {
         try {
-            String concatPath = PathUtils.concatPath("/", stargatePath);
+            String concatPath = PathUtils.makeAbsolutePath(stargatePath);
             
             HTTPUserInterfaceClient client = HTTPUIClient.getClient(serviceURI);
             client.connect();
@@ -163,7 +163,7 @@ public class DataExports {
     
     private static void process_data_exports_add(URI serviceURI, String sourceURI, String stargatePath) {
         try {
-            String concatPath = PathUtils.concatPath("/", stargatePath);
+            String concatPath = PathUtils.makeAbsolutePath(stargatePath);
             DataExportEntry entry = new DataExportEntry(sourceURI, concatPath);
             
             HTTPUserInterfaceClient client = HTTPUIClient.getClient(serviceURI);
@@ -184,7 +184,7 @@ public class DataExports {
     
     private static void process_data_exports_remove(URI serviceURI, String stargatePath) {
         try {
-            String concatPath = PathUtils.concatPath("/", stargatePath);
+            String concatPath = PathUtils.makeAbsolutePath(stargatePath);
             
             HTTPUserInterfaceClient client = HTTPUIClient.getClient(serviceURI);
             client.connect();

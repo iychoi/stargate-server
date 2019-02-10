@@ -44,6 +44,7 @@ public class PolicyManager extends AbstractManager<NullDriver> {
     private VolumePolicy volumePolicy;
     private AbstractKeyValueStore policyStore;
     private List<AbstractPolicyEventHandler> policyEventHandlers = new ArrayList<AbstractPolicyEventHandler>();
+    private Object policyEventHandlersSyncObj = new Object();
     protected long lastUpdateTime;
     
     private static final String POLICY_STORE = "policy";
@@ -90,7 +91,7 @@ public class PolicyManager extends AbstractManager<NullDriver> {
         super.stop();
     }
     
-    private synchronized void safeInitPolicyStore() throws IOException {
+    private void safeInitPolicyStore() throws IOException {
         if(this.policyStore == null) {
             try {
                 StargateService stargateService = getStargateService();
@@ -139,7 +140,7 @@ public class PolicyManager extends AbstractManager<NullDriver> {
         raiseEventForPolicyUpdated(key, value);
     }
     
-    public synchronized ClusterPolicy getClusterPolicy(boolean local) throws IOException {
+    public ClusterPolicy getClusterPolicy(boolean local) throws IOException {
         ClusterPolicy policy = getClusterPolicy();
         
         if(local) {
@@ -166,7 +167,7 @@ public class PolicyManager extends AbstractManager<NullDriver> {
         return this.clusterPolicy;
     }
     
-    public synchronized VolumePolicy getVolumePolicy(boolean local) throws IOException {
+    public VolumePolicy getVolumePolicy(boolean local) throws IOException {
         VolumePolicy policy = getVolumePolicy();
         
         if(local) {
@@ -193,27 +194,33 @@ public class PolicyManager extends AbstractManager<NullDriver> {
         return this.volumePolicy;
     }
     
-    public synchronized void addPolicyEventHandler(AbstractPolicyEventHandler eventHandler) {
-        this.policyEventHandlers.add(eventHandler);
+    public void addPolicyEventHandler(AbstractPolicyEventHandler eventHandler) {
+        synchronized(this.policyEventHandlersSyncObj) {
+            this.policyEventHandlers.add(eventHandler);
+        }
     }
     
-    public synchronized void removePolicyEventHandler(AbstractPolicyEventHandler eventHandler) {
-        this.policyEventHandlers.remove(eventHandler);
-    }
-
-    synchronized void raiseEventForPolicyUpdated(String key, Object value) {
-        LOG.debug(String.format("policy is updated : key=%s, value=%s", key, String.valueOf(value)));
-        
-        for(AbstractPolicyEventHandler handler: this.policyEventHandlers) {
-            handler.updated(this, key, value);
+    public void removePolicyEventHandler(AbstractPolicyEventHandler eventHandler) {
+        synchronized(this.policyEventHandlersSyncObj) {
+            this.policyEventHandlers.remove(eventHandler);
         }
     }
 
-    public synchronized long getLastUpdateTime() {
+    private synchronized void raiseEventForPolicyUpdated(String key, Object value) {
+        LOG.debug(String.format("policy is updated : key=%s, value=%s", key, String.valueOf(value)));
+        
+        synchronized(this.policyEventHandlersSyncObj) {
+            for(AbstractPolicyEventHandler handler: this.policyEventHandlers) {
+                handler.updated(this, key, value);
+            }
+        }
+    }
+
+    public long getLastUpdateTime() {
         return this.lastUpdateTime;
     }
     
-    public synchronized void setLastUpdateTime(long time) {
+    public void setLastUpdateTime(long time) {
         this.lastUpdateTime = time;
     }
 }

@@ -39,7 +39,23 @@ public class LocalFSQueue extends AbstractQueue {
     private Class valueClass;
     private EnumDataStoreProperty property;
     
-    LocalFSQueue(LocalFSDataStoreDriver driver, String name, Class valueClass, EnumDataStoreProperty property) {
+    public LocalFSQueue(LocalFSDataStoreDriver driver, String name, Class valueClass, EnumDataStoreProperty property) {
+        if(driver == null) {
+            throw new IllegalArgumentException("driver is null");
+        }
+        
+        if(name == null || name.isEmpty()) {
+            throw new IllegalArgumentException("name is null or empty");
+        }
+        
+        if(valueClass == null) {
+            throw new IllegalArgumentException("valueClass is null");
+        }
+        
+        if(property == null) {
+            throw new IllegalArgumentException("property is null");
+        }
+        
         this.driver = driver;
         this.name = name;
         this.valueClass = valueClass;
@@ -98,6 +114,10 @@ public class LocalFSQueue extends AbstractQueue {
 
     @Override
     public void enqueue(Object value) throws IOException {
+        if(value == null) {
+            throw new IllegalArgumentException("value is null");
+        }
+        
         List<String> orderedKeys = new ArrayList<String>();
         Collection<String> keys = this.driver.listKeys(this.name);
         Collections.addAll(keys);

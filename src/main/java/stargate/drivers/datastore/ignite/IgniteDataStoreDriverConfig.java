@@ -28,8 +28,6 @@ import stargate.commons.datastore.AbstractDataStoreDriverConfig;
  */
 public class IgniteDataStoreDriverConfig extends AbstractDataStoreDriverConfig {
     
-    private static final Log LOG = LogFactory.getLog(IgniteDataStoreDriverConfig.class);
-    
     public static IgniteDataStoreDriverConfig createInstance(File file) throws IOException {
         if(file == null) {
             throw new IllegalArgumentException("file is null");

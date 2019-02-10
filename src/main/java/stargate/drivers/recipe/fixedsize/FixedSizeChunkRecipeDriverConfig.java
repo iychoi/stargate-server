@@ -17,8 +17,6 @@ package stargate.drivers.recipe.fixedsize;
 
 import java.io.File;
 import java.io.IOException;
-import org.apache.commons.logging.Log;
-import org.apache.commons.logging.LogFactory;
 import org.codehaus.jackson.annotate.JsonProperty;
 import stargate.commons.utils.JsonSerializer;
 import stargate.commons.recipe.AbstractRecipeDriverConfig;
@@ -28,8 +26,6 @@ import stargate.commons.recipe.AbstractRecipeDriverConfig;
  * @author iychoi
  */
 public class FixedSizeChunkRecipeDriverConfig extends AbstractRecipeDriverConfig {
-    
-    private static final Log LOG = LogFactory.getLog(FixedSizeChunkRecipeDriverConfig.class);
     
     private static final int DEFAULT_CHUNK_SIZE = 1024*1024; // 1MB
     private static final String DEFAULT_HASH_ALGORITHM = "SHA-1";
@@ -58,8 +54,8 @@ public class FixedSizeChunkRecipeDriverConfig extends AbstractRecipeDriverConfig
     
     @JsonProperty("chunk_size")
     public void setChunkSize(int chunkSize) {
-        if(chunkSize <= 0) {
-            throw new IllegalArgumentException("chunkSize is invalid");
+        if(chunkSize < 0) {
+            throw new IllegalArgumentException("chunkSize is negative");
         }
         
         super.checkMutableAndRaiseException();

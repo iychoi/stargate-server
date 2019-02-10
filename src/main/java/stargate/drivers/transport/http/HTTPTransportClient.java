@@ -21,8 +21,6 @@ import java.io.InputStream;
 import java.net.URI;
 import java.util.Arrays;
 import java.util.Collection;
-import org.apache.commons.logging.Log;
-import org.apache.commons.logging.LogFactory;
 import stargate.commons.cluster.Cluster;
 import stargate.commons.dataobject.DataObjectMetadata;
 import stargate.commons.dataobject.DataObjectURI;
@@ -41,8 +39,6 @@ import stargate.commons.utils.PathUtils;
  */
 public class HTTPTransportClient extends AbstractTransportClient {
 
-    private static final Log LOG = LogFactory.getLog(HTTPTransportClient.class);
-    
     private URI serviceUri;
     private String username;
     private String password;
@@ -51,10 +47,12 @@ public class HTTPTransportClient extends AbstractTransportClient {
     private long lastActiveTime;
     private boolean connected = false;
     
-    HTTPTransportClient(TransportServiceInfo serviceInfo, String username, String password) throws IOException {
+    public HTTPTransportClient(TransportServiceInfo serviceInfo, String username, String password) throws IOException {
         if(serviceInfo == null) {
             throw new IllegalArgumentException("serviceInfo is null");
         }
+        
+        // username and password can be null
         
         this.serviceUri = serviceInfo.getServiceURI();
         this.username = username;
@@ -63,7 +61,7 @@ public class HTTPTransportClient extends AbstractTransportClient {
     }
     
     @Override
-    public void connect() throws IOException {
+    public synchronized void connect() throws IOException {
         if(!this.connected) {
             this.restfulClient = new RestfulClient(this.serviceUri, this.username, this.password);
 
@@ -74,7 +72,7 @@ public class HTTPTransportClient extends AbstractTransportClient {
     }
     
     @Override
-    public void disconnect() {
+    public synchronized void disconnect() {
         if(this.connected) {
             this.restfulClient.close();
             this.connected = false;
@@ -87,7 +85,7 @@ public class HTTPTransportClient extends AbstractTransportClient {
     }
     
     @Override
-    public boolean isConnected() {
+    public synchronized boolean isConnected() {
         return this.connected;
     }
     

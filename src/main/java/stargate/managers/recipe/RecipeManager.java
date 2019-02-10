@@ -146,7 +146,7 @@ public class RecipeManager extends AbstractManager<AbstractRecipeDriver> {
         super.stop();
     }
     
-    private synchronized void safeInitRecipeStore() throws IOException {
+    private void safeInitRecipeStore() throws IOException {
         if(this.recipeStore == null) {
             try {
                 StargateService stargateService = getStargateService();
@@ -157,9 +157,7 @@ public class RecipeManager extends AbstractManager<AbstractRecipeDriver> {
                 throw new IOException(ex);
             }
         }
-    }
-    
-    private synchronized void safeInitHashStore() throws IOException {
+        
         if(this.hashStore == null) {
             try {
                 StargateService stargateService = getStargateService();
@@ -172,7 +170,7 @@ public class RecipeManager extends AbstractManager<AbstractRecipeDriver> {
         }
     }
     
-    private synchronized void addHashes(Recipe recipe) throws IOException {
+    private void addHashes(Recipe recipe) throws IOException {
         Collection<RecipeChunk> chunks = recipe.getChunks();
         
         for(RecipeChunk chunk : chunks) {
@@ -190,7 +188,7 @@ public class RecipeManager extends AbstractManager<AbstractRecipeDriver> {
         }
     }
     
-    private synchronized void removeHashes(Recipe recipe) throws IOException {
+    private void removeHashes(Recipe recipe) throws IOException {
         Collection<RecipeChunk> chunks = recipe.getChunks();
         
         for(RecipeChunk chunk : chunks) {
@@ -201,8 +199,12 @@ public class RecipeManager extends AbstractManager<AbstractRecipeDriver> {
                 boolean result = mapping.removeRecipeName(recipe.getMetadata().getURI().getPath());
             
                 if(result) {
-                    // update - modified
-                    this.hashStore.put(hash, mapping);
+                    if(mapping.getRecipeNameCount() == 0) {
+                        this.hashStore.remove(hash);
+                    } else {
+                        // update - modified
+                        this.hashStore.put(hash, mapping);
+                    }
                 }
             }
         }
@@ -216,7 +218,7 @@ public class RecipeManager extends AbstractManager<AbstractRecipeDriver> {
         return hashes;
     }
     
-    private synchronized void updateHashes(Recipe oldRecipe, Recipe newRecipe) throws IOException {
+    private void updateHashes(Recipe oldRecipe, Recipe newRecipe) throws IOException {
         Collection<RecipeChunk> oldChunks = oldRecipe.getChunks();
         Collection<RecipeChunk> newChunks = newRecipe.getChunks();
         
@@ -233,8 +235,12 @@ public class RecipeManager extends AbstractManager<AbstractRecipeDriver> {
                 boolean result = mapping.removeRecipeName(oldRecipe.getMetadata().getURI().getPath());
                 
                 if(result) {
-                    // update - modified
-                    this.hashStore.put(hash, mapping);
+                    if(mapping.getRecipeNameCount() == 0) {
+                        this.hashStore.remove(hash);
+                    } else {
+                        // update - modified
+                        this.hashStore.put(hash, mapping);
+                    }
                 }
             }
         }
@@ -320,10 +326,11 @@ public class RecipeManager extends AbstractManager<AbstractRecipeDriver> {
             throw new IllegalStateException("Manager is not started");
         }
         
-        safeInitHashStore();
         safeInitRecipeStore();
         
-        ReverseRecipeMapping reverseRecipeMapping = (ReverseRecipeMapping) this.hashStore.get(hash);
+        String hashKey = hash.trim().toLowerCase();
+        
+        ReverseRecipeMapping reverseRecipeMapping = (ReverseRecipeMapping) this.hashStore.get(hashKey);
         if(reverseRecipeMapping == null) {
             return null;
         }
@@ -331,7 +338,7 @@ public class RecipeManager extends AbstractManager<AbstractRecipeDriver> {
         Collection<String> recipeNames = reverseRecipeMapping.getRecipeNames();
         for(String recipeName : recipeNames) {
             Recipe recipe = (Recipe) this.recipeStore.get(recipeName);
-            RecipeChunk chunk = recipe.getChunk(hash);
+            RecipeChunk chunk = recipe.getChunk(hashKey);
             if(chunk != null) {
                 return recipe;
             }
@@ -349,9 +356,11 @@ public class RecipeManager extends AbstractManager<AbstractRecipeDriver> {
             throw new IllegalStateException("Manager is not started");
         }
         
-        safeInitHashStore();
+        safeInitRecipeStore();
         
-        return this.hashStore.containsKey(hash);
+        String hashKey = hash.trim().toLowerCase();
+        
+        return this.hashStore.containsKey(hashKey);
     }
     
     public synchronized void clearRecipes() throws IOException {
@@ -378,7 +387,6 @@ public class RecipeManager extends AbstractManager<AbstractRecipeDriver> {
         }
         
         safeInitRecipeStore();
-        safeInitHashStore();
         
         List<Recipe> failed = new ArrayList<Recipe>();
         
@@ -412,7 +420,6 @@ public class RecipeManager extends AbstractManager<AbstractRecipeDriver> {
         }
         
         safeInitRecipeStore();
-        safeInitHashStore();
         
         String key = recipe.getMetadata().getURI().getPath();
         
@@ -437,7 +444,6 @@ public class RecipeManager extends AbstractManager<AbstractRecipeDriver> {
         }
         
         safeInitRecipeStore();
-        safeInitHashStore();
         
         removeRecipe(recipe.getMetadata().getURI().getPath());
     }
@@ -452,7 +458,6 @@ public class RecipeManager extends AbstractManager<AbstractRecipeDriver> {
         }
         
         safeInitRecipeStore();
-        safeInitHashStore();
         
         Recipe recipe = (Recipe) this.recipeStore.get(stargatePath);
         if(recipe != null) {
@@ -474,7 +479,6 @@ public class RecipeManager extends AbstractManager<AbstractRecipeDriver> {
         }
         
         safeInitRecipeStore();
-        safeInitHashStore();
         
         String key = newRecipe.getMetadata().getURI().getPath();
         
@@ -551,16 +555,20 @@ public class RecipeManager extends AbstractManager<AbstractRecipeDriver> {
     }
     
     public Recipe createRecipe(DataExportEntry entry) throws IOException {
+        if(entry == null) {
+            throw new IllegalArgumentException("entry is null");
+        }
+        
+        if(!this.started) {
+            throw new IllegalStateException("Manager is not started");
+        }
+        
         LOG.info(String.format("createRecipe - %s", entry.getStargatePath()));
         //return createRecipeLocal(entry);
         return createRecipeParallel(entry);
     }
     
     private Recipe createRecipeLocal(DataExportEntry entry) throws IOException {
-        if(!this.started) {
-            throw new IllegalStateException("Manager is not started");
-        }
-        
         try {
             StargateService stargateService = getStargateService();
 
@@ -612,6 +620,10 @@ public class RecipeManager extends AbstractManager<AbstractRecipeDriver> {
     }
     
     public RecipeChunk createRecipeChunk(RecipeChunkGenerateEvent event) throws IOException {
+        if(event == null) {
+            throw new IllegalArgumentException("event is null");
+        }
+        
         if(!this.started) {
             throw new IllegalStateException("Manager is not started");
         }
@@ -642,10 +654,6 @@ public class RecipeManager extends AbstractManager<AbstractRecipeDriver> {
     }
     
     private synchronized Recipe createRecipeParallel(DataExportEntry entry) throws IOException {
-        if(!this.started) {
-            throw new IllegalStateException("Manager is not started");
-        }
-        
         try {
             StargateService stargateService = getStargateService();
 
@@ -818,11 +826,15 @@ public class RecipeManager extends AbstractManager<AbstractRecipeDriver> {
         }
     }
     
-    public synchronized long getLastUpdateTime() {
+    public long getLastUpdateTime() {
         return this.lastUpdateTime;
     }
     
-    public synchronized void setLastUpdateTime(long time) {
+    public void setLastUpdateTime(long time) {
+        if(time < 0) {
+            throw new IllegalArgumentException("time is negative");
+        }
+        
         this.lastUpdateTime = time;
     }
 }

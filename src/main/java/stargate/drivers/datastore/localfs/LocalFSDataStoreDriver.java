@@ -303,7 +303,19 @@ public class LocalFSDataStoreDriver extends AbstractDataStoreDriver {
     }
 
     @Override
-    public AbstractKeyValueStore getKeyValueStore(String name, Class valueClass, EnumDataStoreProperty property) throws IOException {
+    public synchronized AbstractKeyValueStore getKeyValueStore(String name, Class valueClass, EnumDataStoreProperty property) throws IOException {
+        if(name == null || name.isEmpty()) {
+            throw new IllegalArgumentException("name is null or empty");
+        }
+        
+        if(valueClass == null) {
+            throw new IllegalArgumentException("valueClass is null");
+        }
+        
+        if(property == null) {
+            throw new IllegalArgumentException("property is null");
+        }
+        
         LocalFSKeyValueStore s = this.kvStores.get(name);
         if(s == null) {
             if(!makeStore(name)) {
@@ -317,7 +329,27 @@ public class LocalFSDataStoreDriver extends AbstractDataStoreDriver {
     }
     
     @Override
-    public AbstractKeyValueStore getKeyValueStore(String name, Class valueClass, EnumDataStoreProperty property, TimeUnit timeunit, long timeval) throws IOException {
+    public synchronized AbstractKeyValueStore getKeyValueStore(String name, Class valueClass, EnumDataStoreProperty property, TimeUnit timeunit, long timeval) throws IOException {
+        if(name == null || name.isEmpty()) {
+            throw new IllegalArgumentException("name is null or empty");
+        }
+        
+        if(valueClass == null) {
+            throw new IllegalArgumentException("valueClass is null");
+        }
+        
+        if(property == null) {
+            throw new IllegalArgumentException("property is null");
+        }
+        
+        if(timeunit == null) {
+            throw new IllegalArgumentException("timeunit is null");
+        }
+        
+        if(timeval < 0) {
+            throw new IllegalArgumentException("timeval is negative");
+        }
+        
         LocalFSKeyValueStore s = this.kvStores.get(name);
         if(s == null) {
             if(!makeStore(name)) {
@@ -331,7 +363,19 @@ public class LocalFSDataStoreDriver extends AbstractDataStoreDriver {
     }
 
     @Override
-    public AbstractQueue getQueue(String name, Class valueClass, EnumDataStoreProperty property) throws IOException {
+    public synchronized AbstractQueue getQueue(String name, Class valueClass, EnumDataStoreProperty property) throws IOException {
+        if(name == null || name.isEmpty()) {
+            throw new IllegalArgumentException("name is null or empty");
+        }
+        
+        if(valueClass == null) {
+            throw new IllegalArgumentException("valueClass is null");
+        }
+        
+        if(property == null) {
+            throw new IllegalArgumentException("property is null");
+        }
+        
         LocalFSQueue q = this.queues.get(name);
         if(q == null) {
             if(!makeStore(name)) {

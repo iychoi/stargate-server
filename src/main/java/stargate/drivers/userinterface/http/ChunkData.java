@@ -25,11 +25,19 @@ public class ChunkData implements Comparable<ChunkData> {
     private long offset;
     private long size;
 
-    public ChunkData() {
-
-    }
-
     public ChunkData(byte[] data, long offset, long size) {
+        if(data == null) {
+            throw new IllegalArgumentException("data is null");
+        }
+
+        if(offset < 0) {
+            throw new IllegalArgumentException("offset is negative");
+        }
+        
+        if(size < 0) {
+            throw new IllegalArgumentException("size is negative");
+        }
+        
         this.data = data;
         this.offset = offset;
         this.size = size;
@@ -40,6 +48,10 @@ public class ChunkData implements Comparable<ChunkData> {
     }
 
     public void setData(byte[] data) {
+        if(data == null) {
+            throw new IllegalArgumentException("data is null");
+        }
+        
         this.data = data;
     }
 
@@ -48,6 +60,10 @@ public class ChunkData implements Comparable<ChunkData> {
     }
 
     public void setOffset(long offset) {
+        if(offset < 0) {
+            throw new IllegalArgumentException("offset is negative");
+        }
+        
         this.offset = offset;
     }
 
@@ -56,11 +72,19 @@ public class ChunkData implements Comparable<ChunkData> {
     }
 
     public void setSize(long size) {
+        if(size < 0) {
+            throw new IllegalArgumentException("size is negative");
+        }
+        
         this.size = size;
     }
 
     @Override
     public int compareTo(ChunkData other) {
+        if(other == null) {
+            return -1;
+        }
+        
         return (int)(this.offset - other.offset);
     }
 }

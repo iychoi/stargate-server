@@ -17,8 +17,6 @@ package stargate.drivers.datastore.localfs;
 
 import java.io.File;
 import java.io.IOException;
-import org.apache.commons.logging.Log;
-import org.apache.commons.logging.LogFactory;
 import org.codehaus.jackson.annotate.JsonIgnore;
 import org.codehaus.jackson.annotate.JsonProperty;
 import stargate.commons.datastore.AbstractDataStoreDriverConfig;
@@ -29,8 +27,6 @@ import stargate.commons.utils.JsonSerializer;
  * @author iychoi
  */
 public class LocalFSDataStoreDriverConfig extends AbstractDataStoreDriverConfig {
-    
-    private static final Log LOG = LogFactory.getLog(LocalFSDataStoreDriverConfig.class);
     
     private File rootPath = new File("/");
     

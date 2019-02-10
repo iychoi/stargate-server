@@ -63,6 +63,8 @@ import stargate.managers.dataexport.DataExportManagerException;
 import stargate.managers.datasource.DataSourceManager;
 import stargate.managers.recipe.RecipeManager;
 import stargate.managers.recipe.RecipeManagerException;
+import stargate.managers.transport.TransferAssignment;
+import stargate.managers.transport.TransferEvent;
 import stargate.managers.transport.TransportManager;
 import stargate.managers.volume.VolumeManager;
 import stargate.service.StargateService;
@@ -81,17 +83,25 @@ public class HTTPUserInterfaceServlet extends AbstractUserInterfaceServer {
 
     public class StreamingOutputData implements StreamingOutput {
 
-        private static final int BUFFER_SIZE = 8*1024; // 8k
+        private static final int BUFFER_SIZE = 64*1024; // 64k
         private InputStream is;
         private byte[] buffer;
         
         StreamingOutputData(InputStream is) {
+            if(is == null) {
+                throw new IllegalArgumentException("is is null");
+            }
+            
             this.is = is;
             this.buffer = new byte[BUFFER_SIZE];
         }
         
         @Override
         public void write(OutputStream out) throws IOException, WebApplicationException {
+            if(out == null) {
+                throw new IllegalArgumentException("out is null");
+            }
+            
             try {
                 int read = 0;
                 while ((read = this.is.read(this.buffer)) > 0) {
@@ -105,6 +115,10 @@ public class HTTPUserInterfaceServlet extends AbstractUserInterfaceServer {
     }
     
     static void setDriver(HTTPUserInterfaceDriver driver) {
+        if(driver == null) {
+            throw new IllegalArgumentException("driver is null");
+        }
+        
         HTTPUserInterfaceServlet.driver = driver;
     }
     
@@ -497,15 +511,8 @@ public class HTTPUserInterfaceServlet extends AbstractUserInterfaceServer {
         //    throw new IllegalArgumentException("path is null or empty");
         //}
         
-        String new_path = path;
-        if(path == null || path.isEmpty()) {
-            // this is the case when cluster + path is "/"
-            // e.g. sgfs:///
-            new_path = "/";
-        }
-        
         try {
-            DataObjectURI objectUri = new DataObjectURI(new_path);
+            DataObjectURI objectUri = new DataObjectURI(PathUtils.makeAbsolutePath(path));
             DataObjectMetadata objectMetadata = getDataObjectMetadata(objectUri);
             RestfulResponse rres = new RestfulResponse(objectMetadata);
             return Response.status(Response.Status.OK).entity(rres).build();
@@ -543,15 +550,8 @@ public class HTTPUserInterfaceServlet extends AbstractUserInterfaceServer {
         //    throw new IllegalArgumentException("path is null or empty");
         //}
         
-        String new_path = path;
-        if(path == null || path.isEmpty()) {
-            // this is the case when cluster + path is "/"
-            // e.g. sgfs:///
-            new_path = "/";
-        }
-        
         try {
-            DataObjectURI objectUri = new DataObjectURI(new_path);
+            DataObjectURI objectUri = new DataObjectURI(PathUtils.makeAbsolutePath(path));
             Collection<DataObjectMetadata> objectMetadataList = listDataObjectMetadata(objectUri);        
             RestfulResponse rres = new RestfulResponse(objectMetadataList.toArray(new DataObjectMetadata[0]));
             return Response.status(Response.Status.OK).entity(rres).build();
@@ -588,7 +588,7 @@ public class HTTPUserInterfaceServlet extends AbstractUserInterfaceServer {
         }
         
         try {
-            DataObjectURI objectUri = new DataObjectURI(path);
+            DataObjectURI objectUri = new DataObjectURI(PathUtils.makeAbsolutePath(path));
             Recipe recipe = getRecipe(objectUri);
             RestfulResponse rres = new RestfulResponse(recipe);
             return Response.status(Response.Status.OK).entity(rres).build();
@@ -650,7 +650,8 @@ public class HTTPUserInterfaceServlet extends AbstractUserInterfaceServer {
         }
         
         try {
-            DataObjectURI objectUri = new DataObjectURI("", PathUtils.concatPath("/", path));
+            // local
+            DataObjectURI objectUri = new DataObjectURI("", PathUtils.makeAbsolutePath(path));
             removeRecipe(objectUri);
             RestfulResponse rres = new RestfulResponse(true);
             return Response.status(Response.Status.OK).entity(rres).build();
@@ -702,16 +703,22 @@ public class HTTPUserInterfaceServlet extends AbstractUserInterfaceServer {
     }
     
     @GET
-    @Path(HTTPUserInterfaceRestfulConstants.API_PATH + "/" + HTTPUserInterfaceRestfulConstants.API_GET_DATA_CHUNK_PATH + "/{hash:.*}")
+    @Path(HTTPUserInterfaceRestfulConstants.API_PATH + "/" + HTTPUserInterfaceRestfulConstants.API_GET_DATA_CHUNK_PATH + "/{path:.*}/{hash:.*}")
     @Produces(MediaType.APPLICATION_OCTET_STREAM)
     public Response getDataChunkRestful(
-            @DefaultValue("") @PathParam("hash") String hash) throws Exception {
+            @DefaultValue("") @PathParam("path") String path,
+            @DefaultValue("") @PathParam("hash") String hash) throws IOException {
+        if(path == null || path.isEmpty()) {
+            throw new IllegalArgumentException("path is null or empty");
+        }
+        
         if(hash == null || hash.isEmpty()) {
             throw new IllegalArgumentException("hash is null or empty");
         }
         
         try {
-            final InputStream is = getDataChunk(hash);
+            DataObjectURI objectUri = new DataObjectURI(PathUtils.makeAbsolutePath(path));
+            final InputStream is = getDataChunk(objectUri, hash);
             if(is == null) {
                 return Response.status(Response.Status.NOT_FOUND).build();
             }
@@ -724,41 +731,9 @@ public class HTTPUserInterfaceServlet extends AbstractUserInterfaceServer {
     }
     
     @Override
-    public InputStream getDataChunk(String hash) throws IOException {
-        return getRemoteDataChunk(DataObjectURI.WILDCARD_LOCAL_CLUSTER_NAME, hash);
-    }
-    
-    @GET
-    @Path(HTTPUserInterfaceRestfulConstants.API_PATH + "/" + HTTPUserInterfaceRestfulConstants.API_GET_REMOTE_DATA_CHUNK_PATH + "/{cluster:.*}/{hash:.+}")
-    @Produces(MediaType.APPLICATION_OCTET_STREAM)
-    public Response getRemoteDataChunkRestful(
-            @DefaultValue("") @PathParam("cluster") String cluster,
-            @DefaultValue("") @PathParam("hash") String hash) throws Exception {
-        if(cluster == null || cluster.isEmpty()) {
-            throw new IllegalArgumentException("cluster is null or empty");
-        }
-        
-        if(hash == null || hash.isEmpty()) {
-            throw new IllegalArgumentException("hash is null or empty");
-        }
-        
-        try {
-            final InputStream is = getRemoteDataChunk(cluster, hash);
-            if(is == null) {
-                return Response.status(Response.Status.NOT_FOUND).build();
-            }
-            
-            StreamingOutputData stream = new StreamingOutputData(is);
-            return Response.ok(stream).header("content-disposition", "attachment; filename = " + hash).build();
-        } catch (Exception ex) {
-            return Response.status(Response.Status.INTERNAL_SERVER_ERROR).build();
-        }
-    }
-
-    @Override
-    public InputStream getRemoteDataChunk(String clusterName, String hash) throws IOException {
-        if(clusterName == null || clusterName.isEmpty()) {
-            throw new IllegalArgumentException("clusterName is null or empty");
+    public InputStream getDataChunk(DataObjectURI uri, String hash) throws IOException {
+        if(uri == null) {
+            throw new IllegalArgumentException("uri is null");
         }
         
         if(hash == null || hash.isEmpty()) {
@@ -768,7 +743,7 @@ public class HTTPUserInterfaceServlet extends AbstractUserInterfaceServer {
         try {
             StargateService service = getStargateService();
             VolumeManager volumeManager = service.getVolumeManager();
-            return volumeManager.getDataChunk(clusterName, hash);
+            return volumeManager.getDataChunk(uri, hash);
         } catch (ManagerNotInstantiatedException ex) {
             LOG.error(ex);
             throw new IOException(ex);
@@ -790,7 +765,7 @@ public class HTTPUserInterfaceServlet extends AbstractUserInterfaceServer {
         }
         
         try {
-            DataObjectURI objectUri = new DataObjectURI(PathUtils.concatPath("/", path));
+            DataObjectURI objectUri = new DataObjectURI(PathUtils.makeAbsolutePath(path));
             String assignedNodeName = schedulePrefetch(objectUri, hash);
             RestfulResponse rres = new RestfulResponse(assignedNodeName);
             return Response.status(Response.Status.OK).entity(rres).build();
@@ -813,8 +788,9 @@ public class HTTPUserInterfaceServlet extends AbstractUserInterfaceServer {
         try {
             StargateService service = getStargateService();
             TransportManager transportManager = service.getTransportManager();
-            Node assignedNode = transportManager.schedulePrefetch(uri, hash);
-            return assignedNode.getName();
+            TransferAssignment assignment = transportManager.schedulePrefetch(uri, hash);
+            TransferEvent event = assignment.getEvent();
+            return event.getTargetNodeName();
         } catch (ManagerNotInstantiatedException ex) {
             LOG.error(ex);
             throw new IOException(ex);
@@ -831,7 +807,7 @@ public class HTTPUserInterfaceServlet extends AbstractUserInterfaceServer {
         }
         
         try {
-            DataObjectURI objectUri = new DataObjectURI(PathUtils.concatPath("/", path));
+            DataObjectURI objectUri = new DataObjectURI(PathUtils.makeAbsolutePath(path));
             Recipe recipe = getRemoteRecipeWithTransferSchedule(objectUri);
             RestfulResponse rres = new RestfulResponse(recipe);
             return Response.status(Response.Status.OK).entity(rres).build();
@@ -867,7 +843,8 @@ public class HTTPUserInterfaceServlet extends AbstractUserInterfaceServer {
         }
         
         try {
-            DataObjectURI objectUri = new DataObjectURI("", PathUtils.concatPath("/", path));
+            // local
+            DataObjectURI objectUri = new DataObjectURI("", PathUtils.makeAbsolutePath(path));
             DataExportEntry mapping = getDataExportEntry(objectUri);    
             RestfulResponse rres = new RestfulResponse(mapping);
             return Response.status(Response.Status.OK).entity(rres).build();
@@ -1025,7 +1002,8 @@ public class HTTPUserInterfaceServlet extends AbstractUserInterfaceServer {
         }
         
         try {
-            DataObjectURI objectUri = new DataObjectURI("", PathUtils.concatPath("/", path));
+            // local
+            DataObjectURI objectUri = new DataObjectURI("", PathUtils.makeAbsolutePath(path));
             removeDataExportEntry(objectUri);
             RestfulResponse rres = new RestfulResponse(true);
             return Response.status(Response.Status.OK).entity(rres).build();

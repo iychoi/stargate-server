@@ -50,6 +50,7 @@ public class LocalFSDataSourceDriver extends AbstractDataSourceDriver {
     private File rootPath;
     
     private String cachedLocalNodeName;
+    private Object cachedLocalNodeNameSyncObj = new Object();
     
     public LocalFSDataSourceDriver(AbstractDriverConfig config) {
         if(config == null) {
@@ -126,7 +127,7 @@ public class LocalFSDataSourceDriver extends AbstractDataSourceDriver {
         
         if(source.startsWith(root)) {
             String relativePath = source.substring(root.length());
-            String driverPath = PathUtils.concatPath("/", relativePath);
+            String driverPath = PathUtils.makeAbsolutePath(relativePath);
             return new URI(String.format("%s://%s", this.scheme, driverPath));
         } else {
             throw new IOException(String.format("cannot convert sourcefs URI to driver URI - %s (root: %s)", source, root));
@@ -329,24 +330,26 @@ public class LocalFSDataSourceDriver extends AbstractDataSourceDriver {
     }
     
     private String getLocalNode(Cluster cluster) throws IOException {
-        if(this.cachedLocalNodeName == null || this.cachedLocalNodeName.isEmpty()) {
-            String nodeName = null;
-            Collection<String> hostnames = IPUtils.getHostNames();
-            for(String hostname : hostnames) {
-                // use one of hostnames that can be converted to node name
-                String newNodeName = convNodeName(cluster, hostname);
-                if(newNodeName != null) {
-                    nodeName = newNodeName;
-                    break;
+        synchronized(this.cachedLocalNodeNameSyncObj) {
+            if(this.cachedLocalNodeName == null || this.cachedLocalNodeName.isEmpty()) {
+                String nodeName = null;
+                Collection<String> hostnames = IPUtils.getHostNames();
+                for(String hostname : hostnames) {
+                    // use one of hostnames that can be converted to node name
+                    String newNodeName = convNodeName(cluster, hostname);
+                    if(newNodeName != null) {
+                        nodeName = newNodeName;
+                        break;
+                    }
                 }
-            }
 
-            if(nodeName == null) {
-                throw new IOException("cannot get local node");
+                if(nodeName == null) {
+                    throw new IOException("cannot get local node");
+                }
+                this.cachedLocalNodeName = nodeName;
             }
-            this.cachedLocalNodeName = nodeName;
+            return this.cachedLocalNodeName;
         }
-        return this.cachedLocalNodeName;
     }
     
     private String convNodeName(Cluster cluster, String hostname) {

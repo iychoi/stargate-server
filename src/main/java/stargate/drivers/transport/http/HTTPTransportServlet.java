@@ -42,6 +42,7 @@ import stargate.commons.recipe.Recipe;
 import stargate.commons.restful.RestfulResponse;
 import stargate.commons.service.FSServiceInfo;
 import stargate.commons.transport.AbstractTransportServer;
+import stargate.commons.utils.PathUtils;
 import stargate.managers.cluster.ClusterManager;
 import stargate.managers.recipe.RecipeManager;
 import stargate.managers.volume.VolumeManager;
@@ -60,17 +61,25 @@ public class HTTPTransportServlet extends AbstractTransportServer {
     
     public class StreamingOutputData implements StreamingOutput {
 
-        private static final int BUFFER_SIZE = 8*1024; // 8k
+        private static final int BUFFER_SIZE = 64*1024; // 64k
         private InputStream is;
         private byte[] buffer;
         
         StreamingOutputData(InputStream is) {
+            if(is == null) {
+                throw new IllegalArgumentException("is is null");
+            }
+            
             this.is = is;
             this.buffer = new byte[BUFFER_SIZE];
         }
         
         @Override
         public void write(OutputStream out) throws IOException, WebApplicationException {
+            if(out == null) {
+                throw new IllegalArgumentException("out is null");
+            }
+            
             try {
                 int read = 0;
                 while ((read = this.is.read(this.buffer)) > 0) {
@@ -84,6 +93,10 @@ public class HTTPTransportServlet extends AbstractTransportServer {
     }
     
     static void setDriver(HTTPTransportDriver driver) {
+        if(driver == null) {
+            throw new IllegalArgumentException("driver is null");
+        }
+        
         HTTPTransportServlet.driver = driver;
     }
     
@@ -185,16 +198,9 @@ public class HTTPTransportServlet extends AbstractTransportServer {
         //    throw new IllegalArgumentException("path is null or empty");
         //}
         
-        String new_path = path;
-        if(path == null || path.isEmpty()) {
-            // this is the case when cluster + path is "/"
-            // e.g. sgfs:///
-            new_path = "/";
-        }
-        
         try {
             Cluster cluster = getLocalCluster();
-            DataObjectURI objectUri = new DataObjectURI(cluster.getName(), new_path);
+            DataObjectURI objectUri = new DataObjectURI(cluster.getName(), PathUtils.makeAbsolutePath(path));
             DataObjectMetadata objectMetadata = getDataObjectMetadata(objectUri);
             RestfulResponse rres = new RestfulResponse(objectMetadata);
             return Response.status(Response.Status.OK).entity(rres).build();
@@ -232,16 +238,9 @@ public class HTTPTransportServlet extends AbstractTransportServer {
         //    throw new IllegalArgumentException("path is null or empty");
         //}
         
-        String new_path = path;
-        if(path == null || path.isEmpty()) {
-            // this is the case when cluster + path is "/"
-            // e.g. sgfs:///
-            new_path = "/";
-        }
-        
         try {
             Cluster cluster = getLocalCluster();
-            DataObjectURI objectUri = new DataObjectURI(cluster.getName(), new_path);
+            DataObjectURI objectUri = new DataObjectURI(cluster.getName(), PathUtils.makeAbsolutePath(path));
             Collection<DataObjectMetadata> objectMetadataList = listDataObjectMetadata(objectUri);
             RestfulResponse rres = new RestfulResponse(objectMetadataList.toArray(new DataObjectMetadata[0]));
             return Response.status(Response.Status.OK).entity(rres).build();
@@ -279,7 +278,7 @@ public class HTTPTransportServlet extends AbstractTransportServer {
         
         try {
             Cluster cluster = getLocalCluster();
-            DataObjectURI objectUri = new DataObjectURI(cluster.getName(), path);
+            DataObjectURI objectUri = new DataObjectURI(cluster.getName(), PathUtils.makeAbsolutePath(path));
             Recipe recipe = getRecipe(objectUri);
             RestfulResponse rres = new RestfulResponse(recipe);
             return Response.status(Response.Status.OK).entity(rres).build();
@@ -314,16 +313,9 @@ public class HTTPTransportServlet extends AbstractTransportServer {
         //    throw new IllegalArgumentException("path is null or empty");
         //}
         
-        String new_path = path;
-        if(path == null || path.isEmpty()) {
-            // this is the case when cluster + path is "/"
-            // e.g. sgfs:///
-            new_path = "/";
-        }
-        
         try {
             Cluster cluster = getLocalCluster();
-            DataObjectURI objectUri = new DataObjectURI(cluster.getName(), new_path);
+            DataObjectURI objectUri = new DataObjectURI(cluster.getName(), PathUtils.makeAbsolutePath(path));
             Directory directory = getDirectory(objectUri);
             RestfulResponse rres = new RestfulResponse(directory);
             return Response.status(Response.Status.OK).entity(rres).build();
@@ -380,7 +372,7 @@ public class HTTPTransportServlet extends AbstractTransportServer {
         try {
             StargateService service = getStargateService();
             VolumeManager volumeManager = service.getVolumeManager();
-            return volumeManager.getDataChunk(DataObjectURI.WILDCARD_LOCAL_CLUSTER_NAME, hash);
+            return volumeManager.getLocalDataChunk(hash);
         } catch (ManagerNotInstantiatedException ex) {
             LOG.error(ex);
             throw new IOException(ex);

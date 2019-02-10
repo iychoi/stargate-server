@@ -42,7 +42,23 @@ public class LocalFSKeyValueStore extends AbstractKeyValueStore {
     private TimeUnit expiryTimeUnit;
     private long expiryTimeVal;
     
-    LocalFSKeyValueStore(LocalFSDataStoreDriver driver, String name, Class valueClass, EnumDataStoreProperty property) {
+    public LocalFSKeyValueStore(LocalFSDataStoreDriver driver, String name, Class valueClass, EnumDataStoreProperty property) {
+        if(driver == null) {
+            throw new IllegalArgumentException("driver is null");
+        }
+        
+        if(name == null || name.isEmpty()) {
+            throw new IllegalArgumentException("name is null or empty");
+        }
+        
+        if(valueClass == null) {
+            throw new IllegalArgumentException("valueClass is null");
+        }
+        
+        if(property == null) {
+            throw new IllegalArgumentException("property is null");
+        }
+        
         this.driver = driver;
         this.name = name;
         this.valueClass = valueClass;
@@ -51,7 +67,23 @@ public class LocalFSKeyValueStore extends AbstractKeyValueStore {
         this.expiryTimeVal = 0;
     }
 
-    LocalFSKeyValueStore(LocalFSDataStoreDriver driver, String name, Class valueClass, EnumDataStoreProperty property, TimeUnit timeunit, long timeval) {
+    public LocalFSKeyValueStore(LocalFSDataStoreDriver driver, String name, Class valueClass, EnumDataStoreProperty property, TimeUnit timeunit, long timeval) {
+        if(driver == null) {
+            throw new IllegalArgumentException("driver is null");
+        }
+        
+        if(name == null || name.isEmpty()) {
+            throw new IllegalArgumentException("name is null or empty");
+        }
+        
+        if(valueClass == null) {
+            throw new IllegalArgumentException("valueClass is null");
+        }
+        
+        if(property == null) {
+            throw new IllegalArgumentException("property is null");
+        }
+        
         this.driver = driver;
         this.name = name;
         this.valueClass = valueClass;
@@ -123,6 +155,10 @@ public class LocalFSKeyValueStore extends AbstractKeyValueStore {
 
     @Override
     public boolean containsKey(String key) {
+        if(key == null || key.isEmpty()) {
+            throw new IllegalArgumentException("key is null or empty");
+        }
+        
         try {
             cleanUp();
             return this.driver.existKey(this.name, key);
@@ -158,6 +194,10 @@ public class LocalFSKeyValueStore extends AbstractKeyValueStore {
 
     @Override
     public Object get(String key) throws IOException {
+        if(key == null || key.isEmpty()) {
+            throw new IllegalArgumentException("key is null or empty");
+        }
+        
         byte[] bytes = this.driver.getBytes(this.name, key);
         if(bytes == null) {
             this.driver.remove(this.name, key);
@@ -186,6 +226,14 @@ public class LocalFSKeyValueStore extends AbstractKeyValueStore {
 
     @Override
     public void put(String key, Object value) throws IOException {
+        if(key == null || key.isEmpty()) {
+            throw new IllegalArgumentException("key is null or empty");
+        }
+        
+        if(value == null) {
+            throw new IllegalArgumentException("value is null");
+        }
+        
         byte[] data = ObjectSerializer.toByteArray(value);
         byte[] bytes = new byte[data.length + 8];
         long currentTimestamp = DateTimeUtils.getTimestamp();
@@ -198,6 +246,14 @@ public class LocalFSKeyValueStore extends AbstractKeyValueStore {
 
     @Override
     public boolean putIfAbsent(String key, Object value) throws IOException {
+        if(key == null || key.isEmpty()) {
+            throw new IllegalArgumentException("key is null or empty");
+        }
+        
+        if(value == null) {
+            throw new IllegalArgumentException("value is null");
+        }
+        
         this.cleanUp();
         
         if(!this.driver.existKey(this.name, key)) {
@@ -210,6 +266,10 @@ public class LocalFSKeyValueStore extends AbstractKeyValueStore {
 
     @Override
     public void remove(String key) throws IOException {
+        if(key == null || key.isEmpty()) {
+            throw new IllegalArgumentException("key is null or empty");
+        }
+        
         this.driver.remove(this.name, key);
     }
 

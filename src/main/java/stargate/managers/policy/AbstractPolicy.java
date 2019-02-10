@@ -39,6 +39,10 @@ public abstract class AbstractPolicy extends AbstractImmutableConfig {
     
     @JsonIgnore
     public void setManager(PolicyManager manager) {
+        if(manager == null) {
+            throw new IllegalArgumentException("manager is null");
+        }
+        
         this.manager = manager;
     }
     
@@ -78,11 +82,19 @@ public abstract class AbstractPolicy extends AbstractImmutableConfig {
     
     @JsonIgnore
     protected String getKey(String key) {
+        if(key == null || key.isEmpty()) {
+            throw new IllegalArgumentException("key is null or empty");
+        }
+        
         return this.getGroupName() + "." + key;
     }
     
     @JsonIgnore
     public Object get(String key) throws IOException {
+        if(key == null || key.isEmpty()) {
+            throw new IllegalArgumentException("key is null or empty");
+        }
+        
         if(this.manager == null) {
             return this.store.get(key);
         } else {
@@ -92,6 +104,10 @@ public abstract class AbstractPolicy extends AbstractImmutableConfig {
     
     @JsonIgnore
     public Object get(String key, Object defaultValue) {
+        if(key == null || key.isEmpty()) {
+            throw new IllegalArgumentException("key is null or empty");
+        }
+        
         Object val = null;
         if(this.manager == null) {
             val = this.store.get(key);
@@ -112,6 +128,14 @@ public abstract class AbstractPolicy extends AbstractImmutableConfig {
     
     @JsonIgnore
     public void put(String key, Object value) throws IOException {
+        if(key == null || key.isEmpty()) {
+            throw new IllegalArgumentException("key is null or empty");
+        }
+        
+        if(value == null) {
+            throw new IllegalArgumentException("value is null");
+        }
+        
         if(this.manager == null) {
             this.store.put(key, value);
         } else {

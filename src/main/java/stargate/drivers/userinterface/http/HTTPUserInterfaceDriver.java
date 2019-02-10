@@ -24,8 +24,6 @@ import java.util.List;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 import org.apache.commons.collections.map.LRUMap;
-import org.apache.commons.logging.Log;
-import org.apache.commons.logging.LogFactory;
 import stargate.commons.driver.AbstractDriverConfig;
 import stargate.commons.userinterface.AbstractUserInterfaceClient;
 import stargate.commons.userinterface.AbstractUserInterfaceDriver;
@@ -39,8 +37,6 @@ import stargate.commons.utils.IPUtils;
  */
 public class HTTPUserInterfaceDriver extends AbstractUserInterfaceDriver {
 
-    private static final Log LOG = LogFactory.getLog(HTTPUserInterfaceDriver.class);
-    
     private static final int DEFAULT_LIVECHECK_SECONDS = 60;
     
     private HTTPUserInterfaceDriverConfig config;

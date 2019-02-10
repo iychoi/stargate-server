@@ -15,7 +15,12 @@
 */
 package stargate.managers.cluster;
 
+import java.io.File;
+import java.io.IOException;
+import org.codehaus.jackson.annotate.JsonIgnore;
+import org.codehaus.jackson.annotate.JsonProperty;
 import stargate.commons.cluster.Cluster;
+import stargate.commons.utils.JsonSerializer;
 
 /**
  *
@@ -25,16 +30,77 @@ public class RemoteClusterEvent {
     private RemoteClusterEventType eventType;
     private Cluster cluster;
     
-    RemoteClusterEvent(RemoteClusterEventType eventType, Cluster cluster) {
+    public static RemoteClusterEvent createInstance(File file) throws IOException {
+        if(file == null) {
+            throw new IllegalArgumentException("file is null");
+        }
+
+        return (RemoteClusterEvent) JsonSerializer.fromJsonFile(file, RemoteClusterEvent.class);
+    }
+    
+    public static RemoteClusterEvent createInstance(String json) throws IOException {
+        if(json == null || json.isEmpty()) {
+            throw new IllegalArgumentException("json is null or empty");
+        }
+        
+        return (RemoteClusterEvent) JsonSerializer.fromJson(json, RemoteClusterEvent.class);
+    }
+    
+    RemoteClusterEvent() {
+    }
+    
+    public RemoteClusterEvent(RemoteClusterEventType eventType, Cluster cluster) {
+        if(eventType == null) {
+            throw new IllegalArgumentException("eventType is null");
+        }
+        
+        if(cluster == null) {
+            throw new IllegalArgumentException("cluster is null");
+        }
+        
         this.eventType = eventType;
         this.cluster = cluster;
     }
     
+    @JsonProperty("event_type")
     public RemoteClusterEventType getEventType() {
         return this.eventType;
     }
     
+    @JsonProperty("event_type")
+    public void setEventType(RemoteClusterEventType eventType) {
+        if(eventType == null) {
+            throw new IllegalArgumentException("eventType is null");
+        }
+        
+        this.eventType = eventType;
+    }
+    
+    @JsonProperty("cluster")
     public Cluster getCluster() {
         return this.cluster;
+    }
+    
+    @JsonProperty("cluster")
+    public void setCluster(Cluster cluster) {
+        if(cluster == null) {
+            throw new IllegalArgumentException("cluster is null");
+        }
+        
+        this.cluster = cluster;
+    }
+    
+    @JsonIgnore
+    public String toJson() throws IOException {
+        return JsonSerializer.toJson(this);
+    }
+    
+    @JsonIgnore
+    public void saveTo(File file) throws IOException {
+        if(file == null) {
+            throw new IllegalArgumentException("file is null");
+        }
+        
+        JsonSerializer.toJsonFile(file, this);
     }
 }

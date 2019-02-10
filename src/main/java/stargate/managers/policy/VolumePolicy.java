@@ -21,8 +21,6 @@ import java.util.ArrayList;
 import java.util.Collection;
 import java.util.Collections;
 import java.util.List;
-import org.apache.commons.logging.Log;
-import org.apache.commons.logging.LogFactory;
 import org.codehaus.jackson.annotate.JsonIgnore;
 import org.codehaus.jackson.annotate.JsonProperty;
 import stargate.commons.utils.JsonSerializer;
@@ -33,8 +31,6 @@ import stargate.commons.utils.JsonSerializer;
  */
 public class VolumePolicy extends AbstractPolicy {
 
-    private static final Log LOG = LogFactory.getLog(VolumePolicy.class);
-    
     // scan interval for data updates
     public static final long DEFAULT_SCAN_FOR_DATA_UPDATE_INTERVAL_SEC = 60 * 5;
     public static final String SCAN_FOR_DATA_UPDATE_INTERVAL_SEC = "scan_for_data_update_interval_sec";

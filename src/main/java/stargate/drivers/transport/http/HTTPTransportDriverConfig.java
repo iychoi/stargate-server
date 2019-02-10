@@ -17,8 +17,6 @@ package stargate.drivers.transport.http;
 
 import java.io.File;
 import java.io.IOException;
-import org.apache.commons.logging.Log;
-import org.apache.commons.logging.LogFactory;
 import org.codehaus.jackson.annotate.JsonProperty;
 import stargate.commons.transport.AbstractTransportDriverConfig;
 import stargate.commons.utils.JsonSerializer;
@@ -28,8 +26,6 @@ import stargate.commons.utils.JsonSerializer;
  * @author iychoi
  */
 public class HTTPTransportDriverConfig extends AbstractTransportDriverConfig {
-    
-    private static final Log LOG = LogFactory.getLog(HTTPTransportDriverConfig.class);
     
     public static final String DEFAULT_SERVICE_HOSTNAME_PATTERN = ".*";
     public static final int DEFAULT_SERVICE_PORT = 31010;

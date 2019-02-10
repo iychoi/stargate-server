@@ -39,6 +39,7 @@ public class EventManager extends AbstractManager<NullDriver> {
     
     private static EventManager instance;
     private List<AbstractStargateEventHandler> stargateEventHandlers = new ArrayList<AbstractStargateEventHandler>();
+    private Object stargateEventHandlersSyncObj = new Object();
     private BlockingQueue<StargateEvent> eventQueue = new LinkedBlockingDeque<StargateEvent>();
     private Thread eventDispatchThread;
     private boolean dispatchEvent = true;
@@ -88,7 +89,9 @@ public class EventManager extends AbstractManager<NullDriver> {
             this.eventDispatchThread = null;
         }
         
-        this.stargateEventHandlers.clear();
+        synchronized(this.stargateEventHandlersSyncObj) {
+            this.stargateEventHandlers.clear();
+        }
         
         super.stop();
     }
@@ -115,14 +118,16 @@ public class EventManager extends AbstractManager<NullDriver> {
     }
     
     private void processStargateEvent(StargateEvent event) throws IOException {
-        for(AbstractStargateEventHandler handler: this.stargateEventHandlers) {
-            if(handler.accept(event.getEventType())) {
-                handler.raised(this, event);
+        synchronized(this.stargateEventHandlersSyncObj) {
+            for(AbstractStargateEventHandler handler: this.stargateEventHandlers) {
+                if(handler.accept(event.getEventType())) {
+                    handler.raised(this, event);
+                }
             }
         }
     }
     
-    public synchronized void raiseStargateEvent(StargateEvent event) throws InterruptedException {
+    public void raiseStargateEvent(StargateEvent event) throws InterruptedException {
         LOG.debug(String.format("Enqueue an event : %s", event.getEventType().toString()));
         this.eventQueue.put(event);
         
@@ -130,27 +135,35 @@ public class EventManager extends AbstractManager<NullDriver> {
         this.lastUpdateTime = DateTimeUtils.getTimestamp();
     }
     
-    public synchronized void addEventHandler(AbstractStargateEventHandler eventHandler) {
+    public void addEventHandler(AbstractStargateEventHandler eventHandler) {
         if(eventHandler == null) {
             throw new IllegalArgumentException("eventHandler is null");
         }
         
-        this.stargateEventHandlers.add(eventHandler);
+        synchronized(this.stargateEventHandlersSyncObj) {
+            this.stargateEventHandlers.add(eventHandler);
+        }
     }
     
-    public synchronized void removeEventHandler(AbstractStargateEventHandler eventHandler) {
+    public void removeEventHandler(AbstractStargateEventHandler eventHandler) {
         if(eventHandler == null) {
             throw new IllegalArgumentException("eventHandler is null");
         }
         
-        this.stargateEventHandlers.remove(eventHandler);
+        synchronized(this.stargateEventHandlersSyncObj) {
+            this.stargateEventHandlers.remove(eventHandler);
+        }
     }
     
-    public synchronized long getLastUpdateTime() {
+    public long getLastUpdateTime() {
         return this.lastUpdateTime;
     }
     
-    public synchronized void setLastUpdateTime(long time) {
+    public void setLastUpdateTime(long time) {
+        if(time < 0) {
+            throw new IllegalArgumentException("time is negative");
+        }
+        
         this.lastUpdateTime = time;
     }
 }
