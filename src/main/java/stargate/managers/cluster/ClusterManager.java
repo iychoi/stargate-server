@@ -61,8 +61,9 @@ public class ClusterManager extends AbstractManager<AbstractClusterDriver> {
     private Node localNode;
     private Cluster localCluster;
     private AbstractKeyValueStore remoteClusterStore;
+    private final Object remoteClusterStoreSyncObj = new Object();
     private List<AbstractRemoteClusterEventHandler> remoteClusterEventHandlers = new ArrayList<AbstractRemoteClusterEventHandler>();
-    private Object remoteClusterEventHandlersSyncObj = new Object();
+    private final Object remoteClusterEventHandlersSyncObj = new Object();
     protected long lastUpdateTime;
     
     private static final String REMOTE_CLUSTER_STORE = "rcluster";
@@ -193,15 +194,17 @@ public class ClusterManager extends AbstractManager<AbstractClusterDriver> {
     }
     
     private void safeInitRemoteClusterStore() throws IOException {
-        if(this.remoteClusterStore == null) {
-            try {
-                StargateService stargateService = getStargateService();
-                DataStoreManager keyValueStoreManager = stargateService.getDataStoreManager();
+        synchronized(this.remoteClusterStoreSyncObj) {
+            if(this.remoteClusterStore == null) {
+                try {
+                    StargateService stargateService = getStargateService();
+                    DataStoreManager keyValueStoreManager = stargateService.getDataStoreManager();
 
-                this.remoteClusterStore = keyValueStoreManager.getDriver().getKeyValueStore(REMOTE_CLUSTER_STORE, Cluster.class, EnumDataStoreProperty.DATASTORE_PROP_PERSISTENT_REPLICATED);
-            } catch (ManagerNotInstantiatedException ex) {
-                LOG.error(ex);
-                throw new IOException(ex);
+                    this.remoteClusterStore = keyValueStoreManager.getDriver().getKeyValueStore(REMOTE_CLUSTER_STORE, Cluster.class, EnumDataStoreProperty.DATASTORE_PROP_PERSISTENT_REPLICATED);
+                } catch (ManagerNotInstantiatedException ex) {
+                    LOG.error(ex);
+                    throw new IOException(ex);
+                }
             }
         }
     }
@@ -283,92 +286,102 @@ public class ClusterManager extends AbstractManager<AbstractClusterDriver> {
         return this.localCluster.hasNode(name);
     }
     
-    public synchronized Collection<Cluster> getRemoteClusters() throws IOException {
+    public Collection<Cluster> getRemoteClusters() throws IOException {
         if(!this.started) {
             throw new IllegalStateException("Manager is not started");
         }
         
         safeInitRemoteClusterStore();
         
-        List<Cluster> remoteClusters = new ArrayList<Cluster>();
-        Map<String, Object> remoteClusterMap = this.remoteClusterStore.toMap();
-        Set<Map.Entry<String, Object>> entrySet = remoteClusterMap.entrySet();
-        for(Map.Entry<String, Object> entry : entrySet) {
-            Cluster cluster = (Cluster) entry.getValue();
-            if(cluster != null) {
-                remoteClusters.add(cluster);
+        synchronized(this.remoteClusterStoreSyncObj) {
+            List<Cluster> remoteClusters = new ArrayList<Cluster>();
+            Map<String, Object> remoteClusterMap = this.remoteClusterStore.toMap();
+            Set<Map.Entry<String, Object>> entrySet = remoteClusterMap.entrySet();
+            for(Map.Entry<String, Object> entry : entrySet) {
+                Cluster cluster = (Cluster) entry.getValue();
+                if(cluster != null) {
+                    remoteClusters.add(cluster);
+                }
+            }
+
+            // less efficient implementation
+            //Collection<String> keys = this.remoteClusterStore.keys();
+            //for(String key : keys) {
+            //    Cluster cluster = (Cluster) this.remoteClusterStore.get(key);
+            //    if(cluster != null) {
+            //        remoteClusters.add(cluster);
+            //    }
+            //}
+
+            return Collections.unmodifiableCollection(remoteClusters);
+        }
+    }
+    
+    public Collection<String> getRemoteClusterNames() throws IOException {
+        if(!this.started) {
+            throw new IllegalStateException("Manager is not started");
+        }
+        
+        safeInitRemoteClusterStore();
+        
+        synchronized(this.remoteClusterStoreSyncObj) {
+            List<String> remoteClusterNames = new ArrayList<String>();
+            Collection<String> keys = this.remoteClusterStore.keys();
+            remoteClusterNames.addAll(keys);
+
+            return Collections.unmodifiableCollection(remoteClusterNames);
+        }
+    }
+    
+    public Cluster getRemoteCluster(String name) throws IOException {
+        if(name == null || name.isEmpty()) {
+            throw new IllegalArgumentException("name is null or empty");
+        }
+        
+        if(!this.started) {
+            throw new IllegalStateException("Manager is not started");
+        }
+        
+        safeInitRemoteClusterStore();
+        
+        synchronized(this.remoteClusterStoreSyncObj) {
+            return (Cluster) this.remoteClusterStore.get(name);
+        }
+    }
+    
+    public boolean hasRemoteCluster(String name) throws IOException {
+        if(name == null || name.isEmpty()) {
+            throw new IllegalArgumentException("name is null or empty");
+        }
+        
+        if(!this.started) {
+            throw new IllegalStateException("Manager is not started");
+        }
+        
+        safeInitRemoteClusterStore();
+        
+        synchronized(this.remoteClusterStoreSyncObj) {
+            return this.remoteClusterStore.containsKey(name);
+        }
+    }
+    
+    public void clearRemoteClusters() throws IOException {
+        if(!this.started) {
+            throw new IllegalStateException("Manager is not started");
+        }
+        
+        safeInitRemoteClusterStore();
+        
+        synchronized(this.remoteClusterStoreSyncObj) {
+            Collection<String> keys = this.remoteClusterStore.keys();
+            for(String key : keys) {
+                // this is to raise a cluster removal event
+                removeRemoteCluster(key);
             }
         }
-        
-        // less efficient implementation
-        //Collection<String> keys = this.remoteClusterStore.keys();
-        //for(String key : keys) {
-        //    Cluster cluster = (Cluster) this.remoteClusterStore.get(key);
-        //    if(cluster != null) {
-        //        remoteClusters.add(cluster);
-        //    }
-        //}
-        
-        return Collections.unmodifiableCollection(remoteClusters);
     }
     
-    public synchronized Collection<String> getRemoteClusterNames() throws IOException {
-        if(!this.started) {
-            throw new IllegalStateException("Manager is not started");
-        }
-        
-        safeInitRemoteClusterStore();
-        
-        List<String> remoteClusterNames = new ArrayList<String>();
-        Collection<String> keys = this.remoteClusterStore.keys();
-        remoteClusterNames.addAll(keys);
-        
-        return Collections.unmodifiableCollection(remoteClusterNames);
-    }
-    
-    public synchronized Cluster getRemoteCluster(String name) throws IOException {
-        if(name == null || name.isEmpty()) {
-            throw new IllegalArgumentException("name is null or empty");
-        }
-        
-        if(!this.started) {
-            throw new IllegalStateException("Manager is not started");
-        }
-        
-        safeInitRemoteClusterStore();
-        
-        return (Cluster) this.remoteClusterStore.get(name);
-    }
-    
-    public synchronized boolean hasRemoteCluster(String name) throws IOException {
-        if(name == null || name.isEmpty()) {
-            throw new IllegalArgumentException("name is null or empty");
-        }
-        
-        if(!this.started) {
-            throw new IllegalStateException("Manager is not started");
-        }
-        
-        safeInitRemoteClusterStore();
-        
-        return this.remoteClusterStore.containsKey(name);
-    }
-    
-    public synchronized void clearRemoteClusters() throws IOException {
-        if(!this.started) {
-            throw new IllegalStateException("Manager is not started");
-        }
-        
-        safeInitRemoteClusterStore();
-        
-        Collection<String> keys = this.remoteClusterStore.keys();
-        for(String key : keys) {
-            // this is to raise a cluster removal event
-            removeRemoteCluster(key);
-        }
-    }
-    
-    public synchronized void addRemoteClusters(Collection<Cluster> clusters) throws ClusterManagerException, IOException {
+    public void addRemoteClusters(Collection<Cluster> clusters) throws ClusterManagerException, IOException {
         if(clusters == null) {
             throw new IllegalArgumentException("clusters is null");
         }
@@ -381,27 +394,29 @@ public class ClusterManager extends AbstractManager<AbstractClusterDriver> {
         
         List<Cluster> failed = new ArrayList<Cluster>();
         
-        for(Cluster cluster : clusters) {
-            try {
-                addRemoteCluster(cluster);
-            } catch(ClusterManagerException ex) {
-                failed.add(cluster);
-            }
-        }
-        
-        if(!failed.isEmpty()) {
-            StringBuilder sb = new StringBuilder();
-            for(Cluster cluster : failed) {
-                if(sb.length() > 0) {
-                    sb.append(",");
+        synchronized(this.remoteClusterStoreSyncObj) {
+            for(Cluster cluster : clusters) {
+                try {
+                    addRemoteCluster(cluster);
+                } catch(ClusterManagerException ex) {
+                    failed.add(cluster);
                 }
-                sb.append(cluster.getName());
             }
-            throw new ClusterManagerException("clusters (" + sb.toString() + ") cannot be added (maybe already exist?)");
+
+            if(!failed.isEmpty()) {
+                StringBuilder sb = new StringBuilder();
+                for(Cluster cluster : failed) {
+                    if(sb.length() > 0) {
+                        sb.append(",");
+                    }
+                    sb.append(cluster.getName());
+                }
+                throw new ClusterManagerException("clusters (" + sb.toString() + ") cannot be added (maybe already exist?)");
+            }
         }
     }
     
-    public synchronized void addRemoteCluster(Cluster cluster) throws ClusterManagerException, IOException {
+    public void addRemoteCluster(Cluster cluster) throws ClusterManagerException, IOException {
         if(cluster == null) {
             throw new IllegalArgumentException("cluster is null");
         }
@@ -412,24 +427,26 @@ public class ClusterManager extends AbstractManager<AbstractClusterDriver> {
         
         safeInitRemoteClusterStore();
         
-        if(this.remoteClusterStore.containsKey(cluster.getName())) {
-            throw new ClusterManagerException("cluster " + cluster.getName() + " is already added");
-        }
-        
-        LOG.debug(String.format("Adding a new remote cluster : %s", cluster.getName()));
-        
-        this.remoteClusterStore.put(cluster.getName(), cluster);
-        
-        this.lastUpdateTime = DateTimeUtils.getTimestamp();
-        
-        try {
-            raiseEventForRemoteClusterAdded(cluster);
-        } catch (InterruptedException ex) {
-            throw new IOException(ex);
+        synchronized(this.remoteClusterStoreSyncObj) {
+            if(this.remoteClusterStore.containsKey(cluster.getName())) {
+                throw new ClusterManagerException("cluster " + cluster.getName() + " is already added");
+            }
+
+            LOG.debug(String.format("Adding a new remote cluster : %s", cluster.getName()));
+
+            this.remoteClusterStore.put(cluster.getName(), cluster);
+
+            this.lastUpdateTime = DateTimeUtils.getTimestamp();
+
+            try {
+                raiseEventForRemoteClusterAdded(cluster);
+            } catch (InterruptedException ex) {
+                throw new IOException(ex);
+            }
         }
     }
     
-    public synchronized void removeRemoteCluster(Cluster cluster) throws IOException {
+    public void removeRemoteCluster(Cluster cluster) throws IOException {
         if(cluster == null) {
             throw new IllegalArgumentException("cluster is null");
         }
@@ -440,10 +457,12 @@ public class ClusterManager extends AbstractManager<AbstractClusterDriver> {
         
         safeInitRemoteClusterStore();
         
-        removeRemoteCluster(cluster.getName());
+        synchronized(this.remoteClusterStoreSyncObj) {
+            removeRemoteCluster(cluster.getName());
+        }
     }
     
-    public synchronized void removeRemoteCluster(String name) throws IOException {
+    public void removeRemoteCluster(String name) throws IOException {
         if(name == null || name.isEmpty()) {
             throw new IllegalArgumentException("name is null or empty");
         }
@@ -454,23 +473,25 @@ public class ClusterManager extends AbstractManager<AbstractClusterDriver> {
         
         safeInitRemoteClusterStore();
         
-        Cluster cluster = (Cluster) this.remoteClusterStore.get(name);
-        if(cluster != null) {
-            LOG.debug(String.format("Removing a remote cluster : %s", name));
-            
-            this.remoteClusterStore.remove(name);
-            
-            this.lastUpdateTime = DateTimeUtils.getTimestamp();
+        synchronized(this.remoteClusterStoreSyncObj) {
+            Cluster cluster = (Cluster) this.remoteClusterStore.get(name);
+            if(cluster != null) {
+                LOG.debug(String.format("Removing a remote cluster : %s", name));
 
-            try {
-                raiseEventForRemoteClusterRemoved(cluster);
-            } catch (InterruptedException ex) {
-                throw new IOException(ex);
+                this.remoteClusterStore.remove(name);
+
+                this.lastUpdateTime = DateTimeUtils.getTimestamp();
+
+                try {
+                    raiseEventForRemoteClusterRemoved(cluster);
+                } catch (InterruptedException ex) {
+                    throw new IOException(ex);
+                }
             }
         }
     }
     
-    public synchronized void updateRemoteClusters(Collection<Cluster> clusters) throws IOException {
+    public void updateRemoteClusters(Collection<Cluster> clusters) throws IOException {
         if(clusters == null) {
             throw new IllegalArgumentException("clusters is null");
         }
@@ -481,12 +502,14 @@ public class ClusterManager extends AbstractManager<AbstractClusterDriver> {
         
         safeInitRemoteClusterStore();
         
-        for(Cluster cluster : clusters) {
-            updateRemoteCluster(cluster);
+        synchronized(this.remoteClusterStoreSyncObj) {
+            for(Cluster cluster : clusters) {
+                updateRemoteCluster(cluster);
+            }
         }
     }
     
-    public synchronized void updateRemoteCluster(Cluster cluster) throws IOException {
+    public void updateRemoteCluster(Cluster cluster) throws IOException {
         if(cluster == null) {
             throw new IllegalArgumentException("cluster is null");
         }
@@ -499,14 +522,16 @@ public class ClusterManager extends AbstractManager<AbstractClusterDriver> {
         
         LOG.debug(String.format("Updating a remote cluster : %s", cluster.getName()));
         
-        this.remoteClusterStore.put(cluster.getName(), cluster);
-        
-        this.lastUpdateTime = DateTimeUtils.getTimestamp();
-        
-        try {
-            raiseEventForRemoteClusterUpdated(cluster);
-        } catch (InterruptedException ex) {
-            throw new IOException(ex);
+        synchronized(this.remoteClusterStoreSyncObj) {
+            this.remoteClusterStore.put(cluster.getName(), cluster);
+
+            this.lastUpdateTime = DateTimeUtils.getTimestamp();
+
+            try {
+                raiseEventForRemoteClusterUpdated(cluster);
+            } catch (InterruptedException ex) {
+                throw new IOException(ex);
+            }
         }
     }
     
@@ -621,7 +646,7 @@ public class ClusterManager extends AbstractManager<AbstractClusterDriver> {
         }
     }
     
-    public synchronized void reportRemoteNodeUnreachable(String clusterName, String nodeName) throws IOException {
+    public void reportRemoteNodeUnreachable(String clusterName, String nodeName) throws IOException {
         if(clusterName == null || clusterName.isEmpty()) {
             throw new IllegalArgumentException("clusterName is null or empty");
         }
@@ -637,26 +662,28 @@ public class ClusterManager extends AbstractManager<AbstractClusterDriver> {
         safeInitClusterPolicy();
         safeInitRemoteClusterStore();
         
-        Cluster cluster = (Cluster) this.remoteClusterStore.get(clusterName);
-        if(cluster != null) {
-            Node node = cluster.getNode(nodeName);
-            if(node != null) {
-                long currentTime = DateTimeUtils.getTimestamp();
-                NodeStatus status = node.getStatus();
+        synchronized(this.remoteClusterStoreSyncObj) {
+            Cluster cluster = (Cluster) this.remoteClusterStore.get(clusterName);
+            if(cluster != null) {
+                Node node = cluster.getNode(nodeName);
+                if(node != null) {
+                    long currentTime = DateTimeUtils.getTimestamp();
+                    NodeStatus status = node.getStatus();
 
-                if(DateTimeUtils.timeElapsedSec(status.getLastFailureTime(), currentTime, this.policy.getNodeFailureReportIntervalSec())) {
-                    status.increaseFailureCount(true);
+                    if(DateTimeUtils.timeElapsedSec(status.getLastFailureTime(), currentTime, this.policy.getNodeFailureReportIntervalSec())) {
+                        status.increaseFailureCount(true);
 
-                    if(!status.isBlacklisted()) {
-                        if(status.getFailureCount() >= this.policy.getNumFailuresToBeBlacklisted()) {
-                            status.setBlacklisted(true);
+                        if(!status.isBlacklisted()) {
+                            if(status.getFailureCount() >= this.policy.getNumFailuresToBeBlacklisted()) {
+                                status.setBlacklisted(true);
+                            }
                         }
+
+                        this.lastUpdateTime = currentTime;
+
+                        // update
+                        this.remoteClusterStore.put(clusterName, cluster);
                     }
-
-                    this.lastUpdateTime = currentTime;
-
-                    // update
-                    this.remoteClusterStore.put(clusterName, cluster);
                 }
             }
         }
