@@ -1,0 +1,81 @@
+/*
+   Copyright 2018 The Trustees of University of Arizona
+
+   Licensed under the Apache License, Version 2.0 (the "License" );
+   you may not use this file except in compliance with the License.
+   You may obtain a copy of the License at
+
+       http://www.apache.org/licenses/LICENSE-2.0
+
+   Unless required by applicable law or agreed to in writing, software
+   distributed under the License is distributed on an "AS IS" BASIS,
+   WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+   See the License for the specific language governing permissions and
+   limitations under the License.
+*/
+package stargate.managers.cluster;
+
+import java.io.IOException;
+import java.util.ArrayList;
+import java.util.Collection;
+import java.util.List;
+import java.util.TimerTask;
+import org.apache.commons.logging.Log;
+import org.apache.commons.logging.LogFactory;
+import stargate.commons.cluster.Cluster;
+import stargate.managers.transport.TransportManager;
+
+/**
+ *
+ * @author iychoi
+ */
+public class RemoteClusterSyncTask extends TimerTask {
+    private static final Log LOG = LogFactory.getLog(RemoteClusterSyncTask.class);
+    
+    private ClusterManager clusterManager;
+    private TransportManager transportManager;
+    
+    public RemoteClusterSyncTask(ClusterManager clusterManager, TransportManager transportManager) {
+        if(clusterManager == null) {
+            throw new IllegalArgumentException("clusterManager is null");
+        }
+        
+        if(transportManager == null) {
+            throw new IllegalArgumentException("transportManager is null");
+        }
+        
+        this.clusterManager = clusterManager;
+        this.transportManager = transportManager;
+    }
+    
+    public void sync() throws IOException {
+        try {
+            if(this.clusterManager.isLeaderNode()) {
+                List<Cluster> syncedRemoteClusters = new ArrayList<Cluster>();
+            
+                Collection<Cluster> remoteClusters = this.clusterManager.getRemoteClusters();
+                for(Cluster remoteCluster : remoteClusters) {
+                    LOG.debug(String.format("Synchronizing remote cluster - %s", remoteCluster.getName()));
+
+                    Cluster syncedRemoteCluster = this.transportManager.getRemoteCluster(remoteCluster);
+                    LOG.debug(String.format("Remote cluster is synced %s", syncedRemoteCluster.getName()));
+
+                    syncedRemoteClusters.add(syncedRemoteCluster);
+                }
+
+                this.clusterManager.updateRemoteClusters(syncedRemoteClusters);
+            }
+        } catch (IOException ex) {
+            throw ex;
+        }
+    }
+
+    @Override
+    public void run() {
+        try {
+            sync();
+        } catch (IOException ex) {
+            LOG.error(ex);
+        }
+    }
+}
