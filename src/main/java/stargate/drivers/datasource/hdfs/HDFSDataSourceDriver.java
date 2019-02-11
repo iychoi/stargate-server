@@ -58,7 +58,7 @@ public class HDFSDataSourceDriver extends AbstractDataSourceDriver {
     private FileSystem filesystem;
     
     private Map<String, String> cachedNodeNameConvTable = new HashMap<String, String>();
-    private Object cachedNodeNameConvTableSyncObj = new Object();
+    private final Object cachedNodeNameConvTableSyncObj = new Object();
     
     public HDFSDataSourceDriver(AbstractDriverConfig config) {
         if(config == null) {

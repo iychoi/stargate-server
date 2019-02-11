@@ -50,7 +50,7 @@ public class LocalFSDataSourceDriver extends AbstractDataSourceDriver {
     private File rootPath;
     
     private String cachedLocalNodeName;
-    private Object cachedLocalNodeNameSyncObj = new Object();
+    private final Object cachedLocalNodeNameSyncObj = new Object();
     
     public LocalFSDataSourceDriver(AbstractDriverConfig config) {
         if(config == null) {

@@ -70,7 +70,7 @@ public class IgniteClusterDriver extends AbstractClusterDriver {
     private Node localNode;
     private boolean listenEvent = true;
     private List<AbstractLocalClusterEventHandler> localClusterEventHandlers = new ArrayList<AbstractLocalClusterEventHandler>();
-    private Object localClusterEventHandlersSyncObj = new Object();
+    private final Object localClusterEventHandlersSyncObj = new Object();
     
     public IgniteClusterDriver(AbstractDriverConfig config) {
         if(config == null) {
