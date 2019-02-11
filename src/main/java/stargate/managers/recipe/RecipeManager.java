@@ -62,6 +62,8 @@ public class RecipeManager extends AbstractManager<AbstractRecipeDriver> {
     
     private AbstractKeyValueStore recipeStore; // <String, Recipe>
     private AbstractKeyValueStore hashStore; // <String, ReverseRecipeMapping>
+    private final Object recipeStoreSyncObj = new Object();
+    private final Object parallelRecipeCreationSyncObj = new Object();
     protected long lastUpdateTime;
     
     private static final String RECIPE_STORE = "recipe";
@@ -147,25 +149,27 @@ public class RecipeManager extends AbstractManager<AbstractRecipeDriver> {
     }
     
     private void safeInitRecipeStore() throws IOException {
-        if(this.recipeStore == null) {
-            try {
-                StargateService stargateService = getStargateService();
-                DataStoreManager keyValueStoreManager = stargateService.getDataStoreManager();
-                this.recipeStore = keyValueStoreManager.getDriver().getKeyValueStore(RECIPE_STORE, Recipe.class, EnumDataStoreProperty.DATASTORE_PROP_PERSISTENT_DISTRIBUTED);
-            } catch (ManagerNotInstantiatedException ex) {
-                LOG.error(ex);
-                throw new IOException(ex);
+        synchronized(this.recipeStoreSyncObj) {
+            if(this.recipeStore == null) {
+                try {
+                    StargateService stargateService = getStargateService();
+                    DataStoreManager keyValueStoreManager = stargateService.getDataStoreManager();
+                    this.recipeStore = keyValueStoreManager.getDriver().getKeyValueStore(RECIPE_STORE, Recipe.class, EnumDataStoreProperty.DATASTORE_PROP_PERSISTENT_DISTRIBUTED);
+                } catch (ManagerNotInstantiatedException ex) {
+                    LOG.error(ex);
+                    throw new IOException(ex);
+                }
             }
-        }
-        
-        if(this.hashStore == null) {
-            try {
-                StargateService stargateService = getStargateService();
-                DataStoreManager keyValueStoreManager = stargateService.getDataStoreManager();
-                this.hashStore = keyValueStoreManager.getDriver().getKeyValueStore(HASH_STORE, ReverseRecipeMapping.class, EnumDataStoreProperty.DATASTORE_PROP_PERSISTENT_DISTRIBUTED);
-            } catch (ManagerNotInstantiatedException ex) {
-                LOG.error(ex);
-                throw new IOException(ex);
+
+            if(this.hashStore == null) {
+                try {
+                    StargateService stargateService = getStargateService();
+                    DataStoreManager keyValueStoreManager = stargateService.getDataStoreManager();
+                    this.hashStore = keyValueStoreManager.getDriver().getKeyValueStore(HASH_STORE, ReverseRecipeMapping.class, EnumDataStoreProperty.DATASTORE_PROP_PERSISTENT_DISTRIBUTED);
+                } catch (ManagerNotInstantiatedException ex) {
+                    LOG.error(ex);
+                    throw new IOException(ex);
+                }
             }
         }
     }
@@ -173,37 +177,41 @@ public class RecipeManager extends AbstractManager<AbstractRecipeDriver> {
     private void addHashes(Recipe recipe) throws IOException {
         Collection<RecipeChunk> chunks = recipe.getChunks();
         
-        for(RecipeChunk chunk : chunks) {
-            String hash = chunk.getHash();
-            
-            ReverseRecipeMapping mapping = (ReverseRecipeMapping) this.hashStore.get(hash);
-            if(mapping == null) {
-                mapping = new ReverseRecipeMapping(hash);
+        synchronized(this.recipeStoreSyncObj) {
+            for(RecipeChunk chunk : chunks) {
+                String hash = chunk.getHash();
+
+                ReverseRecipeMapping mapping = (ReverseRecipeMapping) this.hashStore.get(hash);
+                if(mapping == null) {
+                    mapping = new ReverseRecipeMapping(hash);
+                }
+
+                mapping.addRecipeName(recipe.getMetadata().getURI().getPath());
+
+                // update
+                this.hashStore.put(hash, mapping);
             }
-            
-            mapping.addRecipeName(recipe.getMetadata().getURI().getPath());
-            
-            // update
-            this.hashStore.put(hash, mapping);
         }
     }
     
     private void removeHashes(Recipe recipe) throws IOException {
         Collection<RecipeChunk> chunks = recipe.getChunks();
         
-        for(RecipeChunk chunk : chunks) {
-            String hash = chunk.getHash();
-            
-            ReverseRecipeMapping mapping = (ReverseRecipeMapping) this.hashStore.get(hash);
-            if(mapping != null) {
-                boolean result = mapping.removeRecipeName(recipe.getMetadata().getURI().getPath());
-            
-                if(result) {
-                    if(mapping.getRecipeNameCount() == 0) {
-                        this.hashStore.remove(hash);
-                    } else {
-                        // update - modified
-                        this.hashStore.put(hash, mapping);
+        synchronized(this.recipeStoreSyncObj) {
+            for(RecipeChunk chunk : chunks) {
+                String hash = chunk.getHash();
+
+                ReverseRecipeMapping mapping = (ReverseRecipeMapping) this.hashStore.get(hash);
+                if(mapping != null) {
+                    boolean result = mapping.removeRecipeName(recipe.getMetadata().getURI().getPath());
+
+                    if(result) {
+                        if(mapping.getRecipeNameCount() == 0) {
+                            this.hashStore.remove(hash);
+                        } else {
+                            // update - modified
+                            this.hashStore.put(hash, mapping);
+                        }
                     }
                 }
             }
@@ -229,67 +237,73 @@ public class RecipeManager extends AbstractManager<AbstractRecipeDriver> {
         Collection<String> toBeRemovedHashes = getHashes(oldChunks);
         toBeRemovedHashes.removeAll(newHashes);
         
-        for(String hash : toBeRemovedHashes) {
-            ReverseRecipeMapping mapping = (ReverseRecipeMapping) this.hashStore.get(hash);
-            if(mapping != null) {
-                boolean result = mapping.removeRecipeName(oldRecipe.getMetadata().getURI().getPath());
-                
-                if(result) {
-                    if(mapping.getRecipeNameCount() == 0) {
-                        this.hashStore.remove(hash);
-                    } else {
-                        // update - modified
-                        this.hashStore.put(hash, mapping);
+        synchronized(this.recipeStoreSyncObj) {
+            for(String hash : toBeRemovedHashes) {
+                ReverseRecipeMapping mapping = (ReverseRecipeMapping) this.hashStore.get(hash);
+                if(mapping != null) {
+                    boolean result = mapping.removeRecipeName(oldRecipe.getMetadata().getURI().getPath());
+
+                    if(result) {
+                        if(mapping.getRecipeNameCount() == 0) {
+                            this.hashStore.remove(hash);
+                        } else {
+                            // update - modified
+                            this.hashStore.put(hash, mapping);
+                        }
                     }
                 }
             }
-        }
-        
-        // to be added
-        newHashes.removeAll(oldHashes);
-        for(String hash : newHashes) {
-            ReverseRecipeMapping mapping = (ReverseRecipeMapping) this.hashStore.get(hash);
-            if(mapping == null) {
-                mapping = new ReverseRecipeMapping(hash);
+
+            // to be added
+            newHashes.removeAll(oldHashes);
+            for(String hash : newHashes) {
+                ReverseRecipeMapping mapping = (ReverseRecipeMapping) this.hashStore.get(hash);
+                if(mapping == null) {
+                    mapping = new ReverseRecipeMapping(hash);
+                }
+
+                mapping.addRecipeName(oldRecipe.getMetadata().getURI().getPath());
+
+                // update
+                this.hashStore.put(hash, mapping);
             }
-
-            mapping.addRecipeName(oldRecipe.getMetadata().getURI().getPath());
-
-            // update
-            this.hashStore.put(hash, mapping);
         }
     }
     
-    public synchronized Collection<Recipe> getRecipes() throws IOException {
+    public Collection<Recipe> getRecipes() throws IOException {
         if(!this.started) {
             throw new IllegalStateException("Manager is not started");
         }
         
         safeInitRecipeStore();
         
-        List<Recipe> recipes = new ArrayList<Recipe>();
-        Collection<String> keys = this.recipeStore.keys();
-        for(String key : keys) {
-            Recipe recipe = (Recipe) this.recipeStore.get(key);
-            if(recipe != null) {
-                recipes.add(recipe);
+        synchronized(this.recipeStoreSyncObj) {
+            List<Recipe> recipes = new ArrayList<Recipe>();
+            Collection<String> keys = this.recipeStore.keys();
+            for(String key : keys) {
+                Recipe recipe = (Recipe) this.recipeStore.get(key);
+                if(recipe != null) {
+                    recipes.add(recipe);
+                }
             }
+            
+            return Collections.unmodifiableCollection(recipes);
         }
-        
-        return Collections.unmodifiableCollection(recipes);
     }
     
-    public synchronized Collection<String> getRecipeKeys() throws IOException {
+    public Collection<String> getRecipeKeys() throws IOException {
         if(!this.started) {
             throw new IllegalStateException("Manager is not started");
         }
         
         safeInitRecipeStore();
         
-        return Collections.unmodifiableCollection(this.recipeStore.keys());
+        synchronized(this.recipeStoreSyncObj) {
+            return Collections.unmodifiableCollection(this.recipeStore.keys());
+        }
     }
     
-    public synchronized Recipe getRecipe(String stargatePath) throws IOException {
+    public Recipe getRecipe(String stargatePath) throws IOException {
         if(stargatePath == null || stargatePath.isEmpty()) {
             throw new IllegalArgumentException("stargatePath is null or empty");
         }
@@ -300,10 +314,12 @@ public class RecipeManager extends AbstractManager<AbstractRecipeDriver> {
         
         safeInitRecipeStore();
         
-        return (Recipe) this.recipeStore.get(stargatePath);
+        synchronized(this.recipeStoreSyncObj) {
+            return (Recipe) this.recipeStore.get(stargatePath);
+        }
     }
     
-    public synchronized boolean hasRecipe(String stargatePath) throws IOException {
+    public boolean hasRecipe(String stargatePath) throws IOException {
         if(stargatePath == null || stargatePath.isEmpty()) {
             throw new IllegalArgumentException("stargatePath is null or empty");
         }
@@ -314,10 +330,12 @@ public class RecipeManager extends AbstractManager<AbstractRecipeDriver> {
         
         safeInitRecipeStore();
         
-        return this.recipeStore.containsKey(stargatePath);
+        synchronized(this.recipeStoreSyncObj) {
+            return this.recipeStore.containsKey(stargatePath);
+        }
     }
     
-    public synchronized Recipe getRecipeByHash(String hash) throws IOException {
+    public Recipe getRecipeByHash(String hash) throws IOException {
         if(hash == null || hash.isEmpty()) {
             throw new IllegalArgumentException("hash is null or empty");
         }
@@ -330,24 +348,26 @@ public class RecipeManager extends AbstractManager<AbstractRecipeDriver> {
         
         String hashKey = hash.trim().toLowerCase();
         
-        ReverseRecipeMapping reverseRecipeMapping = (ReverseRecipeMapping) this.hashStore.get(hashKey);
-        if(reverseRecipeMapping == null) {
+        synchronized(this.recipeStoreSyncObj) {
+            ReverseRecipeMapping reverseRecipeMapping = (ReverseRecipeMapping) this.hashStore.get(hashKey);
+            if(reverseRecipeMapping == null) {
+                return null;
+            }
+
+            Collection<String> recipeNames = reverseRecipeMapping.getRecipeNames();
+            for(String recipeName : recipeNames) {
+                Recipe recipe = (Recipe) this.recipeStore.get(recipeName);
+                RecipeChunk chunk = recipe.getChunk(hashKey);
+                if(chunk != null) {
+                    return recipe;
+                }
+            }
+
             return null;
         }
-        
-        Collection<String> recipeNames = reverseRecipeMapping.getRecipeNames();
-        for(String recipeName : recipeNames) {
-            Recipe recipe = (Recipe) this.recipeStore.get(recipeName);
-            RecipeChunk chunk = recipe.getChunk(hashKey);
-            if(chunk != null) {
-                return recipe;
-            }
-        }
-        
-        return null;
     }
     
-    public synchronized boolean hasRecipeByHash(String hash) throws IOException {
+    public boolean hasRecipeByHash(String hash) throws IOException {
         if(hash == null || hash.isEmpty()) {
             throw new IllegalArgumentException("hash is null or empty");
         }
@@ -360,24 +380,28 @@ public class RecipeManager extends AbstractManager<AbstractRecipeDriver> {
         
         String hashKey = hash.trim().toLowerCase();
         
-        return this.hashStore.containsKey(hashKey);
+        synchronized(this.recipeStoreSyncObj) {
+            return this.hashStore.containsKey(hashKey);
+        }
     }
     
-    public synchronized void clearRecipes() throws IOException {
+    public void clearRecipes() throws IOException {
         if(!this.started) {
             throw new IllegalStateException("Manager is not started");
         }
         
         safeInitRecipeStore();
         
-        Collection<String> keys = this.recipeStore.keys();
-        for(String key : keys) {
-            // this is to raise a recipe removal event
-            removeRecipe(key);
+        synchronized(this.recipeStoreSyncObj) {
+            Collection<String> keys = this.recipeStore.keys();
+            for(String key : keys) {
+                // this is to raise a recipe removal event
+                removeRecipe(key);
+            }
         }
     }
     
-    public synchronized void addRecipes(Collection<Recipe> recipes) throws RecipeManagerException, IOException {
+    public void addRecipes(Collection<Recipe> recipes) throws RecipeManagerException, IOException {
         if(recipes == null) {
             throw new IllegalArgumentException("recipes is null");
         }
@@ -390,27 +414,29 @@ public class RecipeManager extends AbstractManager<AbstractRecipeDriver> {
         
         List<Recipe> failed = new ArrayList<Recipe>();
         
-        for(Recipe recipe : recipes) {
-            try {
-                addRecipe(recipe);
-            } catch(RecipeManagerException ex) {
-                failed.add(recipe);
-            }
-        }
-        
-        if(!failed.isEmpty()) {
-            StringBuilder sb = new StringBuilder();
-            for(Recipe recipe : failed) {
-                if(sb.length() > 0) {
-                    sb.append(",");
+        synchronized(this.recipeStoreSyncObj) {
+            for(Recipe recipe : recipes) {
+                try {
+                    addRecipe(recipe);
+                } catch(RecipeManagerException ex) {
+                    failed.add(recipe);
                 }
-                sb.append(recipe.getMetadata().getURI().getPath());
             }
-            throw new RecipeManagerException(String.format("recipes (%s) cannot be added (maybe already exist?)", sb.toString()));
+
+            if(!failed.isEmpty()) {
+                StringBuilder sb = new StringBuilder();
+                for(Recipe recipe : failed) {
+                    if(sb.length() > 0) {
+                        sb.append(",");
+                    }
+                    sb.append(recipe.getMetadata().getURI().getPath());
+                }
+                throw new RecipeManagerException(String.format("recipes (%s) cannot be added (maybe already exist?)", sb.toString()));
+            }
         }
     }
     
-    public synchronized void addRecipe(Recipe recipe) throws RecipeManagerException, IOException {
+    public void addRecipe(Recipe recipe) throws RecipeManagerException, IOException {
         if(recipe == null) {
             throw new IllegalArgumentException("recipe is null");
         }
@@ -423,18 +449,20 @@ public class RecipeManager extends AbstractManager<AbstractRecipeDriver> {
         
         String key = recipe.getMetadata().getURI().getPath();
         
-        if(this.recipeStore.containsKey(key)) {
-            throw new RecipeManagerException(String.format("recipe %s is already added", key));
+        synchronized(this.recipeStoreSyncObj) {
+            if(this.recipeStore.containsKey(key)) {
+                throw new RecipeManagerException(String.format("recipe %s is already added", key));
+            }
+
+            this.recipeStore.put(key, recipe);
+
+            addHashes(recipe);
+
+            this.lastUpdateTime = DateTimeUtils.getTimestamp();
         }
-        
-        this.recipeStore.put(key, recipe);
-        
-        addHashes(recipe);
-        
-        this.lastUpdateTime = DateTimeUtils.getTimestamp();
     }
     
-    public synchronized void removeRecipe(Recipe recipe) throws IOException {
+    public void removeRecipe(Recipe recipe) throws IOException {
         if(recipe == null) {
             throw new IllegalArgumentException("recipe is null");
         }
@@ -445,10 +473,12 @@ public class RecipeManager extends AbstractManager<AbstractRecipeDriver> {
         
         safeInitRecipeStore();
         
-        removeRecipe(recipe.getMetadata().getURI().getPath());
+        synchronized(this.recipeStoreSyncObj) {
+            removeRecipe(recipe.getMetadata().getURI().getPath());
+        }
     }
     
-    public synchronized void removeRecipe(String stargatePath) throws IOException {
+    public void removeRecipe(String stargatePath) throws IOException {
         if(stargatePath == null || stargatePath.isEmpty()) {
             throw new IllegalArgumentException("stargatePath is null or empty");
         }
@@ -459,17 +489,19 @@ public class RecipeManager extends AbstractManager<AbstractRecipeDriver> {
         
         safeInitRecipeStore();
         
-        Recipe recipe = (Recipe) this.recipeStore.get(stargatePath);
-        if(recipe != null) {
-            this.recipeStore.remove(stargatePath);
-            
-            removeHashes(recipe);
-            
-            this.lastUpdateTime = DateTimeUtils.getTimestamp();
+        synchronized(this.recipeStoreSyncObj) {
+            Recipe recipe = (Recipe) this.recipeStore.get(stargatePath);
+            if(recipe != null) {
+                this.recipeStore.remove(stargatePath);
+
+                removeHashes(recipe);
+
+                this.lastUpdateTime = DateTimeUtils.getTimestamp();
+            }
         }
     }
     
-    public synchronized void updateRecipe(Recipe newRecipe) throws IOException {
+    public void updateRecipe(Recipe newRecipe) throws IOException {
         if(newRecipe == null) {
             throw new IllegalArgumentException("recipe is null");
         }
@@ -482,19 +514,21 @@ public class RecipeManager extends AbstractManager<AbstractRecipeDriver> {
         
         String key = newRecipe.getMetadata().getURI().getPath();
         
-        Recipe oldRecipe = (Recipe) this.recipeStore.get(key);
-        this.recipeStore.put(key, newRecipe);
-        
-        this.lastUpdateTime = DateTimeUtils.getTimestamp();
-        
-        if(oldRecipe == null) {
-            addHashes(newRecipe);
-        } else {
-            updateHashes(oldRecipe, newRecipe);
+        synchronized(this.recipeStoreSyncObj) {
+            Recipe oldRecipe = (Recipe) this.recipeStore.get(key);
+            this.recipeStore.put(key, newRecipe);
+
+            this.lastUpdateTime = DateTimeUtils.getTimestamp();
+
+            if(oldRecipe == null) {
+                addHashes(newRecipe);
+            } else {
+                updateHashes(oldRecipe, newRecipe);
+            }
         }
     }
     
-    public synchronized void syncRecipes() throws IOException, ManagerNotInstantiatedException, RecipeManagerException {
+    public void syncRecipes() throws IOException, ManagerNotInstantiatedException, RecipeManagerException {
         if(!this.started) {
             throw new IllegalStateException("Manager is not started");
         }
@@ -505,52 +539,54 @@ public class RecipeManager extends AbstractManager<AbstractRecipeDriver> {
         DataExportManager dataExportManager = stargateService.getDataExportManager();
         DataSourceManager dataSourceManager = stargateService.getDataSourceManager();
         
-        // find missing recipes
-        Collection<String> recipeKeys = this.recipeStore.keys();
-        
-        Collection<DataExportEntry> dataExportEntries = dataExportManager.getDataExportEntries();
-        for(DataExportEntry entry : dataExportEntries) {
-            if(!recipeKeys.contains(entry.getStargatePath())) {
-                // recipe does not exist
-                Recipe recipe = createRecipe(entry);
-                addRecipe(recipe);
-            } else {
-                //check stale recipe
-                Recipe recipe = (Recipe) this.recipeStore.get(entry.getStargatePath());
-                if(recipe == null) {
-                    removeRecipe(entry.getStargatePath());
-                    continue;
-                }
-                
-                AbstractDataSourceDriver dataSourceDriver = dataSourceManager.getDriver(entry.getSourceURI());
-                
-                DataObjectMetadata recipeMetadata = recipe.getMetadata();
-                SourceFileMetadata sourceFileMetadata = dataSourceDriver.getMetadata(entry.getSourceURI());
-                if(recipeMetadata == null || sourceFileMetadata == null) {
-                    removeRecipe(entry.getStargatePath());
-                    continue;
-                }
-                
-                if(recipeMetadata.getLastModifiedTime() != sourceFileMetadata.getLastModifiedTime() ||
-                        recipeMetadata.getSize() != sourceFileMetadata.getFileSize()) {
-                    removeRecipe(entry.getStargatePath());
-                    Recipe newRecipe = createRecipe(entry);
-                    addRecipe(newRecipe);
+        synchronized(this.recipeStoreSyncObj) {
+            // find missing recipes
+            Collection<String> recipeKeys = this.recipeStore.keys();
+
+            Collection<DataExportEntry> dataExportEntries = dataExportManager.getDataExportEntries();
+            for(DataExportEntry entry : dataExportEntries) {
+                if(!recipeKeys.contains(entry.getStargatePath())) {
+                    // recipe does not exist
+                    Recipe recipe = createRecipe(entry);
+                    addRecipe(recipe);
+                } else {
+                    //check stale recipe
+                    Recipe recipe = (Recipe) this.recipeStore.get(entry.getStargatePath());
+                    if(recipe == null) {
+                        removeRecipe(entry.getStargatePath());
+                        continue;
+                    }
+
+                    AbstractDataSourceDriver dataSourceDriver = dataSourceManager.getDriver(entry.getSourceURI());
+
+                    DataObjectMetadata recipeMetadata = recipe.getMetadata();
+                    SourceFileMetadata sourceFileMetadata = dataSourceDriver.getMetadata(entry.getSourceURI());
+                    if(recipeMetadata == null || sourceFileMetadata == null) {
+                        removeRecipe(entry.getStargatePath());
+                        continue;
+                    }
+
+                    if(recipeMetadata.getLastModifiedTime() != sourceFileMetadata.getLastModifiedTime() ||
+                            recipeMetadata.getSize() != sourceFileMetadata.getFileSize()) {
+                        removeRecipe(entry.getStargatePath());
+                        Recipe newRecipe = createRecipe(entry);
+                        addRecipe(newRecipe);
+                    }
                 }
             }
-        }
-        
-        recipeKeys = this.recipeStore.keys();
-        
-        // remove broken recipes
-        List<String> brokenRecipeList = new ArrayList<String>();
-        brokenRecipeList.addAll(recipeKeys);
-        for(DataExportEntry entry : dataExportEntries) {
-            brokenRecipeList.remove(entry.getStargatePath());
-        }
-        
-        for(String key : brokenRecipeList) {
-            removeRecipe(key);
+
+            recipeKeys = this.recipeStore.keys();
+
+            // remove broken recipes
+            List<String> brokenRecipeList = new ArrayList<String>();
+            brokenRecipeList.addAll(recipeKeys);
+            for(DataExportEntry entry : dataExportEntries) {
+                brokenRecipeList.remove(entry.getStargatePath());
+            }
+
+            for(String key : brokenRecipeList) {
+                removeRecipe(key);
+            }
         }
     }
     
@@ -653,176 +689,179 @@ public class RecipeManager extends AbstractManager<AbstractRecipeDriver> {
         }
     }
     
-    private synchronized Recipe createRecipeParallel(DataExportEntry entry) throws IOException {
-        try {
-            StargateService stargateService = getStargateService();
+    private Recipe createRecipeParallel(DataExportEntry entry) throws IOException {
+        
+        synchronized(this.parallelRecipeCreationSyncObj) {
+            try {
+                StargateService stargateService = getStargateService();
 
-            ClusterManager clusterManager = stargateService.getClusterManager();
-            AbstractClusterDriver clusterDriver = clusterManager.getDriver();
-            Cluster cluster = clusterDriver.getLocalCluster();
+                ClusterManager clusterManager = stargateService.getClusterManager();
+                AbstractClusterDriver clusterDriver = clusterManager.getDriver();
+                Cluster cluster = clusterDriver.getLocalCluster();
 
-            DataSourceManager dataSourceManager = stargateService.getDataSourceManager();
-            AbstractDataSourceDriver dataSourceDriver = dataSourceManager.getDriver(entry.getSourceURI());
-            SourceFileMetadata sourceMetadata = dataSourceDriver.getMetadata(entry.getSourceURI());
+                DataSourceManager dataSourceManager = stargateService.getDataSourceManager();
+                AbstractDataSourceDriver dataSourceDriver = dataSourceManager.getDriver(entry.getSourceURI());
+                SourceFileMetadata sourceMetadata = dataSourceDriver.getMetadata(entry.getSourceURI());
 
-            DataObjectURI dataObjectURI = new DataObjectURI(cluster.getName(), entry.getStargatePath());
-            DataObjectMetadata objMetadata = new DataObjectMetadata(dataObjectURI, sourceMetadata.getFileSize(), sourceMetadata.isDirectory(), sourceMetadata.getLastModifiedTime());
+                DataObjectURI dataObjectURI = new DataObjectURI(cluster.getName(), entry.getStargatePath());
+                DataObjectMetadata objMetadata = new DataObjectMetadata(dataObjectURI, sourceMetadata.getFileSize(), sourceMetadata.isDirectory(), sourceMetadata.getLastModifiedTime());
 
-            // create recipe
-            AbstractRecipeDriver driver = getDriver();
+                // create recipe
+                AbstractRecipeDriver driver = getDriver();
 
-            int chunkSize = driver.getChunkSize();
-            Collection<String> nodeNames = cluster.getNodeNames();
-            
-            Recipe recipe = new Recipe(objMetadata, driver.getHashAlgorithm(), chunkSize, nodeNames);
-            long offset = 0;
-            long remaining = sourceMetadata.getFileSize();
-            int recipeChunkNum = 0;
-            
-            // distribute tasks
-            List<RecipeChunkGenerateEvent> anyNodeTasks = new ArrayList<RecipeChunkGenerateEvent>();
-            
-            int numNodes = nodeNames.size();
-            List<RecipeChunkGenerateEvent> nodeTasks[] = new List[numNodes];
-            for(int i=0;i<numNodes;i++) {
-                nodeTasks[i] = new ArrayList<RecipeChunkGenerateEvent>();
-            }
-            
-            while(remaining > 0) {
-                int blockSize = (int) Math.min(chunkSize, remaining);
-                RecipeChunkGenerateEvent event = new RecipeChunkGenerateEvent(entry, sourceMetadata, offset, blockSize);
-                
-                Collection<String> blockLocations = dataSourceDriver.listBlockLocations(cluster, sourceMetadata.getURI(), offset, chunkSize);
-                if(blockLocations.contains("*")) {
-                    // distribute to any
-                    anyNodeTasks.add(event);
-                } else {
-                    // simply use the primary host
-                    for(String nodeName : blockLocations) {
-                        int nodeID = recipe.getNodeID(nodeName);
-                        if(nodeID >= 0) {
-                            nodeTasks[nodeID].add(event);
-                        } else {
-                            anyNodeTasks.add(event);
-                        }
-                        break;
-                    }
+                int chunkSize = driver.getChunkSize();
+                Collection<String> nodeNames = cluster.getNodeNames();
+
+                Recipe recipe = new Recipe(objMetadata, driver.getHashAlgorithm(), chunkSize, nodeNames);
+                long offset = 0;
+                long remaining = sourceMetadata.getFileSize();
+                int recipeChunkNum = 0;
+
+                // distribute tasks
+                List<RecipeChunkGenerateEvent> anyNodeTasks = new ArrayList<RecipeChunkGenerateEvent>();
+
+                int numNodes = nodeNames.size();
+                List<RecipeChunkGenerateEvent> nodeTasks[] = new List[numNodes];
+                for(int i=0;i<numNodes;i++) {
+                    nodeTasks[i] = new ArrayList<RecipeChunkGenerateEvent>();
                 }
-                
-                offset += blockSize;
-                remaining -= blockSize;
-                recipeChunkNum++;
-            }
-            
-            int remainingTasks = recipeChunkNum;
-            int remainingNodes = numNodes;
-            int optimalTasksPerNode = remainingTasks / remainingNodes;
-            
-            for(int i=0;i<numNodes;i++) {
-                if(nodeTasks[i].size() > optimalTasksPerNode) {
-                    remainingTasks -= nodeTasks[i].size();
-                    remainingNodes--;
-                }
-            }
-            
-            optimalTasksPerNode = remainingTasks / remainingNodes;
-            for(int i=0;i<numNodes;i++) {
-                int toAdd = optimalTasksPerNode - nodeTasks[i].size();
-                for(int j=0;j<toAdd;j++) {
-                    if(anyNodeTasks.size() > 0) {
-                        RecipeChunkGenerateEvent event = anyNodeTasks.remove(0);
-                        nodeTasks[i].add(event);
-                        remainingTasks--;
-                    } else {
-                        break;
-                    }
-                }
-                    
-                if(anyNodeTasks.size() <= 0) {
-                    break;
-                }
-            }
-            
-            // remaining
-            if(anyNodeTasks.size() > 0) {
-                nodeTasks[numNodes - 1].addAll(anyNodeTasks);
-            }
-            
-            //// now launch tasks
-            ScheduleManager scheduleManager = stargateService.getScheduleManager();
-            
-            Iterator<String> nodeNameIterator = nodeNames.iterator();
-            int nodeId = 0;
-            
-            List<RecipeChunkGenerateTask> recipeChunkGenerateTasks = new ArrayList<RecipeChunkGenerateTask>();
-            while(nodeNameIterator.hasNext()) {
-                String nodeName = nodeNameIterator.next();
-                
-                if(nodeTasks[nodeId].size() > 0) {
-                    List<String> nodeNameList = new ArrayList<String>();
-                    nodeNameList.add(nodeName);
 
-                    RecipeChunkGenerateTask recipeChunkGenerateTask = new RecipeChunkGenerateTask(nodeNameList, nodeTasks[nodeId]);
-                    scheduleManager.scheduleTask(recipeChunkGenerateTask);
+                while(remaining > 0) {
+                    int blockSize = (int) Math.min(chunkSize, remaining);
+                    RecipeChunkGenerateEvent event = new RecipeChunkGenerateEvent(entry, sourceMetadata, offset, blockSize);
 
-                    recipeChunkGenerateTasks.add(recipeChunkGenerateTask);
-                }
-                
-                nodeId++;
-            }
-            
-            // collect
-            List<RecipeChunk> collectedRecipeChunks = new ArrayList<RecipeChunk>();
-            
-            for(RecipeChunkGenerateTask task : recipeChunkGenerateTasks) {
-                Collection<RecipeChunk> recipeChunks = task.getRecipeChunks();
-                for(RecipeChunk recipeChunk : recipeChunks) {
-                    LOG.debug(String.format("Received chunk - %s", recipeChunk.toString()));
-                    
-                    Collection<String> blockLocations = dataSourceDriver.listBlockLocations(cluster, sourceMetadata.getURI(), recipeChunk.getOffset(), recipeChunk.getLength());
+                    Collection<String> blockLocations = dataSourceDriver.listBlockLocations(cluster, sourceMetadata.getURI(), offset, chunkSize);
                     if(blockLocations.contains("*")) {
-                        LOG.debug("block location of recipechunk has *");
-                        recipeChunk.setAccessibleFromAllNode();
+                        // distribute to any
+                        anyNodeTasks.add(event);
                     } else {
+                        // simply use the primary host
                         for(String nodeName : blockLocations) {
                             int nodeID = recipe.getNodeID(nodeName);
                             if(nodeID >= 0) {
-                                LOG.debug(String.format("block location of recipechunk is mapped to a node : %d", nodeID));
-                                recipeChunk.addNodeID(nodeID);
+                                nodeTasks[nodeID].add(event);
                             } else {
-                                LOG.debug("block location of recipechunk cannot be mapped to a node");
-                                recipeChunk.setAccessibleFromAllNode();
+                                anyNodeTasks.add(event);
                             }
+                            break;
                         }
                     }
 
-                    collectedRecipeChunks.add(recipeChunk);
+                    offset += blockSize;
+                    remaining -= blockSize;
+                    recipeChunkNum++;
                 }
-            }
-            
-            // sort
-            Collections.sort(collectedRecipeChunks, new Comparator<RecipeChunk>() {
-                @Override
-                public int compare(RecipeChunk c1, RecipeChunk c2) {
-                    long diff = c1.getOffset() - c2.getOffset();
-                    if(diff < 0) {
-                        return -1;
-                    } else if(diff == 0) {
-                        return 0;
-                    } else {
-                        return 1;
+
+                int remainingTasks = recipeChunkNum;
+                int remainingNodes = numNodes;
+                int optimalTasksPerNode = remainingTasks / remainingNodes;
+
+                for(int i=0;i<numNodes;i++) {
+                    if(nodeTasks[i].size() > optimalTasksPerNode) {
+                        remainingTasks -= nodeTasks[i].size();
+                        remainingNodes--;
                     }
-                } 
-            });
-            
-            for(RecipeChunk recipeChunk : collectedRecipeChunks) {
-                recipe.addChunk(recipeChunk);
+                }
+
+                optimalTasksPerNode = remainingTasks / remainingNodes;
+                for(int i=0;i<numNodes;i++) {
+                    int toAdd = optimalTasksPerNode - nodeTasks[i].size();
+                    for(int j=0;j<toAdd;j++) {
+                        if(anyNodeTasks.size() > 0) {
+                            RecipeChunkGenerateEvent event = anyNodeTasks.remove(0);
+                            nodeTasks[i].add(event);
+                            remainingTasks--;
+                        } else {
+                            break;
+                        }
+                    }
+
+                    if(anyNodeTasks.size() <= 0) {
+                        break;
+                    }
+                }
+
+                // remaining
+                if(anyNodeTasks.size() > 0) {
+                    nodeTasks[numNodes - 1].addAll(anyNodeTasks);
+                }
+
+                //// now launch tasks
+                ScheduleManager scheduleManager = stargateService.getScheduleManager();
+
+                Iterator<String> nodeNameIterator = nodeNames.iterator();
+                int nodeId = 0;
+
+                List<RecipeChunkGenerateTask> recipeChunkGenerateTasks = new ArrayList<RecipeChunkGenerateTask>();
+                while(nodeNameIterator.hasNext()) {
+                    String nodeName = nodeNameIterator.next();
+
+                    if(nodeTasks[nodeId].size() > 0) {
+                        List<String> nodeNameList = new ArrayList<String>();
+                        nodeNameList.add(nodeName);
+
+                        RecipeChunkGenerateTask recipeChunkGenerateTask = new RecipeChunkGenerateTask(nodeNameList, nodeTasks[nodeId]);
+                        scheduleManager.scheduleTask(recipeChunkGenerateTask);
+
+                        recipeChunkGenerateTasks.add(recipeChunkGenerateTask);
+                    }
+
+                    nodeId++;
+                }
+
+                // collect
+                List<RecipeChunk> collectedRecipeChunks = new ArrayList<RecipeChunk>();
+
+                for(RecipeChunkGenerateTask task : recipeChunkGenerateTasks) {
+                    Collection<RecipeChunk> recipeChunks = task.getRecipeChunks();
+                    for(RecipeChunk recipeChunk : recipeChunks) {
+                        LOG.debug(String.format("Received chunk - %s", recipeChunk.toString()));
+
+                        Collection<String> blockLocations = dataSourceDriver.listBlockLocations(cluster, sourceMetadata.getURI(), recipeChunk.getOffset(), recipeChunk.getLength());
+                        if(blockLocations.contains("*")) {
+                            LOG.debug("block location of recipechunk has *");
+                            recipeChunk.setAccessibleFromAllNode();
+                        } else {
+                            for(String nodeName : blockLocations) {
+                                int nodeID = recipe.getNodeID(nodeName);
+                                if(nodeID >= 0) {
+                                    LOG.debug(String.format("block location of recipechunk is mapped to a node : %d", nodeID));
+                                    recipeChunk.addNodeID(nodeID);
+                                } else {
+                                    LOG.debug("block location of recipechunk cannot be mapped to a node");
+                                    recipeChunk.setAccessibleFromAllNode();
+                                }
+                            }
+                        }
+
+                        collectedRecipeChunks.add(recipeChunk);
+                    }
+                }
+
+                // sort
+                Collections.sort(collectedRecipeChunks, new Comparator<RecipeChunk>() {
+                    @Override
+                    public int compare(RecipeChunk c1, RecipeChunk c2) {
+                        long diff = c1.getOffset() - c2.getOffset();
+                        if(diff < 0) {
+                            return -1;
+                        } else if(diff == 0) {
+                            return 0;
+                        } else {
+                            return 1;
+                        }
+                    } 
+                });
+
+                for(RecipeChunk recipeChunk : collectedRecipeChunks) {
+                    recipe.addChunk(recipeChunk);
+                }
+
+                return recipe;
+            } catch (ManagerNotInstantiatedException ex) {
+                LOG.error(ex);
+                throw new IOException(ex);
             }
-            
-            return recipe;
-        } catch (ManagerNotInstantiatedException ex) {
-            LOG.error(ex);
-            throw new IOException(ex);
         }
     }
     
