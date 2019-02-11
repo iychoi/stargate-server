@@ -43,8 +43,9 @@ public class PolicyManager extends AbstractManager<NullDriver> {
     private ClusterPolicy clusterPolicy;
     private VolumePolicy volumePolicy;
     private AbstractKeyValueStore policyStore;
+    private final Object policyStoreSyncObj = new Object();
     private List<AbstractPolicyEventHandler> policyEventHandlers = new ArrayList<AbstractPolicyEventHandler>();
-    private Object policyEventHandlersSyncObj = new Object();
+    private final Object policyEventHandlersSyncObj = new Object();
     protected long lastUpdateTime;
     
     private static final String POLICY_STORE = "policy";
@@ -92,19 +93,21 @@ public class PolicyManager extends AbstractManager<NullDriver> {
     }
     
     private void safeInitPolicyStore() throws IOException {
-        if(this.policyStore == null) {
-            try {
-                StargateService stargateService = getStargateService();
-                DataStoreManager keyValueStoreManager = stargateService.getDataStoreManager();
-                this.policyStore = keyValueStoreManager.getDriver().getKeyValueStore(POLICY_STORE, DataExportEntry.class, EnumDataStoreProperty.DATASTORE_PROP_PERSISTENT_REPLICATED);
-            } catch (ManagerNotInstantiatedException ex) {
-                LOG.error(ex);
-                throw new IOException(ex);
+        synchronized(this.policyStoreSyncObj) {
+            if(this.policyStore == null) {
+                try {
+                    StargateService stargateService = getStargateService();
+                    DataStoreManager keyValueStoreManager = stargateService.getDataStoreManager();
+                    this.policyStore = keyValueStoreManager.getDriver().getKeyValueStore(POLICY_STORE, DataExportEntry.class, EnumDataStoreProperty.DATASTORE_PROP_PERSISTENT_REPLICATED);
+                } catch (ManagerNotInstantiatedException ex) {
+                    LOG.error(ex);
+                    throw new IOException(ex);
+                }
             }
         }
     }
     
-    public synchronized Object get(String key) throws IOException {
+    public Object get(String key) throws IOException {
         if(key == null || key.isEmpty()) {
             throw new IllegalArgumentException("key is null or empty");
         }
@@ -115,10 +118,12 @@ public class PolicyManager extends AbstractManager<NullDriver> {
         
         safeInitPolicyStore();
         
-        return this.policyStore.get(key);
+        synchronized(this.policyStoreSyncObj) {
+            return this.policyStore.get(key);
+        }
     }
     
-    public synchronized void put(String key, Object value) throws IOException {
+    public void put(String key, Object value) throws IOException {
         if(key == null || key.isEmpty()) {
             throw new IllegalArgumentException("key is null or empty");
         }
@@ -133,11 +138,13 @@ public class PolicyManager extends AbstractManager<NullDriver> {
         
         safeInitPolicyStore();
         
-        this.policyStore.put(key, value);
+        synchronized(this.policyStoreSyncObj) {
+            this.policyStore.put(key, value);
         
-        this.lastUpdateTime = DateTimeUtils.getTimestamp();
-        
-        raiseEventForPolicyUpdated(key, value);
+            this.lastUpdateTime = DateTimeUtils.getTimestamp();
+
+            raiseEventForPolicyUpdated(key, value);
+        }
     }
     
     public ClusterPolicy getClusterPolicy(boolean local) throws IOException {
@@ -152,7 +159,7 @@ public class PolicyManager extends AbstractManager<NullDriver> {
         }
     }
     
-    public synchronized ClusterPolicy getClusterPolicy() throws IOException {
+    public ClusterPolicy getClusterPolicy() throws IOException {
         if(!this.started) {
             throw new IllegalStateException("Manager is not started");
         }
@@ -179,7 +186,7 @@ public class PolicyManager extends AbstractManager<NullDriver> {
         }
     }
     
-    public synchronized VolumePolicy getVolumePolicy() throws IOException {
+    public VolumePolicy getVolumePolicy() throws IOException {
         if(!this.started) {
             throw new IllegalStateException("Manager is not started");
         }
