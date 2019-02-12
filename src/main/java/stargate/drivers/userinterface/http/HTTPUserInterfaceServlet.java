@@ -790,7 +790,7 @@ public class HTTPUserInterfaceServlet extends AbstractUserInterfaceServer {
             TransportManager transportManager = service.getTransportManager();
             TransferAssignment assignment = transportManager.schedulePrefetch(uri, hash);
             TransferEvent event = assignment.getEvent();
-            return event.getTargetNodeName();
+            return event.getLocalNodeName();
         } catch (ManagerNotInstantiatedException ex) {
             LOG.error(ex);
             throw new IOException(ex);

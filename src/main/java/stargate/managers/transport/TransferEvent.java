@@ -17,10 +17,6 @@ package stargate.managers.transport;
 
 import java.io.File;
 import java.io.IOException;
-import java.util.ArrayList;
-import java.util.Collection;
-import java.util.Collections;
-import java.util.List;
 import org.codehaus.jackson.annotate.JsonIgnore;
 import org.codehaus.jackson.annotate.JsonProperty;
 import stargate.commons.dataobject.DataObjectURI;
@@ -33,15 +29,10 @@ import stargate.commons.utils.JsonSerializer;
  */
 public class TransferEvent {
 
-    public static final String ANY_NODES = "ANY";
-    
     private TransferEventType eventType;
     private DataObjectURI uri;
-    private long offset;
-    private int length;
     private String hash;
-    private List<String> dataSourceNodeNames = new ArrayList<String>();
-    private String targetNodeName;
+    private String localNodeName;
     
     public static TransferEvent createInstance(File file) throws IOException {
         if(file == null) {
@@ -62,7 +53,7 @@ public class TransferEvent {
     TransferEvent() {
     }
     
-    TransferEvent(TransferEventType eventType, DataObjectURI uri, long offset, int length, String hash, Collection<String> dataSourceNodeNames, String targetNodeName) {
+    TransferEvent(TransferEventType eventType, DataObjectURI uri, String hash, String targetNodeName) {
         if(eventType == null) {
             throw new IllegalArgumentException("eventType is null");
         }
@@ -71,33 +62,14 @@ public class TransferEvent {
             throw new IllegalArgumentException("uri is null");
         }
         
-        if(offset < 0) {
-            throw new IllegalArgumentException("offset is negative");
-        }
-        
-        if(length < 0) {
-            throw new IllegalArgumentException("length is negative");
-        }
-        
         if(hash == null || hash.isEmpty()) {
             throw new IllegalArgumentException("hash is null or empty");
         }
         
-        if(dataSourceNodeNames == null || dataSourceNodeNames.isEmpty()) {
-            throw new IllegalArgumentException("dataSourceNodeNames is null or empty");
-        }
-        
         this.eventType = eventType;
         this.uri = uri;
-        this.offset = offset;
-        this.length = length;
         this.hash = hash.toLowerCase();
-        this.dataSourceNodeNames.addAll(dataSourceNodeNames);
-        if(targetNodeName == null) {
-            this.targetNodeName = ANY_NODES;
-        } else {
-            this.targetNodeName = targetNodeName;
-        }
+        this.localNodeName = targetNodeName;
     }
     
     @JsonProperty("event_type")
@@ -107,6 +79,10 @@ public class TransferEvent {
     
     @JsonProperty("event_type")
     public void setEventType(TransferEventType eventType) {
+        if(eventType == null) {
+            throw new IllegalArgumentException("eventType is null");
+        }
+        
         this.eventType = eventType;
     }
     
@@ -117,27 +93,11 @@ public class TransferEvent {
     
     @JsonProperty("uri")
     public void setDataObjectURI(DataObjectURI uri) {
+        if(uri == null) {
+            throw new IllegalArgumentException("uri is null");
+        }
+        
         this.uri = uri;
-    }
-
-    @JsonProperty("offset")
-    public long getOffset() {
-        return offset;
-    }
-    
-    @JsonProperty("offset")
-    public void setOffset(long offset) {
-        this.offset = offset;
-    }
-
-    @JsonProperty("length")
-    public int getLength() {
-        return length;
-    }
-    
-    @JsonProperty("length")
-    public void setLength(int length) {
-        this.length = length;
     }
 
     @JsonProperty("hash")
@@ -157,35 +117,24 @@ public class TransferEvent {
         }
     }
     
-    @JsonProperty("data_source_node_names")
-    public Collection<String> getDataSourceNodeNames() {
-        return Collections.unmodifiableCollection(this.dataSourceNodeNames);
+    @JsonProperty("local_node_name")
+    public String getLocalNodeName() {
+        return this.localNodeName;
     }
     
-    @JsonProperty("data_source_node_names")
-    public void addDataSourceNodeNames(Collection<String> dataSourceNodeNames) {
-        this.dataSourceNodeNames.addAll(dataSourceNodeNames);
-    }
-    
-    @JsonIgnore
-    public void addDataSourceNodeName(String dataSourceNodeName) {
-        this.dataSourceNodeNames.add(dataSourceNodeName);
-    }
-    
-    @JsonProperty("target_node_name")
-    public String getTargetNodeName() {
-        return this.targetNodeName;
-    }
-    
-    @JsonProperty("target_node_names")
-    public void setTargetNodeName(String targetNodeName) {
-        this.targetNodeName = targetNodeName;
+    @JsonProperty("local_node_name")
+    public void setLocalNodeName(String localNodeName) {
+        if(localNodeName == null || localNodeName.isEmpty()) {
+            throw new IllegalArgumentException("localNodeName is null or empty");
+        }
+        
+        this.localNodeName = localNodeName;
     }
     
     @Override
     @JsonIgnore
     public String toString() {
-        return "TransferEvent{" + "eventType=" + eventType + ", uri=" + uri + ", offset=" + offset + ", length=" + length + ", hash=" + hash + '}';
+        return "TransferEvent{" + "eventType=" + eventType + ", uri=" + uri + ", hash=" + hash + '}';
     }
     
     @JsonIgnore

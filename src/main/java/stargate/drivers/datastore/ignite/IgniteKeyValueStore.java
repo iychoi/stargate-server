@@ -23,6 +23,7 @@ import java.util.List;
 import java.util.ArrayList;
 import java.util.Map;
 import java.util.concurrent.TimeUnit;
+import java.util.concurrent.locks.Lock;
 import javax.cache.Cache;
 import javax.cache.expiry.CreatedExpiryPolicy;
 import javax.cache.expiry.Duration;
@@ -34,7 +35,10 @@ import org.apache.ignite.cache.CacheAtomicityMode;
 import org.apache.ignite.cache.CacheMode;
 import org.apache.ignite.cache.CachePeekMode;
 import org.apache.ignite.cache.CacheWriteSynchronizationMode;
+import org.apache.ignite.cache.affinity.Affinity;
+import org.apache.ignite.cluster.ClusterNode;
 import org.apache.ignite.configuration.CacheConfiguration;
+import stargate.commons.datastore.AbstractDataStoreLayoutEventHandler;
 import stargate.commons.datastore.AbstractKeyValueStore;
 import stargate.commons.datastore.EnumDataStoreProperty;
 import stargate.commons.utils.ObjectSerializer;
@@ -55,8 +59,11 @@ public class IgniteKeyValueStore extends AbstractKeyValueStore {
     private EnumDataStoreProperty property;
     private TimeUnit expiryTimeUnit;
     private long expiryTimeValue;
+    private List<AbstractDataStoreLayoutEventHandler> layoutEventHandlers = new ArrayList<AbstractDataStoreLayoutEventHandler>();
+    private final Object layoutEventHandlersSyncObj = new Object();
     
     private IgniteCache<String, byte[]> store;
+    private Affinity<String> affinity;
     
     public IgniteKeyValueStore(IgniteDataStoreDriver driver, Ignite ignite, String name, Class valueClass, EnumDataStoreProperty property) {
         if(driver == null) {
@@ -109,6 +116,7 @@ public class IgniteKeyValueStore extends AbstractKeyValueStore {
         cc.setName(name);
         
         this.store = this.ignite.getOrCreateCache(cc);
+        this.affinity = this.ignite.affinity(name);
     }
     
     public IgniteKeyValueStore(IgniteDataStoreDriver driver, Ignite ignite, String name, Class valueClass, EnumDataStoreProperty property, TimeUnit timeunit, long timeval) {
@@ -172,6 +180,7 @@ public class IgniteKeyValueStore extends AbstractKeyValueStore {
         Duration duration = new Duration(timeunit, timeval);
         CreatedExpiryPolicy expiryPolicy = new CreatedExpiryPolicy(duration);
         this.store = this.ignite.getOrCreateCache(cc).withExpiryPolicy(expiryPolicy);
+        this.affinity = this.ignite.affinity(name);
     }
     
     @Override
@@ -182,6 +191,14 @@ public class IgniteKeyValueStore extends AbstractKeyValueStore {
     @Override
     public EnumDataStoreProperty getProperty() {
         return this.property;
+    }
+    
+    public TimeUnit getExpiryTimeUnit() {
+        return this.expiryTimeUnit;
+    }
+    
+    public long getExpiryTime() {
+        return this.expiryTimeValue;
     }
     
     @Override
@@ -235,6 +252,10 @@ public class IgniteKeyValueStore extends AbstractKeyValueStore {
         
         byte[] valueBytes = ObjectSerializer.toByteArray(value);
         this.store.put(key, valueBytes);
+        
+        // call event
+        ClusterNode primaryNode = this.affinity.mapKeyToNode(key);
+        raiseEventForLayoutEventDataAdded(key, primaryNode.consistentId().toString());
     }
 
     @Override
@@ -252,6 +273,12 @@ public class IgniteKeyValueStore extends AbstractKeyValueStore {
             return true;
         }
         return false;
+    }
+    
+    @Override
+    public String getNodeForData(String key) throws IOException {
+        ClusterNode primaryNode = this.affinity.mapKeyToNode(key);
+        return primaryNode.consistentId().toString();
     }
 
     @Override
@@ -295,5 +322,52 @@ public class IgniteKeyValueStore extends AbstractKeyValueStore {
             keys.add(entry.getKey());
         }
         return keys;
+    }
+    
+    @Override
+    public Lock getKeyLock(String key) {
+        if(key == null || key.isEmpty()) {
+            throw new IllegalArgumentException("key is null or empty");
+        }
+        
+        return this.store.lock(key);
+    }
+
+    @Override
+    public void addLayoutEventHandler(AbstractDataStoreLayoutEventHandler eventHandler) {
+        if(eventHandler == null) {
+            throw new IllegalArgumentException("eventHandler is null");
+        }
+        
+        synchronized(this.layoutEventHandlersSyncObj) {
+            this.layoutEventHandlers.add(eventHandler);
+        }
+    }
+
+    @Override
+    public void removeLayoutEventHandler(AbstractDataStoreLayoutEventHandler eventHandler) {
+        if(eventHandler == null) {
+            throw new IllegalArgumentException("eventHandler is null");
+        }
+        
+        synchronized(this.layoutEventHandlersSyncObj) {
+            this.layoutEventHandlers.remove(eventHandler);
+        }
+    }
+    
+    private void raiseEventForLayoutEventDataAdded(String key, String node) {
+        if(key == null || key.isEmpty()) {
+            throw new IllegalArgumentException("key is null or empty");
+        }
+        
+        if(node == null || node.isEmpty()) {
+            throw new IllegalArgumentException("node is null or empty");
+        }
+        
+        synchronized(this.layoutEventHandlersSyncObj) {
+            for(AbstractDataStoreLayoutEventHandler handler: this.layoutEventHandlers) {
+                handler.added(this, key, node);
+            }
+        }
     }
 }

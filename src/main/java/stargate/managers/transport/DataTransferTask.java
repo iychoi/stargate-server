@@ -21,14 +21,11 @@ import java.util.concurrent.Callable;
 import java.util.concurrent.Future;
 import org.apache.commons.logging.Log;
 import org.apache.commons.logging.LogFactory;
-import stargate.commons.cluster.Cluster;
-import stargate.commons.cluster.Node;
 import stargate.commons.dataobject.DataObjectURI;
 import stargate.commons.manager.ManagerNotInstantiatedException;
 import stargate.commons.schedule.DistributedTask;
 import stargate.commons.service.ServiceNotStartedException;
 import stargate.commons.utils.DateTimeUtils;
-import stargate.managers.cluster.ClusterManager;
 import stargate.service.StargateService;
 
 /**
@@ -55,31 +52,15 @@ public class DataTransferTask extends DistributedTask {
         public TransferResult call() {
             LOG.debug(String.format("Processing a data transfer task for - %s", this.event.toString()));
             
-            Collection<String> dataSourceNodeNames = this.event.getDataSourceNodeNames();
-                
-            if(dataSourceNodeNames.size() != 1) {
-                LOG.warn(String.format("There are multiple sources for %s", this.event.getDataObjectURI().toUri().toASCIIString()));
-            }
-
-            String dataSourceNodeName = null;
-            for(String nodeName : dataSourceNodeNames) {
-                dataSourceNodeName = nodeName;
-                break;
-            }
-            
             try {
                 StargateService stargateInstance = StargateService.getInstance();
                 TransportManager transportManager = stargateInstance.getTransportManager();
-                ClusterManager clusterManager = stargateInstance.getClusterManager();
                 
                 DataObjectURI uri = this.event.getDataObjectURI();
-                String clusterName = uri.getClusterName();
-                Cluster remoteCluster = clusterManager.getRemoteCluster(clusterName);
                 
-                Node remoteNode = remoteCluster.getNode(dataSourceNodeName);
-                
-                transportManager.transferDataChunk(remoteNode, this.event.getHash());
-                return new TransferResult(this.event, dataSourceNodeName, DateTimeUtils.getTimestamp(), true);
+                TransferResult result = transportManager.cacheRemoteDataChunk(uri, this.event.getHash());
+                result.setEvent(this.event);
+                return result;
             } catch (ServiceNotStartedException ex) {
                 LOG.error(ex);
             } catch (ManagerNotInstantiatedException ex) {
@@ -87,7 +68,7 @@ public class DataTransferTask extends DistributedTask {
             } catch (IOException ex) {
                 LOG.error(ex);
             }
-            return new TransferResult(this.event, dataSourceNodeName, DateTimeUtils.getTimestamp(), false);
+            return new TransferResult(this.event, null, DateTimeUtils.getTimestamp(), false);
         }
     }
     

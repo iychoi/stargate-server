@@ -39,7 +39,6 @@ public class DataStoreManager extends AbstractManager<AbstractDataStoreDriver> {
     
     private static DataStoreManager instance;
     
-
     public static DataStoreManager getInstance(StargateService service, Collection<AbstractDataStoreDriver> drivers) throws ManagerNotInstantiatedException {
         synchronized (DataStoreManager.class) {
             if(instance == null) {

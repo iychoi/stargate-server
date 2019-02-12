@@ -146,7 +146,9 @@ public class ClusterManager extends AbstractManager<AbstractClusterDriver> {
     
     @Override
     public synchronized void stop() throws IOException {
-        this.remoteClusterEventHandlers.clear();
+        synchronized(this.remoteClusterEventHandlers) {
+            this.remoteClusterEventHandlers.clear();
+        }
         
         super.stop();
     }

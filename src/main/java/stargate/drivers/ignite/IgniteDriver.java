@@ -169,6 +169,13 @@ public class IgniteDriver {
         this.initCount++;
     }
     
+    private int[] mergeArray(int[] arr1, int[] arr2) {
+        int[] newArr = new int[arr1.length + arr2.length];
+        System.arraycopy(arr1, 0, newArr, 0, arr1.length);
+        System.arraycopy(arr2, 0, newArr, arr1.length, arr2.length);
+        return newArr;
+    }
+    
     private void runChecker() {
         this.checkActive = true;
         this.activeCheckThread = new Thread(new Runnable() {

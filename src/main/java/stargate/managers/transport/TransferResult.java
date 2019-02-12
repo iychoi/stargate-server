@@ -28,10 +28,9 @@ import stargate.commons.utils.JsonSerializer;
  */
 public class TransferResult {
     private TransferEvent event;
-    private String dataSourceNodeName;
+    private String remoteNodeName;
     private long transferTime;
     private boolean success;
-    
     
     public static TransferResult createInstance(File file) throws IOException {
         if(file == null) {
@@ -52,21 +51,38 @@ public class TransferResult {
     TransferResult() {
     }
     
-    public TransferResult(TransferEvent event, String dataSourceNodeName, long transferTime, boolean success) {
+    public TransferResult(String remoteNodeName, long transferTime, boolean success) {
+        //if(remoteNodeName == null || remoteNodeName.isEmpty()) {
+        //    throw new IllegalArgumentException("dataSourceNodeName is null or empty");
+        //}
+        // remote node can be null
+        
+        if(transferTime < 0) {
+            throw new IllegalArgumentException("transferTime is negative");
+        }
+        
+        this.event = null;
+        this.remoteNodeName = remoteNodeName;
+        this.transferTime = transferTime;
+        this.success = success;
+    }
+    
+    public TransferResult(TransferEvent event, String remoteNodeName, long transferTime, boolean success) {
         if(event == null) {
             throw new IllegalArgumentException("event is null");
         }
         
-        if(dataSourceNodeName == null || dataSourceNodeName.isEmpty()) {
-            throw new IllegalArgumentException("dataSourceNodeName is null or empty");
-        }
+        //if(remoteNodeName == null || remoteNodeName.isEmpty()) {
+        //    throw new IllegalArgumentException("dataSourceNodeName is null or empty");
+        //}
+        // remote node can be null
         
         if(transferTime < 0) {
             throw new IllegalArgumentException("transferTime is negative");
         }
         
         this.event = event;
-        this.dataSourceNodeName = dataSourceNodeName;
+        this.remoteNodeName = remoteNodeName;
         this.transferTime = transferTime;
         this.success = success;
     }
@@ -81,14 +97,14 @@ public class TransferResult {
         this.event = event;
     }
     
-    @JsonProperty("data_source_node_name")
-    public String getDataSourceNodeName() {
-        return this.dataSourceNodeName;
+    @JsonProperty("remote_node_name")
+    public String getRemoteNodeName() {
+        return this.remoteNodeName;
     }
     
-    @JsonProperty("data_source_node_name")
-    public void setDataSourceNodeName(String dataSourceNodeName) {
-        this.dataSourceNodeName = dataSourceNodeName;
+    @JsonProperty("remote_node_name")
+    public void setRemoteNodeName(String remoteNodeName) {
+        this.remoteNodeName = remoteNodeName;
     }
     
     @JsonProperty("transfer_time")
@@ -116,7 +132,7 @@ public class TransferResult {
     public int hashCode() {
         int hash = 5;
         hash = 17 * hash + Objects.hashCode(this.event);
-        hash = 17 * hash + Objects.hashCode(this.dataSourceNodeName);
+        hash = 17 * hash + Objects.hashCode(this.remoteNodeName);
         hash = 17 * hash + Objects.hashCode(this.transferTime);
         hash = 17 * hash + Objects.hashCode(this.success);
         return hash;
@@ -138,7 +154,7 @@ public class TransferResult {
         if (!Objects.equals(this.event, other.event)) {
             return false;
         }
-        if (!this.dataSourceNodeName.equals(other.dataSourceNodeName)) {
+        if (!this.remoteNodeName.equals(other.remoteNodeName)) {
             return false;
         }
         if (this.transferTime != other.transferTime) {
@@ -153,7 +169,7 @@ public class TransferResult {
     @Override
     @JsonIgnore
     public String toString() {
-        return "TransferResult{" + "event=" + event + ", dataSourceNodeName=" + dataSourceNodeName + ", transferTime=" + transferTime + '}';
+        return "TransferResult{" + "event=" + event + ", remoteNodeName=" + remoteNodeName + ", transferTime=" + transferTime + '}';
     }
     
     @JsonIgnore

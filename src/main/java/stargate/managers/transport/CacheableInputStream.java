@@ -36,7 +36,7 @@ public class CacheableInputStream extends InputStream {
         this.inputStream = inputStream;
         this.hash = hash;
     }
-
+    
     @Override
     public int read() throws IOException {
         int b = this.inputStream.read();
@@ -120,7 +120,7 @@ public class CacheableInputStream extends InputStream {
         this.inputStream.close();
         
         // cache
-        this.manager.addDataChunkCache(this.hash, cacheDataBytes);
+        this.manager.putDataChunkCacheData(this.hash, cacheDataBytes);
         this.cacheData.close();
     }
 

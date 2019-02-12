@@ -16,12 +16,16 @@
 package stargate.drivers.datastore.localfs;
 
 import java.io.IOException;
+import java.util.ArrayList;
 import java.util.Collection;
 import java.util.HashMap;
+import java.util.List;
 import java.util.Map;
 import java.util.concurrent.TimeUnit;
+import java.util.concurrent.locks.Lock;
 import org.apache.commons.logging.Log;
 import org.apache.commons.logging.LogFactory;
+import stargate.commons.datastore.AbstractDataStoreLayoutEventHandler;
 import stargate.commons.datastore.AbstractKeyValueStore;
 import stargate.commons.datastore.EnumDataStoreProperty;
 import stargate.commons.utils.DateTimeUtils;
@@ -41,6 +45,8 @@ public class LocalFSKeyValueStore extends AbstractKeyValueStore {
     private EnumDataStoreProperty property;
     private TimeUnit expiryTimeUnit;
     private long expiryTimeVal;
+    private List<AbstractDataStoreLayoutEventHandler> layoutEventHandlers = new ArrayList<AbstractDataStoreLayoutEventHandler>();
+    private final Object layoutEventHandlersSyncObj = new Object();
     
     public LocalFSKeyValueStore(LocalFSDataStoreDriver driver, String name, Class valueClass, EnumDataStoreProperty property) {
         if(driver == null) {
@@ -242,6 +248,7 @@ public class LocalFSKeyValueStore extends AbstractKeyValueStore {
         System.arraycopy(data, 0, bytes, 8, data.length);
         
         this.driver.putBytes(this.name, key, bytes);
+        raiseEventForLayoutEventDataAdded(key, "*");
     }
 
     @Override
@@ -262,6 +269,11 @@ public class LocalFSKeyValueStore extends AbstractKeyValueStore {
         }
         
         return false;
+    }
+    
+    @Override
+    public String getNodeForData(String key) throws IOException {
+        return "*";
     }
 
     @Override
@@ -296,5 +308,49 @@ public class LocalFSKeyValueStore extends AbstractKeyValueStore {
             map.put(key, value);
         }
         return map;
+    }
+    
+    @Override
+    public Lock getKeyLock(String key) {
+        //TODO: Implement this
+        throw new UnsupportedOperationException("Not supported yet."); //To change body of generated methods, choose Tools | Templates.
+    }
+    
+    @Override
+    public void addLayoutEventHandler(AbstractDataStoreLayoutEventHandler eventHandler) {
+        if(eventHandler == null) {
+            throw new IllegalArgumentException("eventHandler is null");
+        }
+        
+        synchronized(this.layoutEventHandlersSyncObj) {
+            this.layoutEventHandlers.add(eventHandler);
+        }
+    }
+
+    @Override
+    public void removeLayoutEventHandler(AbstractDataStoreLayoutEventHandler eventHandler) {
+        if(eventHandler == null) {
+            throw new IllegalArgumentException("eventHandler is null");
+        }
+        
+        synchronized(this.layoutEventHandlersSyncObj) {
+            this.layoutEventHandlers.remove(eventHandler);
+        }
+    }
+    
+    private void raiseEventForLayoutEventDataAdded(String key, String node) {
+        if(key == null || key.isEmpty()) {
+            throw new IllegalArgumentException("key is null or empty");
+        }
+        
+        if(node == null || node.isEmpty()) {
+            throw new IllegalArgumentException("node is null or empty");
+        }
+        
+        synchronized(this.layoutEventHandlersSyncObj) {
+            for(AbstractDataStoreLayoutEventHandler handler: this.layoutEventHandlers) {
+                handler.added(this, key, node);
+            }
+        }
     }
 }

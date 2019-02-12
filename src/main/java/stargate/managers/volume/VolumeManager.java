@@ -474,16 +474,15 @@ public class VolumeManager extends AbstractManager<NullDriver> {
                 ClusterManager clusterManager = stargateService.getClusterManager();
                 
                 Cluster localCluster = clusterManager.getLocalCluster();
-                Collection<Node> localNodes = localCluster.getNodes();
                 
                 Recipe remoteRecipe = getRemoteRecipe(absPath);
                 Recipe newRecipe = new Recipe(remoteRecipe.getMetadata(), remoteRecipe.getHashAlgorithm(), remoteRecipe.getChunkSize(), localCluster.getNodeNames());
                 
                 Collection<RecipeChunk> recipeChunks = remoteRecipe.getChunks();
                 for(RecipeChunk chunk : recipeChunks) {
-                    TransferAssignment assignment = transportManager.schedulePrefetch(localNodes, remoteRecipe, chunk.getHash());
+                    TransferAssignment assignment = transportManager.schedulePrefetch(localCluster, remoteRecipe, chunk.getHash());
                     TransferEvent transferEvent = assignment.getEvent();
-                    String assignedNodeName = transferEvent.getTargetNodeName();
+                    String assignedNodeName = transferEvent.getLocalNodeName();
                     int assignedNodeID = newRecipe.getNodeID(assignedNodeName);
                     
                     RecipeChunk newChunk = new RecipeChunk(chunk.getOffset(), chunk.getLength(), chunk.getHash());
