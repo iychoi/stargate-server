@@ -22,6 +22,8 @@ import java.util.HashSet;
 import java.util.Map;
 import java.util.Set;
 import java.util.UUID;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
 import org.apache.commons.logging.Log;
 import org.apache.commons.logging.LogFactory;
 import org.apache.ignite.Ignite;
@@ -50,6 +52,7 @@ public class IgniteEventDriver extends AbstractEventDriver {
     private boolean listenEvent = true;
     private Map<StargateEventType, Set<AbstractEventHandler>> eventHandlers = new HashMap<StargateEventType, Set<AbstractEventHandler>>();
     private final Object eventHandlersSyncObj = new Object();
+    private ExecutorService eventHandlerThreadPool = Executors.newFixedThreadPool(1);
     
     private final String STARGATE_TOPIC = "STARGATE_TOPIC";
     
@@ -101,6 +104,7 @@ public class IgniteEventDriver extends AbstractEventDriver {
     public synchronized void uninit() throws IOException {
         this.listenEvent = false;
         this.eventHandlers.clear();
+        this.eventHandlerThreadPool.shutdownNow();
         
         if(this.igniteDriver != null && this.igniteDriver.isStarted()) {
             this.igniteDriver.uninit();
@@ -127,7 +131,22 @@ public class IgniteEventDriver extends AbstractEventDriver {
                 try {
                     // msg is an StargateEvent object
                     StargateEvent event = StargateEvent.createInstance(msg);
-                    processEvent(event);
+                    
+                    Runnable r = new Runnable() {
+                        @Override
+                        public void run() {
+                            try {
+                                processEvent(event);
+                            } catch (IOException ex) {
+                                LOG.error(ex);
+                            }
+                        }
+                    };
+                    
+                    eventHandlerThreadPool.execute(r);
+            
+                    // do not call synchronously
+                    //processEvent(event);
                 } catch (IOException ex) {
                     LOG.error(ex);
                 }
