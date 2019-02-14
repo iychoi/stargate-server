@@ -24,9 +24,7 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.UUID;
-import java.util.concurrent.locks.Condition;
-import java.util.concurrent.locks.Lock;
-import java.util.concurrent.locks.ReentrantLock;
+import java.util.concurrent.CountDownLatch;
 import org.apache.commons.logging.Log;
 import org.apache.commons.logging.LogFactory;
 import org.apache.ignite.Ignite;
@@ -38,7 +36,6 @@ import org.apache.ignite.cluster.ClusterNode;
 import org.apache.ignite.configuration.DataRegionConfiguration;
 import org.apache.ignite.configuration.DataStorageConfiguration;
 import org.apache.ignite.configuration.IgniteConfiguration;
-import org.apache.ignite.events.EventType;
 import org.apache.ignite.internal.managers.discovery.IgniteDiscoverySpi;
 import org.apache.ignite.logger.log4j.Log4JLogger;
 import org.apache.ignite.spi.collision.CollisionSpi;
@@ -74,8 +71,7 @@ public class IgniteDriver {
     private int initCount = 0;
     private Ignite igniteInstance;
     private Thread activeCheckThread;
-    private Lock clusterActivationLock = new ReentrantLock();
-    private Condition clusterActivationCondition = this.clusterActivationLock.newCondition();
+    private CountDownLatch activationLatch = new CountDownLatch(1);
     private boolean checkActive = true;
     private Map<String, UUID> clusterNodeNameIDMappings = new HashMap<String, UUID>(); // node name to nodeID mappings
     
@@ -161,13 +157,12 @@ public class IgniteDriver {
             
             runChecker();
 
-            this.clusterActivationLock.lock();
             try {
-                this.clusterActivationCondition.await();
+                // block at this point until the cluster is activated
+                this.activationLatch.await();
             } catch (InterruptedException ex) {
-                LOG.error("waiting for the activation is interrupted");
-            } finally {
-                this.clusterActivationLock.unlock();
+                LOG.error(ex);
+                throw new IOException(ex);
             }
             
             this.initialized = true;
@@ -183,14 +178,14 @@ public class IgniteDriver {
         return newArr;
     }
     
-    private void runChecker() {
+    private void runChecker() throws IOException {
         this.checkActive = true;
+        
         this.activeCheckThread = new Thread(new Runnable() {
             @Override
             public void run() {
                 try {
                     // to make condition await
-                    Thread.sleep(1000);
                     boolean first = true;
                     
                     while(checkActive) {
@@ -198,12 +193,6 @@ public class IgniteDriver {
                         boolean active = cluster.active();
                         if(active) {
                             System.out.println("Detected Ignite cluster activation!");
-                            clusterActivationLock.lock();
-                            try {
-                                clusterActivationCondition.signal();
-                            } finally {
-                                clusterActivationLock.unlock();
-                            }
                             break;
                         } else {
                             if(first) {
@@ -213,8 +202,11 @@ public class IgniteDriver {
                             Thread.sleep(1000);
                         }
                     }
+                    
+                    activationLatch.countDown();
                 } catch (Exception ex) {
                     LOG.error(ex);
+                    activationLatch.countDown();
                 }
             }
         });

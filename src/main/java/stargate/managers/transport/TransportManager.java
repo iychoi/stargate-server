@@ -27,6 +27,7 @@ import java.util.Collection;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.concurrent.TimeUnit;
@@ -82,7 +83,7 @@ public class TransportManager extends AbstractManager<AbstractTransportDriver> {
     
     private AbstractKeyValueStore dataChunkCacheStore; // <String, byte[]> key = hashstring
     private final Object dataChunkSyncObj = new Object();
-    private Map<String, Object> waitObjects = new HashMap<String, Object>();
+    private Map<String, CountDownLatch> waitObjects = new HashMap<String, CountDownLatch>();
     
     private ExecutorService prefetchThreadPool = Executors.newFixedThreadPool(5);
     
@@ -431,11 +432,9 @@ public class TransportManager extends AbstractManager<AbstractTransportDriver> {
             this.dataChunkCacheStore.clear();
         
             // notify all and clear
-            Collection<Object> values = this.waitObjects.values();
-            for(Object syncObj : values) {
-                synchronized(syncObj) {
-                    syncObj.notifyAll();
-                }
+            Collection<CountDownLatch> values = this.waitObjects.values();
+            for(CountDownLatch latch : values) {
+                latch.countDown();
             }
             this.waitObjects.clear();
         }
@@ -459,13 +458,11 @@ public class TransportManager extends AbstractManager<AbstractTransportDriver> {
             this.dataChunkCacheStore.remove(hash);
         
             // notify all and clear
-            Object syncObj = this.waitObjects.get(hash);
-            if(syncObj != null) {
-                synchronized(syncObj) {
-                    syncObj.notifyAll();
-                }
+            CountDownLatch latch = this.waitObjects.get(hash);
+            if(latch != null) {
+                latch.countDown();
+                this.waitObjects.remove(hash);
             }
-            this.waitObjects.remove(hash);
         }
         this.lastUpdateTime = DateTimeUtils.getTimestamp();
     }
@@ -785,14 +782,13 @@ public class TransportManager extends AbstractManager<AbstractTransportDriver> {
             } else if(dataChunkCacheType == DataChunkCacheType.DATA_CHUNK_CACHE_PLACEHOLDER || 
                     dataChunkCacheType == DataChunkCacheType.DATA_CHUNK_CACHE_PENDING) {
                 //Wait until the data transfer is complete
-                this.waitObjects.putIfAbsent(hash, new Object());
-                Object syncObj = this.waitObjects.get(hash);
-                synchronized(syncObj) {
-                    try {
-                        syncObj.wait();
-                    } catch (InterruptedException ex) {
-                        LOG.error(ex);
-                    }
+                this.waitObjects.putIfAbsent(hash, new CountDownLatch(1));
+                CountDownLatch latch = this.waitObjects.get(hash);
+                try {
+                    latch.await();
+                } catch (InterruptedException ex) {
+                    LOG.error(ex);
+                    throw new IOException(ex);
                 }
 
                 // re-check
@@ -1309,11 +1305,9 @@ public class TransportManager extends AbstractManager<AbstractTransportDriver> {
             case TRANSFER_EVENT_TYPE_COMPLETE:
                 LOG.debug(String.format("transfser is finished : %s - %s", event.getURI().toUri().toASCIIString(), event.getHash()));
                 
-                Object syncObj = this.waitObjects.get(event.getHash());
-                if(syncObj != null) {
-                    synchronized(syncObj) {
-                        syncObj.notifyAll();
-                    }
+                CountDownLatch latch = this.waitObjects.get(event.getHash());
+                if(latch != null) {
+                    latch.countDown();
                 }
                 break;
             default:
