@@ -234,9 +234,10 @@ public class DataChunkCache {
     
     @JsonProperty("transfer_node")
     public void setTransferNode(String transferNode) {
-        if(transferNode == null || transferNode.isEmpty()) {
-            throw new IllegalArgumentException("transferNode is null or empty");
-        }
+        // this can be null
+        //if(transferNode == null || transferNode.isEmpty()) {
+        //    throw new IllegalArgumentException("transferNode is null or empty");
+        //}
         
         this.transferNode = transferNode;
     }
@@ -312,9 +313,14 @@ public class DataChunkCache {
         
         oos.writeLong(this.version);
         
-        byte[] transferNodeName = this.transferNode.getBytes();
-        oos.writeInt(transferNodeName.length);
-        oos.write(transferNodeName);
+        if(this.transferNode == null) {
+            oos.writeInt(0);
+        } else {
+            byte[] transferNodeName = this.transferNode.getBytes();
+            oos.writeInt(transferNodeName.length);
+            oos.write(transferNodeName);
+        }
+        
         
         oos.writeInt(this.waitingNodes.size());
         for(String node : this.waitingNodes) {
@@ -350,10 +356,13 @@ public class DataChunkCache {
         
         long version = ois.readLong();
         
+        String transferNode = null;
         int transferNodeBytesLen = ois.readInt();
-        byte[] transferNodeBytes = new byte[transferNodeBytesLen];
-        ois.readFully(transferNodeBytes, 0, transferNodeBytesLen);
-        String transferNode = new String(transferNodeBytes);
+        if(transferNodeBytesLen > 0) {
+            byte[] transferNodeBytes = new byte[transferNodeBytesLen];
+            ois.readFully(transferNodeBytes, 0, transferNodeBytesLen);
+            transferNode = new String(transferNodeBytes);
+        }
         
         int waitingNodeNum = ois.readInt();
         Set<String> waitingNodes = new HashSet<String>();
