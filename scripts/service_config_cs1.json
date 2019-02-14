@@ -45,7 +45,7 @@
       "driver_class" : "stargate.drivers.recipe.fixedsize.FixedSizeChunkRecipeDriver",
       "driver_config" : {
         "@class" : "stargate.drivers.recipe.fixedsize.FixedSizeChunkRecipeDriverConfig",
-        "chunk_size" : 67108864,
+        "chunk_size" : 8388608,
         "hash_algorithm" : "SHA-1"
       }
     } ]
