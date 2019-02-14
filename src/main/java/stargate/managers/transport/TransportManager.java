@@ -521,7 +521,8 @@ public class TransportManager extends AbstractManager<AbstractTransportDriver> {
                     this.lastUpdateTime = DateTimeUtils.getTimestamp();
                 } else {
                     // there already is
-                    dataChunkCache = (DataChunkCache) this.dataChunkCacheStore.get(hash);
+                    byte[] bytes = (byte[]) this.dataChunkCacheStore.get(hash);
+                    dataChunkCache = DataChunkCache.fromBytes(bytes);
                     if(dataChunkCache.getType() == DataChunkCacheType.DATA_CHUNK_CACHE_PLACEHOLDER) {
                         // escalate
                         dataChunkCache.setType(DataChunkCacheType.DATA_CHUNK_CACHE_PENDING);
@@ -570,7 +571,8 @@ public class TransportManager extends AbstractManager<AbstractTransportDriver> {
                 if(retval) {
                     this.lastUpdateTime = DateTimeUtils.getTimestamp();
                 } else {
-                    dataChunkCache = (DataChunkCache) this.dataChunkCacheStore.get(hash);
+                    byte[] bytes = (byte[]) this.dataChunkCacheStore.get(hash);
+                    dataChunkCache = DataChunkCache.fromBytes(bytes);
                     if(dataChunkCache.getType() == DataChunkCacheType.DATA_CHUNK_CACHE_PLACEHOLDER) {
                         // escalate
                         dataChunkCache.setType(DataChunkCacheType.DATA_CHUNK_CACHE_PRESENT);
