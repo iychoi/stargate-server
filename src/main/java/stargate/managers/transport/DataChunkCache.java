@@ -39,6 +39,7 @@ public class DataChunkCache {
     private DataChunkCacheType type;
     private String hash;
     private long version; // incremental
+    private String transferNode;
     private Set<String> waitingNodes = new HashSet<String>();
     private byte[] data;
     
@@ -79,12 +80,13 @@ public class DataChunkCache {
         //}
         
         this.type = type;
-        this.hash = hash.trim().toLowerCase();
+        this.hash = hash;
+        this.transferNode = null;
         this.version = version;
         this.data = data;
     }
     
-    public DataChunkCache(DataChunkCacheType type, String hash, long version, String waitingNode, byte[] data) {
+    public DataChunkCache(DataChunkCacheType type, String hash, long version, String transferNode, byte[] data) {
         if(type == null) {
             throw new IllegalArgumentException("type is null");
         }
@@ -96,6 +98,38 @@ public class DataChunkCache {
         if(version <= 0) {
             throw new IllegalArgumentException("version is negative");
         }
+        
+        //if(transferNode == null || transferNode.isEmpty()) {
+        //    throw new IllegalArgumentException("transferNode is null or empty");
+        //}
+        
+        //if(data == null) {
+        //    throw new IllegalArgumentException("data is null");
+        //}
+        
+        this.type = type;
+        this.hash = hash;
+        this.transferNode = transferNode;
+        this.version = version;
+        this.data = data;
+    }
+    
+    public DataChunkCache(DataChunkCacheType type, String hash, long version, String transferNode, String waitingNode, byte[] data) {
+        if(type == null) {
+            throw new IllegalArgumentException("type is null");
+        }
+        
+        if(hash == null || hash.isEmpty()) {
+            throw new IllegalArgumentException("hash is null or empty");
+        }
+        
+        if(version <= 0) {
+            throw new IllegalArgumentException("version is negative");
+        }
+        
+        //if(transferNode == null || transferNode.isEmpty()) {
+        //    throw new IllegalArgumentException("transferNode is null or empty");
+        //}
         
         if(waitingNode == null || waitingNode.isEmpty()) {
             throw new IllegalArgumentException("waitingNode is null or empty");
@@ -106,13 +140,14 @@ public class DataChunkCache {
         //}
         
         this.type = type;
-        this.hash = hash.trim().toLowerCase();
+        this.hash = hash;
         this.version = version;
+        this.transferNode = transferNode;
         this.waitingNodes.add(waitingNode);
         this.data = data;
     }
     
-    public DataChunkCache(DataChunkCacheType type, String hash, long version, Collection<String> waitingNodes, byte[] data) {
+    public DataChunkCache(DataChunkCacheType type, String hash, long version, String transferNode, Collection<String> waitingNodes, byte[] data) {
         if(type == null) {
             throw new IllegalArgumentException("type is null");
         }
@@ -125,6 +160,10 @@ public class DataChunkCache {
             throw new IllegalArgumentException("version is negative");
         }
         
+        //if(transferNode == null || transferNode.isEmpty()) {
+        //    throw new IllegalArgumentException("transferNode is null or empty");
+        //}
+        
         if(waitingNodes == null) {
             throw new IllegalArgumentException("waitingNodes is null or empty");
         }
@@ -134,8 +173,9 @@ public class DataChunkCache {
         //}
         
         this.type = type;
-        this.hash = hash.trim().toLowerCase();
+        this.hash = hash;
         this.version = version;
+        this.transferNode = transferNode;
         this.waitingNodes.addAll(waitingNodes);
         this.data = data;
     }
@@ -165,7 +205,7 @@ public class DataChunkCache {
             throw new IllegalArgumentException("hash is null or empty");
         }
         
-        this.hash = hash.trim().toLowerCase();
+        this.hash = hash;
     }
     
     @JsonProperty("version")
@@ -185,6 +225,25 @@ public class DataChunkCache {
     @JsonIgnore
     public void increaseVersion() {
         this.version++;
+    }
+    
+    @JsonProperty("transfer_node")
+    public String getTransferNode() {
+        return this.transferNode;
+    }
+    
+    @JsonProperty("transfer_node")
+    public void setTransferNode(String transferNode) {
+        if(transferNode == null || transferNode.isEmpty()) {
+            throw new IllegalArgumentException("transferNode is null or empty");
+        }
+        
+        this.transferNode = transferNode;
+    }
+    
+    @JsonIgnore
+    public void clearTransferNode() {
+        this.transferNode = null;
     }
     
     @JsonProperty("waiting_nodes")
@@ -210,6 +269,11 @@ public class DataChunkCache {
         }
         
         this.waitingNodes.add(node);
+    }
+    
+    @JsonIgnore
+    public void clearWaitingNode() {
+        this.waitingNodes.clear();
     }
     
     @JsonIgnore
@@ -248,6 +312,10 @@ public class DataChunkCache {
         
         oos.writeLong(this.version);
         
+        byte[] transferNodeName = this.transferNode.getBytes();
+        oos.writeInt(transferNodeName.length);
+        oos.write(transferNodeName);
+        
         oos.writeInt(this.waitingNodes.size());
         for(String node : this.waitingNodes) {
             byte[] nodeBytes = node.getBytes();
@@ -282,6 +350,11 @@ public class DataChunkCache {
         
         long version = ois.readLong();
         
+        int transferNodeBytesLen = ois.readInt();
+        byte[] transferNodeBytes = new byte[transferNodeBytesLen];
+        ois.readFully(transferNodeBytes, 0, transferNodeBytesLen);
+        String transferNode = new String(transferNodeBytes);
+        
         int waitingNodeNum = ois.readInt();
         Set<String> waitingNodes = new HashSet<String>();
         for(int i=0;i<waitingNodeNum;i++) {
@@ -302,13 +375,13 @@ public class DataChunkCache {
         ois.close();
         input.close();
         
-        return new DataChunkCache(type, hash, version, waitingNodes, data);
+        return new DataChunkCache(type, hash, version, transferNode, waitingNodes, data);
     }
     
     @Override
     @JsonIgnore
     public String toString() {
-        return "DataChunkCache{" + "type=" + type + ", hash=" + hash + ", version=" + version + ", waitingNodes=" + waitingNodes + ", data=" + data + '}';
+        return "DataChunkCache{" + "type=" + type + ", hash=" + hash + ", version=" + version + ", transferNode=" + transferNode + ", waitingNodes=" + waitingNodes + ", data=" + data + '}';
     }
     
     @JsonIgnore

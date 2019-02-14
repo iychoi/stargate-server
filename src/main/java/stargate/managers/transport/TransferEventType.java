@@ -21,5 +21,6 @@ package stargate.managers.transport;
  */
 public enum TransferEventType {
     TRANSFER_EVENT_TYPE_ONDEMAND,
-    TRANSFER_EVENT_TYPE_PREFETCH
+    TRANSFER_EVENT_TYPE_PREFETCH,
+    TRANSFER_EVENT_TYPE_COMPLETE
 }

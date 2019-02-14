@@ -24,18 +24,22 @@ import java.util.Map;
 import java.util.Set;
 import org.apache.commons.logging.Log;
 import org.apache.commons.logging.LogFactory;
+import stargate.commons.cluster.Cluster;
+import stargate.commons.cluster.Node;
 import stargate.commons.datasource.DataExportEntry;
 import stargate.commons.driver.NullDriver;
 import stargate.commons.datastore.AbstractKeyValueStore;
 import stargate.commons.datastore.EnumDataStoreProperty;
+import stargate.commons.driver.DriverNotInitializedException;
 import stargate.commons.manager.AbstractManager;
 import stargate.commons.manager.ManagerNotInstantiatedException;
 import stargate.commons.utils.DateTimeUtils;
 import stargate.managers.datastore.DataStoreManager;
-import stargate.managers.event.AbstractStargateEventHandler;
+import stargate.commons.event.AbstractEventHandler;
 import stargate.managers.event.EventManager;
-import stargate.managers.event.StargateEvent;
-import stargate.managers.event.StargateEventType;
+import stargate.commons.event.StargateEvent;
+import stargate.commons.event.StargateEventType;
+import stargate.managers.cluster.ClusterManager;
 import stargate.service.StargateService;
 
 /**
@@ -52,7 +56,7 @@ public class DataExportManager extends AbstractManager<NullDriver> {
     private List<AbstractDataExportEventHandler> dataExportEventHandlers = new ArrayList<AbstractDataExportEventHandler>();
     protected long lastUpdateTime;
     
-    private static final String DATA_EXPORT_STORE = "dexport";
+    private static final String DATA_EXPORT_STORE = "data_export";
     
     public static DataExportManager getInstance(StargateService service) throws ManagerNotInstantiatedException {
         synchronized (DataExportManager.class) {
@@ -99,19 +103,23 @@ public class DataExportManager extends AbstractManager<NullDriver> {
     }
     
     private void setEventHandler() throws IOException {
-        AbstractStargateEventHandler hander = new AbstractStargateEventHandler() {
+        AbstractEventHandler hander = new AbstractEventHandler() {
+            private final StargateEventType[] acceptedEventTypes = {StargateEventType.STARGATE_EVENT_TYPE_DATAEXPORT};
+                    
             @Override
-            public boolean accept(StargateEventType eventType) {
-                if(eventType == StargateEventType.STARGATE_EVENT_TYPE_DATAEXPORT) {
-                    return true;
-                }
-                return false;
+            public StargateEventType[] getAcceptedTypes() {
+                return this.acceptedEventTypes;
             }
 
             @Override
-            public void raised(EventManager manager, StargateEvent event) {
-                DataExportEvent evt = (DataExportEvent) event.getValue();
-                processDataExportEntryEvent(evt);
+            public void raised(StargateEvent event) {
+                String jsonValue = event.getJsonValue();
+                try {
+                    DataExportEvent evt = DataExportEvent.createInstance(jsonValue);
+                    processDataExportEntryEvent(evt);
+                } catch (IOException ex) {
+                    LOG.error(ex);
+                }
             }
         };
         
@@ -132,6 +140,9 @@ public class DataExportManager extends AbstractManager<NullDriver> {
                 DataStoreManager keyValueStoreManager = stargateService.getDataStoreManager();
                 this.dataExportEntryStore = keyValueStoreManager.getDriver().getKeyValueStore(DATA_EXPORT_STORE, DataExportEntry.class, EnumDataStoreProperty.DATASTORE_PROP_PERSISTENT_REPLICATED);
             } catch (ManagerNotInstantiatedException ex) {
+                LOG.error(ex);
+                throw new IOException(ex);
+            } catch (DriverNotInitializedException ex) {
                 LOG.error(ex);
                 throw new IOException(ex);
             }
@@ -195,7 +206,7 @@ public class DataExportManager extends AbstractManager<NullDriver> {
         return this.dataExportEntryStore.containsKey(stargatePath);
     }
     
-    public synchronized void clearDataExportEntries() throws IOException {
+    public synchronized void clearDataExportEntries() throws IOException, DriverNotInitializedException {
         if(!this.started) {
             throw new IllegalStateException("Manager is not started");
         }
@@ -209,7 +220,7 @@ public class DataExportManager extends AbstractManager<NullDriver> {
         }
     }
     
-    public synchronized void addDataExportEntries(Collection<DataExportEntry> entries) throws DataExportManagerException, IOException {
+    public synchronized void addDataExportEntries(Collection<DataExportEntry> entries) throws DataExportManagerException, IOException, DriverNotInitializedException {
         if(entries == null) {
             throw new IllegalArgumentException("entries is null");
         }
@@ -242,7 +253,7 @@ public class DataExportManager extends AbstractManager<NullDriver> {
         }
     }
     
-    public synchronized void addDataExportEntry(DataExportEntry entry) throws DataExportManagerException, IOException {
+    public synchronized void addDataExportEntry(DataExportEntry entry) throws DataExportManagerException, IOException, DriverNotInitializedException {
         if(entry == null) {
             throw new IllegalArgumentException("entry is null");
         }
@@ -263,14 +274,10 @@ public class DataExportManager extends AbstractManager<NullDriver> {
         
         this.lastUpdateTime = DateTimeUtils.getTimestamp();
         
-        try {
-            raiseEventForDataExportEntryAdded(entry);
-        } catch (InterruptedException ex) {
-            throw new IOException(ex);
-        }
+        raiseEventForDataExportEntryAdded(entry);
     }
     
-    public synchronized void removeDataExportEntry(DataExportEntry entry) throws IOException {
+    public synchronized void removeDataExportEntry(DataExportEntry entry) throws IOException, DriverNotInitializedException {
         if(entry == null) {
             throw new IllegalArgumentException("entry is null");
         }
@@ -284,7 +291,7 @@ public class DataExportManager extends AbstractManager<NullDriver> {
         removeDataExportEntry(entry.getStargatePath());
     }
     
-    public synchronized void removeDataExportEntry(String stargatePath) throws IOException {
+    public synchronized void removeDataExportEntry(String stargatePath) throws IOException, DriverNotInitializedException {
         if(stargatePath == null || stargatePath.isEmpty()) {
             throw new IllegalArgumentException("stargatePath is null or empty");
         }
@@ -303,15 +310,11 @@ public class DataExportManager extends AbstractManager<NullDriver> {
             
             this.lastUpdateTime = DateTimeUtils.getTimestamp();
 
-            try {
-                raiseEventForDataExportEntryRemoved(entry);
-            } catch (InterruptedException ex) {
-                throw new IOException(ex);
-            }
+            raiseEventForDataExportEntryRemoved(entry);
         }
     }
     
-    public synchronized void updateDataExportEntry(DataExportEntry entry) throws IOException {
+    public synchronized void updateDataExportEntry(DataExportEntry entry) throws IOException, DriverNotInitializedException {
         if(entry == null) {
             throw new IllegalArgumentException("entry is null");
         }
@@ -328,11 +331,7 @@ public class DataExportManager extends AbstractManager<NullDriver> {
         
         this.lastUpdateTime = DateTimeUtils.getTimestamp();
         
-        try {
-            raiseEventForDataExportEntryUpdated(entry);
-        } catch (InterruptedException ex) {
-            throw new IOException(ex);
-        }
+        raiseEventForDataExportEntryUpdated(entry);
     }
     
     public synchronized void addDataExportEventHandler(AbstractDataExportEventHandler eventHandler) {
@@ -351,42 +350,54 @@ public class DataExportManager extends AbstractManager<NullDriver> {
         this.dataExportEventHandlers.remove(eventHandler);
     }
 
-    private void raiseEventForDataExportEntryAdded(DataExportEntry entry) throws InterruptedException {
+    private void raiseEventForDataExportEntryAdded(DataExportEntry entry) throws IOException, DriverNotInitializedException {
         DataExportEvent dataExportEvent = new DataExportEvent(DataExportEventType.DATAEXPORT_EVENT_TYPE_ADD, entry);
         
         try {
             StargateService stargateService = getStargateService();
             EventManager eventManager = stargateService.getEventManager();
+            ClusterManager clusterManager = stargateService.getClusterManager();
+            Cluster localCluster = clusterManager.getLocalCluster();
+            Node localNode = clusterManager.getLocalNode();
+            Collection<String> nodeNames = localCluster.getNodeNames();
             
-            StargateEvent event = new StargateEvent(StargateEventType.STARGATE_EVENT_TYPE_DATAEXPORT, dataExportEvent);
-            eventManager.raiseStargateEvent(event);
+            StargateEvent event = new StargateEvent(StargateEventType.STARGATE_EVENT_TYPE_DATAEXPORT, nodeNames, localNode.getName(), dataExportEvent.toJson());
+            eventManager.raiseEvent(event);
         } catch (ManagerNotInstantiatedException ex) {
             LOG.error(ex);
         }
     }
     
-    private void raiseEventForDataExportEntryRemoved(DataExportEntry entry) throws InterruptedException {
+    private void raiseEventForDataExportEntryRemoved(DataExportEntry entry) throws IOException, DriverNotInitializedException {
         DataExportEvent dataExportEvent = new DataExportEvent(DataExportEventType.DATAEXPORT_EVENT_TYPE_REMOVE, entry);
         
         try {
             StargateService stargateService = getStargateService();
             EventManager eventManager = stargateService.getEventManager();
+            ClusterManager clusterManager = stargateService.getClusterManager();
+            Cluster localCluster = clusterManager.getLocalCluster();
+            Node localNode = clusterManager.getLocalNode();
+            Collection<String> nodeNames = localCluster.getNodeNames();
             
-            StargateEvent event = new StargateEvent(StargateEventType.STARGATE_EVENT_TYPE_DATAEXPORT, dataExportEvent);
-            eventManager.raiseStargateEvent(event);
+            StargateEvent event = new StargateEvent(StargateEventType.STARGATE_EVENT_TYPE_DATAEXPORT, nodeNames, localNode.getName(), dataExportEvent.toJson());
+            eventManager.raiseEvent(event);
         } catch (ManagerNotInstantiatedException ex) {
             LOG.error(ex);
         }
     }
     
-    private void raiseEventForDataExportEntryUpdated(DataExportEntry entry) throws InterruptedException {
+    private void raiseEventForDataExportEntryUpdated(DataExportEntry entry) throws IOException, DriverNotInitializedException {
         DataExportEvent dataExportEvent = new DataExportEvent(DataExportEventType.DATAEXPORT_EVENT_TYPE_UPDATE, entry);
         try {
             StargateService stargateService = getStargateService();
             EventManager eventManager = stargateService.getEventManager();
+            ClusterManager clusterManager = stargateService.getClusterManager();
+            Cluster localCluster = clusterManager.getLocalCluster();
+            Node localNode = clusterManager.getLocalNode();
+            Collection<String> nodeNames = localCluster.getNodeNames();
             
-            StargateEvent event = new StargateEvent(StargateEventType.STARGATE_EVENT_TYPE_DATAEXPORT, dataExportEvent);
-            eventManager.raiseStargateEvent(event);
+            StargateEvent event = new StargateEvent(StargateEventType.STARGATE_EVENT_TYPE_DATAEXPORT, nodeNames, localNode.getName(), dataExportEvent.toJson());
+            eventManager.raiseEvent(event);
         } catch (ManagerNotInstantiatedException ex) {
             LOG.error(ex);
         }

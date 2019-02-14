@@ -35,6 +35,7 @@ import stargate.commons.datastore.AbstractDataStoreDriver;
 import stargate.commons.datastore.AbstractDataStoreDriverConfig;
 import stargate.commons.datastore.AbstractQueue;
 import stargate.commons.datastore.EnumDataStoreProperty;
+import stargate.commons.driver.DriverNotInitializedException;
 import stargate.commons.utils.IOUtils;
 import stargate.commons.utils.PathUtils;
 
@@ -303,7 +304,7 @@ public class LocalFSDataStoreDriver extends AbstractDataStoreDriver {
     }
 
     @Override
-    public synchronized AbstractKeyValueStore getKeyValueStore(String name, Class valueClass, EnumDataStoreProperty property) throws IOException {
+    public synchronized AbstractKeyValueStore getKeyValueStore(String name, Class valueClass, EnumDataStoreProperty property) throws IOException, DriverNotInitializedException {
         if(name == null || name.isEmpty()) {
             throw new IllegalArgumentException("name is null or empty");
         }
@@ -314,6 +315,10 @@ public class LocalFSDataStoreDriver extends AbstractDataStoreDriver {
         
         if(property == null) {
             throw new IllegalArgumentException("property is null");
+        }
+        
+        if(!isStarted()) {
+            throw new DriverNotInitializedException("driver is not initialized");
         }
         
         LocalFSKeyValueStore s = this.kvStores.get(name);
@@ -329,7 +334,7 @@ public class LocalFSDataStoreDriver extends AbstractDataStoreDriver {
     }
     
     @Override
-    public synchronized AbstractKeyValueStore getKeyValueStore(String name, Class valueClass, EnumDataStoreProperty property, TimeUnit timeunit, long timeval) throws IOException {
+    public synchronized AbstractKeyValueStore getKeyValueStore(String name, Class valueClass, EnumDataStoreProperty property, TimeUnit timeunit, long timeval) throws IOException, DriverNotInitializedException {
         if(name == null || name.isEmpty()) {
             throw new IllegalArgumentException("name is null or empty");
         }
@@ -350,6 +355,10 @@ public class LocalFSDataStoreDriver extends AbstractDataStoreDriver {
             throw new IllegalArgumentException("timeval is negative");
         }
         
+        if(!isStarted()) {
+            throw new DriverNotInitializedException("driver is not initialized");
+        }
+        
         LocalFSKeyValueStore s = this.kvStores.get(name);
         if(s == null) {
             if(!makeStore(name)) {
@@ -363,7 +372,7 @@ public class LocalFSDataStoreDriver extends AbstractDataStoreDriver {
     }
 
     @Override
-    public synchronized AbstractQueue getQueue(String name, Class valueClass, EnumDataStoreProperty property) throws IOException {
+    public synchronized AbstractQueue getQueue(String name, Class valueClass, EnumDataStoreProperty property) throws IOException, DriverNotInitializedException {
         if(name == null || name.isEmpty()) {
             throw new IllegalArgumentException("name is null or empty");
         }
@@ -374,6 +383,10 @@ public class LocalFSDataStoreDriver extends AbstractDataStoreDriver {
         
         if(property == null) {
             throw new IllegalArgumentException("property is null");
+        }
+        
+        if(!isStarted()) {
+            throw new DriverNotInitializedException("driver is not initialized");
         }
         
         LocalFSQueue q = this.queues.get(name);

@@ -13,14 +13,27 @@
    See the License for the specific language governing permissions and
    limitations under the License.
 */
-package stargate.managers.event;
+package stargate.drivers.schedule.ignite;
+
+import java.util.concurrent.Callable;
+import org.apache.ignite.lang.IgniteCallable;
 
 /**
  *
  * @author iychoi
  */
-public enum StargateEventType {
-    STARGATE_EVENT_TYPE_DATAEXPORT,
-    STARGATE_EVENT_TYPE_REMOTECLUSTER,
-    STARGATE_EVENT_TYPE_NODE,
+public class IgniteCallableWrapper implements IgniteCallable {
+    private Callable callable;
+        
+    IgniteCallableWrapper() {
+    }
+
+    public IgniteCallableWrapper(Callable callable) {
+        this.callable = callable;
+    }
+
+    @Override
+    public Object call() throws Exception {
+        return this.callable.call();
+    }
 }

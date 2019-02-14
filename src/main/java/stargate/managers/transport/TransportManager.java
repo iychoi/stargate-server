@@ -15,14 +15,20 @@
 */
 package stargate.managers.transport;
 
+import stargate.commons.transport.TransferAssignment;
 import java.io.ByteArrayInputStream;
 import java.io.ByteArrayOutputStream;
+import java.io.FileNotFoundException;
 import java.io.IOException;
 import java.io.InputStream;
 import java.net.URI;
 import java.util.ArrayList;
 import java.util.Collection;
+import java.util.HashMap;
 import java.util.List;
+import java.util.Map;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.locks.Lock;
 import org.apache.commons.logging.Log;
@@ -37,8 +43,11 @@ import stargate.commons.datasource.DataExportEntry;
 import stargate.commons.driver.AbstractDriver;
 import stargate.commons.driver.DriverFailedToLoadException;
 import stargate.commons.datastore.AbstractKeyValueStore;
-import stargate.commons.datastore.AbstractQueue;
 import stargate.commons.datastore.EnumDataStoreProperty;
+import stargate.commons.driver.DriverNotInitializedException;
+import stargate.commons.event.AbstractEventHandler;
+import stargate.commons.event.StargateEvent;
+import stargate.commons.event.StargateEventType;
 import stargate.commons.manager.AbstractManager;
 import stargate.commons.manager.ManagerConfig;
 import stargate.commons.manager.ManagerNotInstantiatedException;
@@ -52,6 +61,7 @@ import stargate.managers.cluster.ClusterManager;
 import stargate.managers.dataexport.DataExportManager;
 import stargate.managers.datasource.DataSourceManager;
 import stargate.managers.datastore.DataStoreManager;
+import stargate.managers.event.EventManager;
 import stargate.managers.recipe.RecipeManager;
 import stargate.service.StargateService;
 
@@ -66,14 +76,16 @@ public class TransportManager extends AbstractManager<AbstractTransportDriver> {
     private static TransportManager instance;
     
     private AbstractKeyValueStore remoteDirectoryCacheStore; // <DataObjectURI, Directory>
-    private final Object remoteDirectoryCacheStoreSyncObj = new Object();
+    private final Object remoteDirectorySyncObj = new Object();
     private AbstractKeyValueStore remoteRecipeCacheStore; // <DataObjectURI, Recipe>
-    private final Object remoteRecipeCacheStoreSyncObj = new Object();
+    private final Object remoteRecipeSyncObj = new Object();
+    
     private AbstractKeyValueStore dataChunkCacheStore; // <String, byte[]> key = hashstring
-    private final Object dataChunkCacheStoreSyncObj = new Object();
-    private AbstractQueue prefetchTransferQueue; // <TransferEvent>
-    private AbstractKeyValueStore transferInQueueStore; //<String, TransferAssignment> key = hashstring
-    private final Object transferSyncObj = new Object();
+    private final Object dataChunkSyncObj = new Object();
+    private Map<String, Object> waitObjects = new HashMap<String, Object>();
+    
+    private ExecutorService prefetchThreadPool = Executors.newFixedThreadPool(5);
+    
     private AbstractContactNodeDeterminationAlgorithm contactNodeDeterminationAlgorithm;
     private AbstractTransferLayoutAlgorithm transferLayoutAlgorithm;
     protected long lastUpdateTime;
@@ -81,8 +93,6 @@ public class TransportManager extends AbstractManager<AbstractTransportDriver> {
     private static final String REMOTE_DIRECTORY_CACHE_STORE = "remote_dir_cache";
     private static final String REMOTE_RECIPE_CACHE_STORE = "remote_recipe_cache";
     private static final String DATA_CHUNK_CACHE_STORE = "data_chunk_cache";
-    private static final String PREFETCH_TRANSFER_QUEUE = "prefetch_transfer_queue";
-    private static final String TRANSFER_IN_QUEUE_STORE = "transfer_in_queue";
     
     public static TransportManager getInstance(StargateService service, Collection<AbstractTransportDriver> drivers) throws ManagerNotInstantiatedException {
         synchronized (TransportManager.class) {
@@ -158,33 +168,74 @@ public class TransportManager extends AbstractManager<AbstractTransportDriver> {
         super.start();
         
         for(AbstractTransportDriver driver : drivers) {
-            driver.startServer();
+            try {
+                driver.startServer();
+            } catch (DriverNotInitializedException ex) {
+                throw new IOException(ex);
+            }
         }
         
-        // init algorithms
         this.contactNodeDeterminationAlgorithm = new RoundRobinContactNodeDeterminationAlgorithm(this.service, this);
         
-        safeInitDataChunkCacheStore(); //  chunk cache store must be called before next line is executed
-        this.transferLayoutAlgorithm = new StaticTransferLayoutAlgorithm(this.service, this, this.dataChunkCacheStore);
+        setEventHandler();
     }
     
     @Override
     public synchronized void stop() throws IOException {
+        this.prefetchThreadPool.shutdownNow();
+        
         for(AbstractTransportDriver driver : drivers) {
-            driver.stopServer();
+            try {
+                driver.stopServer();
+            } catch (DriverNotInitializedException ex) {
+                throw new IOException(ex);
+            }
         }
         
         super.stop();
     }
     
-    public TransportServiceInfo getServiceInfo() throws IOException {
+    private void setEventHandler() throws IOException {
+        AbstractEventHandler hander = new AbstractEventHandler() {
+            private final StargateEventType[] acceptedEventTypes = {StargateEventType.STARGATE_EVENT_TYPE_TRANSPORT};
+                    
+            @Override
+            public StargateEventType[] getAcceptedTypes() {
+                return this.acceptedEventTypes;
+            }
+
+            @Override
+            public void raised(StargateEvent event) {
+                String jsonValue = event.getJsonValue();
+                try {
+                    TransferEvent evt = TransferEvent.createInstance(jsonValue);
+                    processTransferEvent(evt);
+                } catch (IOException ex) {
+                    LOG.error(ex);
+                } catch (DriverNotInitializedException ex) {
+                    LOG.error(ex);
+                }
+            }
+        };
+        
+        try {
+            StargateService stargateService = getStargateService();
+            EventManager eventManager = stargateService.getEventManager();
+            eventManager.addEventHandler(hander);
+        } catch (ManagerNotInstantiatedException ex) {
+            LOG.error(ex);
+            throw new IOException(ex);
+        }
+    }
+    
+    public TransportServiceInfo getServiceInfo() throws IOException, DriverNotInitializedException {
         AbstractTransportDriver driver = getDriver();
         URI serviceURI = driver.getServiceURI();
         return new TransportServiceInfo(driver.getClass().getName(), serviceURI);
     }
     
     private void safeInitRemoteDirectoryCacheStore() throws IOException {
-        synchronized(this.remoteDirectoryCacheStoreSyncObj) {
+        synchronized(this.remoteDirectorySyncObj) {
             if(this.remoteDirectoryCacheStore == null) {
                 try {
                     StargateService stargateService = getStargateService();
@@ -193,13 +244,16 @@ public class TransportManager extends AbstractManager<AbstractTransportDriver> {
                 } catch (ManagerNotInstantiatedException ex) {
                     LOG.error(ex);
                     throw new IOException(ex);
+                } catch (DriverNotInitializedException ex) {
+                    LOG.error(ex);
+                    throw new IOException(ex);
                 }
             }
         }
     }
     
     private void safeInitRemoteRecipeCacheStore() throws IOException {
-        synchronized(this.remoteRecipeCacheStoreSyncObj) {
+        synchronized(this.remoteRecipeSyncObj) {
             if(this.remoteRecipeCacheStore == null) {
                 try {
                     StargateService stargateService = getStargateService();
@@ -208,13 +262,16 @@ public class TransportManager extends AbstractManager<AbstractTransportDriver> {
                 } catch (ManagerNotInstantiatedException ex) {
                     LOG.error(ex);
                     throw new IOException(ex);
+                } catch (DriverNotInitializedException ex) {
+                    LOG.error(ex);
+                    throw new IOException(ex);
                 }
             }
         }
     }
     
     private void safeInitDataChunkCacheStore() throws IOException {
-        synchronized(this.dataChunkCacheStoreSyncObj) {
+        synchronized(this.dataChunkSyncObj) {
             if(this.dataChunkCacheStore == null) {
                 try {
                     StargateService stargateService = getStargateService();
@@ -223,34 +280,20 @@ public class TransportManager extends AbstractManager<AbstractTransportDriver> {
                 } catch (ManagerNotInstantiatedException ex) {
                     LOG.error(ex);
                     throw new IOException(ex);
+                } catch (DriverNotInitializedException ex) {
+                    LOG.error(ex);
+                    throw new IOException(ex);
                 }
             }
         }
     }
     
-    private void safeInitTransferQueueStore() throws IOException {
-        synchronized(this.transferSyncObj) {
-            if(this.prefetchTransferQueue == null) {
-                try {
-                    StargateService stargateService = getStargateService();
-                    DataStoreManager keyValueStoreManager = stargateService.getDataStoreManager();
-                    this.prefetchTransferQueue = keyValueStoreManager.getDriver().getQueue(PREFETCH_TRANSFER_QUEUE, TransferEvent.class, EnumDataStoreProperty.DATASTORE_PROP_VOLATILE_REPLICATED);
-                } catch (ManagerNotInstantiatedException ex) {
-                    LOG.error(ex);
-                    throw new IOException(ex);
-                }
-            }
-
-            if(this.transferInQueueStore == null) {
-                try {
-                    StargateService stargateService = getStargateService();
-                    DataStoreManager keyValueStoreManager = stargateService.getDataStoreManager();
-                    this.transferInQueueStore = keyValueStoreManager.getDriver().getKeyValueStore(TRANSFER_IN_QUEUE_STORE, TransferAssignment.class, EnumDataStoreProperty.DATASTORE_PROP_VOLATILE_REPLICATED, TimeUnit.MINUTES, 5);
-                } catch (ManagerNotInstantiatedException ex) {
-                    LOG.error(ex);
-                    throw new IOException(ex);
-                }
-            }
+    private void safeInitTransferLayoutAlgorithm() throws IOException {
+        // init algorithms
+        safeInitDataChunkCacheStore(); //  chunk cache store must be called before next line is executed
+        if(this.transferLayoutAlgorithm == null) {
+            StargateService stargateService = getStargateService();
+            this.transferLayoutAlgorithm = new StaticTransferLayoutAlgorithm(stargateService, this, this.dataChunkCacheStore);
         }
     }
     
@@ -265,7 +308,7 @@ public class TransportManager extends AbstractManager<AbstractTransportDriver> {
         
         safeInitDataChunkCacheStore();
         
-        synchronized(this.dataChunkCacheStoreSyncObj) {
+        synchronized(this.dataChunkSyncObj) {
             byte[] bytes = (byte[]) this.dataChunkCacheStore.get(hash);
             if(bytes == null) {
                 return null;
@@ -286,8 +329,37 @@ public class TransportManager extends AbstractManager<AbstractTransportDriver> {
         
         safeInitDataChunkCacheStore();
         
-        synchronized(this.dataChunkCacheStoreSyncObj) {
+        synchronized(this.dataChunkSyncObj) {
             return this.dataChunkCacheStore.containsKey(hash);
+        }
+    }
+    
+    public boolean hasDataChunkCachePlaceholder(String hash) throws IOException {
+        if(hash == null || hash.isEmpty()) {
+            throw new IllegalArgumentException("hash is null or empty");
+        }
+        
+        if(!this.started) {
+            throw new IllegalStateException("Manager is not started");
+        }
+        
+        safeInitDataChunkCacheStore();
+        
+        synchronized(this.dataChunkSyncObj) {
+            if(!this.dataChunkCacheStore.containsKey(hash)) {
+                return false;
+            }
+            
+            byte[] bytes = (byte[]) this.dataChunkCacheStore.get(hash);
+            if(bytes == null) {
+                return false;
+            }
+            
+            DataChunkCache dataChunkCache = DataChunkCache.fromBytes(bytes);
+            if(dataChunkCache.getType() == DataChunkCacheType.DATA_CHUNK_CACHE_PLACEHOLDER) {
+                return true;
+            }
+            return false;
         }
     }
     
@@ -302,7 +374,7 @@ public class TransportManager extends AbstractManager<AbstractTransportDriver> {
         
         safeInitDataChunkCacheStore();
         
-        synchronized(this.dataChunkCacheStoreSyncObj) {
+        synchronized(this.dataChunkSyncObj) {
             if(!this.dataChunkCacheStore.containsKey(hash)) {
                 return false;
             }
@@ -331,7 +403,7 @@ public class TransportManager extends AbstractManager<AbstractTransportDriver> {
         
         safeInitDataChunkCacheStore();
         
-        synchronized(this.dataChunkCacheStoreSyncObj) {
+        synchronized(this.dataChunkSyncObj) {
             if(!this.dataChunkCacheStore.containsKey(hash)) {
                 return false;
             }
@@ -356,40 +428,21 @@ public class TransportManager extends AbstractManager<AbstractTransportDriver> {
         
         safeInitDataChunkCacheStore();
         
-        synchronized(this.dataChunkCacheStoreSyncObj) {
+        // TODO: need to clear this safely
+        // there can be many waiting threads for data cache
+        synchronized(this.dataChunkSyncObj) {
             this.dataChunkCacheStore.clear();
-        }
         
-        this.lastUpdateTime = DateTimeUtils.getTimestamp();
-    }
-    
-    public void ___addDataChunkCache(String hash, DataChunkCache dataChunkCache) throws IOException {
-        if(hash == null || hash.isEmpty()) {
-            throw new IllegalArgumentException("hash is null or empty");
-        }
-        
-        if(dataChunkCache == null) {
-            throw new IllegalArgumentException("dataChunkCache is null");
-        }
-        
-        if(!this.started) {
-            throw new IllegalStateException("Manager is not started");
-        }
-        
-        safeInitDataChunkCacheStore();
-        
-        synchronized(this.dataChunkCacheStoreSyncObj) {
-            if(this.dataChunkCacheStore.containsKey(hash)) {
-                if(dataChunkCache.getType() == DataChunkCacheType.DATA_CHUNK_CACHE_PRESENT) {
-                    // overwrite
-                    this.dataChunkCacheStore.put(hash, dataChunkCache.toBytes());
-                    this.lastUpdateTime = DateTimeUtils.getTimestamp();
+            // notify all and clear
+            Collection<Object> values = this.waitObjects.values();
+            for(Object syncObj : values) {
+                synchronized(syncObj) {
+                    syncObj.notifyAll();
                 }
-            } else {
-                this.dataChunkCacheStore.put(hash, dataChunkCache.toBytes());
-                this.lastUpdateTime = DateTimeUtils.getTimestamp();
             }
+            this.waitObjects.clear();
         }
+        this.lastUpdateTime = DateTimeUtils.getTimestamp();
     }
     
     public void removeDataChunkCache(String hash) throws IOException {
@@ -403,14 +456,24 @@ public class TransportManager extends AbstractManager<AbstractTransportDriver> {
         
         safeInitDataChunkCacheStore();
         
-        synchronized(this.dataChunkCacheStoreSyncObj) {
+        // TODO: need to clear this safely
+        // there can be many waiting threads for data cache
+        synchronized(this.dataChunkSyncObj) {
             this.dataChunkCacheStore.remove(hash);
-        }
         
+            // notify all and clear
+            Object syncObj = this.waitObjects.get(hash);
+            if(syncObj != null) {
+                synchronized(syncObj) {
+                    syncObj.notifyAll();
+                }
+            }
+            this.waitObjects.remove(hash);
+        }
         this.lastUpdateTime = DateTimeUtils.getTimestamp();
     }
     
-    public void putPendingDataChunkCache(String hash) throws IOException {
+    private void putDataChunkCachePlaceholder(String hash) throws IOException {
         if(hash == null || hash.isEmpty()) {
             throw new IllegalArgumentException("hash is null or empty");
         }
@@ -421,12 +484,12 @@ public class TransportManager extends AbstractManager<AbstractTransportDriver> {
         
         safeInitDataChunkCacheStore();
         
-        synchronized(this.dataChunkCacheStoreSyncObj) {
+        synchronized(this.dataChunkSyncObj) {
             Lock lock = this.dataChunkCacheStore.getKeyLock(hash);
             lock.lock();
             try {
                 if(!this.dataChunkCacheStore.containsKey(hash)) {
-                    DataChunkCache dataChunkCache = new DataChunkCache(DataChunkCacheType.DATA_CHUNK_CACHE_PENDING, hash, 1, null);
+                    DataChunkCache dataChunkCache = new DataChunkCache(DataChunkCacheType.DATA_CHUNK_CACHE_PLACEHOLDER, hash, 1, null, null);
                     this.dataChunkCacheStore.put(hash, dataChunkCache.toBytes());
                     this.lastUpdateTime = DateTimeUtils.getTimestamp();
                 }
@@ -436,13 +499,13 @@ public class TransportManager extends AbstractManager<AbstractTransportDriver> {
         }
     }
     
-    public void putPendingDataChunkCache(String hash, String waitingNodeName) throws IOException {
+    private void putPendingDataChunkCache(String hash, String nodeName) throws IOException {
         if(hash == null || hash.isEmpty()) {
             throw new IllegalArgumentException("hash is null or empty");
         }
         
-        if(waitingNodeName == null || waitingNodeName.isEmpty()) {
-            throw new IllegalArgumentException("waitingNodeName is null or empty");
+        if(nodeName == null || nodeName.isEmpty()) {
+            throw new IllegalArgumentException("nodeName is null or empty");
         }
         
         if(!this.started) {
@@ -451,25 +514,35 @@ public class TransportManager extends AbstractManager<AbstractTransportDriver> {
         
         safeInitDataChunkCacheStore();
         
-        synchronized(this.dataChunkCacheStoreSyncObj) {
+        synchronized(this.dataChunkSyncObj) {
             Lock lock = this.dataChunkCacheStore.getKeyLock(hash);
             lock.lock();
             try {
                 if(this.dataChunkCacheStore.containsKey(hash)) {
+                    // there already is
                     DataChunkCache dataChunkCache = (DataChunkCache) this.dataChunkCacheStore.get(hash);
-                    if(dataChunkCache.getType() == DataChunkCacheType.DATA_CHUNK_CACHE_PENDING) {
-                        // overwrite
-                        if(!dataChunkCache.hasWaitingNode(waitingNodeName)) {
-                            dataChunkCache.increaseVersion();
-                            dataChunkCache.addWaitingNode(waitingNodeName);
-                            
-                            this.dataChunkCacheStore.put(hash, dataChunkCache.toBytes());
-                            this.lastUpdateTime = DateTimeUtils.getTimestamp();
-                        }
+                    if(dataChunkCache.getType() == DataChunkCacheType.DATA_CHUNK_CACHE_PLACEHOLDER) {
+                        // escalate
+                        dataChunkCache.setType(DataChunkCacheType.DATA_CHUNK_CACHE_PENDING);
+                        dataChunkCache.setTransferNode(nodeName);
+                        dataChunkCache.addWaitingNode(nodeName);
+                        dataChunkCache.increaseVersion();
+                        this.dataChunkCacheStore.put(hash, dataChunkCache.toBytes());
+                        
+                        this.lastUpdateTime = DateTimeUtils.getTimestamp();
+                    } else if(dataChunkCache.getType() == DataChunkCacheType.DATA_CHUNK_CACHE_PENDING) {
+                        // escalate
+                        dataChunkCache.addWaitingNode(nodeName);
+                        dataChunkCache.increaseVersion();
+                        this.dataChunkCacheStore.put(hash, dataChunkCache.toBytes());
+                        
+                        this.lastUpdateTime = DateTimeUtils.getTimestamp();
                     }
                 } else {
-                    DataChunkCache dataChunkCache = new DataChunkCache(DataChunkCacheType.DATA_CHUNK_CACHE_PENDING, hash, 1, waitingNodeName, null);
+                    // if there's no existing cache
+                    DataChunkCache dataChunkCache = new DataChunkCache(DataChunkCacheType.DATA_CHUNK_CACHE_PENDING, hash, 1, nodeName, nodeName, null);
                     this.dataChunkCacheStore.put(hash, dataChunkCache.toBytes());
+                    
                     this.lastUpdateTime = DateTimeUtils.getTimestamp();
                 }
             } finally {
@@ -493,24 +566,37 @@ public class TransportManager extends AbstractManager<AbstractTransportDriver> {
         
         safeInitDataChunkCacheStore();
         
-        synchronized(this.dataChunkCacheStoreSyncObj) {
+        synchronized(this.dataChunkSyncObj) {
             Lock lock = this.dataChunkCacheStore.getKeyLock(hash);
             lock.lock();
             try {
                 if(this.dataChunkCacheStore.containsKey(hash)) {
                     DataChunkCache dataChunkCache = (DataChunkCache) this.dataChunkCacheStore.get(hash);
-                    if(dataChunkCache.getType() == DataChunkCacheType.DATA_CHUNK_CACHE_PENDING) {
-                        // overwrite
-                        dataChunkCache.increaseVersion();
+                    if(dataChunkCache.getType() == DataChunkCacheType.DATA_CHUNK_CACHE_PLACEHOLDER) {
+                        // escalate
                         dataChunkCache.setType(DataChunkCacheType.DATA_CHUNK_CACHE_PRESENT);
+                        dataChunkCache.clearTransferNode();
+                        dataChunkCache.clearWaitingNode();
                         dataChunkCache.setData(data);
-                        
+                        dataChunkCache.increaseVersion();
                         this.dataChunkCacheStore.put(hash, dataChunkCache.toBytes());
+                        
+                        this.lastUpdateTime = DateTimeUtils.getTimestamp();
+                    } else if(dataChunkCache.getType() == DataChunkCacheType.DATA_CHUNK_CACHE_PENDING) {
+                        // escalate
+                        dataChunkCache.setType(DataChunkCacheType.DATA_CHUNK_CACHE_PRESENT);
+                        dataChunkCache.clearTransferNode();
+                        dataChunkCache.clearWaitingNode();
+                        dataChunkCache.setData(data);
+                        dataChunkCache.increaseVersion();
+                        this.dataChunkCacheStore.put(hash, dataChunkCache.toBytes());
+                        
                         this.lastUpdateTime = DateTimeUtils.getTimestamp();
                     }
                 } else {
                     DataChunkCache dataChunkCache = new DataChunkCache(DataChunkCacheType.DATA_CHUNK_CACHE_PRESENT, hash, 1, data);
                     this.dataChunkCacheStore.put(hash, dataChunkCache.toBytes());
+                    
                     this.lastUpdateTime = DateTimeUtils.getTimestamp();
                 }
             } finally {
@@ -519,7 +605,7 @@ public class TransportManager extends AbstractManager<AbstractTransportDriver> {
         }
     }
     
-    public Cluster getRemoteCluster(Cluster remoteCluster) throws IOException {
+    public Cluster getRemoteCluster(Cluster remoteCluster) throws IOException, DriverNotInitializedException {
         if(remoteCluster == null) {
             throw new IllegalArgumentException("remoteCluster is null");
         }
@@ -544,7 +630,7 @@ public class TransportManager extends AbstractManager<AbstractTransportDriver> {
         }
     }
     
-    public Cluster getRemoteCluster(Node remoteClusterNode) throws IOException {
+    public Cluster getRemoteCluster(Node remoteClusterNode) throws IOException, DriverNotInitializedException {
         if(remoteClusterNode == null) {
             throw new IllegalArgumentException("node is null");
         }
@@ -558,7 +644,7 @@ public class TransportManager extends AbstractManager<AbstractTransportDriver> {
         return client.getLocalCluster();
     }
     
-    public TransferResult cacheRemoteDataChunk(DataObjectURI uri, String hash) throws IOException {
+    public void cacheRemoteDataChunk(DataObjectURI uri, String hash) throws IOException, DriverNotInitializedException {
         if(uri == null) {
             throw new IllegalArgumentException("uri is null");
         }
@@ -570,6 +656,8 @@ public class TransportManager extends AbstractManager<AbstractTransportDriver> {
         if(!this.started) {
             throw new IllegalStateException("Manager is not started");
         }
+        
+        safeInitTransferLayoutAlgorithm();
         
         try {
             StargateService stargateService = getStargateService();
@@ -587,7 +675,7 @@ public class TransportManager extends AbstractManager<AbstractTransportDriver> {
             
             // double-check cache
             if(hasDataChunkCacheData(hash)) {
-                return new TransferResult(remoteNode.getName(), DateTimeUtils.getTimestamp(), true);
+                return;
             }
             
             AbstractTransportDriver driver = getDriver();
@@ -599,7 +687,7 @@ public class TransportManager extends AbstractManager<AbstractTransportDriver> {
             
             this.transferLayoutAlgorithm.increaseNodeWorkload(localCluster, localNode);
             this.transferLayoutAlgorithm.increaseNodeWorkload(remoteCluster, remoteNode);
-
+            
             InputStream dataChunkInputStream = client.getDataChunk(hash);
             if (dataChunkInputStream == null) {
                 throw new IOException("dataChunkInputStream is null");
@@ -618,7 +706,6 @@ public class TransportManager extends AbstractManager<AbstractTransportDriver> {
             cacheData.close();
             byte[] cacheDataBytes = cacheData.toByteArray();
             dataChunkInputStream.close();
-            cacheData.close();
 
             // decrease workload
             this.transferLayoutAlgorithm.decreaseNodeWorkload(localCluster, localNode);
@@ -626,15 +713,15 @@ public class TransportManager extends AbstractManager<AbstractTransportDriver> {
 
             // put to the cache
             putDataChunkCacheData(hash, cacheDataBytes);
-            
-            return new TransferResult(remoteNode.getName(), DateTimeUtils.getTimestamp(), true);
+            //notify
+            raiseEventForTransferCompletion(uri, hash);
         } catch (ManagerNotInstantiatedException ex) {
             LOG.error(ex);
             throw new IOException(ex);
         }
     }
     
-    public InputStream getDataChunk(DataObjectURI uri, String hash) throws IOException, IOException, IOException {
+    public InputStream getDataChunk(DataObjectURI uri, String hash) throws IOException, IOException, IOException, DriverNotInitializedException {
         if(uri == null) {
             throw new IllegalArgumentException("uri is null");
         }
@@ -646,6 +733,8 @@ public class TransportManager extends AbstractManager<AbstractTransportDriver> {
         if(!this.started) {
             throw new IllegalStateException("Manager is not started");
         }
+        
+        safeInitTransferLayoutAlgorithm();
         
         try {
             StargateService stargateService = getStargateService();
@@ -661,16 +750,20 @@ public class TransportManager extends AbstractManager<AbstractTransportDriver> {
                 throw new IOException(String.format("cannot determine a remote node for a remote cluster %s", uri.getClusterName()));
             }
             
-            return getDataChunk(remoteNode, hash);
+            return getDataChunk(remoteNode, uri, hash);
         } catch (ManagerNotInstantiatedException ex) {
             LOG.error(ex);
             throw new IOException(ex);
         }
     }
     
-    public InputStream getDataChunk(Node remoteNode, String hash) throws IOException {
+    private InputStream getDataChunk(Node remoteNode, DataObjectURI uri, String hash) throws IOException, FileNotFoundException, DriverNotInitializedException {
         if(remoteNode == null) {
             throw new IllegalArgumentException("remoteNode is null");
+        }
+        
+        if(uri == null) {
+            throw new IllegalArgumentException("uri is null");
         }
         
         if(hash == null || hash.isEmpty()) {
@@ -681,6 +774,8 @@ public class TransportManager extends AbstractManager<AbstractTransportDriver> {
             throw new IllegalStateException("Manager is not started");
         }
         
+        safeInitTransferLayoutAlgorithm();
+        
         // step 1. check cache
         if(hasDataChunkCache(hash)) {
             DataChunkCache dataChunkCache = getDataChunkCache(hash);
@@ -689,20 +784,40 @@ public class TransportManager extends AbstractManager<AbstractTransportDriver> {
                 byte[] data = dataChunkCache.getData();
                 ByteArrayInputStream bais = new ByteArrayInputStream(data);
                 return bais;
-            } else if(dataChunkCacheType == DataChunkCacheType.DATA_CHUNK_CACHE_PENDING) {
-                // place holder
-                //TODO: Wait until the data transfer is complete
+            } else if(dataChunkCacheType == DataChunkCacheType.DATA_CHUNK_CACHE_PLACEHOLDER || 
+                    dataChunkCacheType == DataChunkCacheType.DATA_CHUNK_CACHE_PENDING) {
+                //Wait until the data transfer is complete
+                this.waitObjects.putIfAbsent(hash, new Object());
+                Object syncObj = this.waitObjects.get(hash);
+                synchronized(syncObj) {
+                    try {
+                        syncObj.wait();
+                    } catch (InterruptedException ex) {
+                        LOG.error(ex);
+                    }
+                }
+
+                // re-check
+                DataChunkCache updatedDataChunkCache = getDataChunkCache(hash);
+                if(updatedDataChunkCache.getType() == DataChunkCacheType.DATA_CHUNK_CACHE_PRESENT) {
+                    byte[] data = dataChunkCache.getData();
+                    ByteArrayInputStream bais = new ByteArrayInputStream(data);
+                    return bais;
+                } else {
+                    // something caused the waiting thread to wake up
+                    throw new IOException(String.format("Something caused the thread waiting for the data %s to wake up", hash));
+                }
             }
         }
-        
+
         // step 2. check local recipes
         StargateService stargateService = getStargateService();
-        
+
         try {
             RecipeManager recipeManager = stargateService.getRecipeManager();
             DataExportManager dataExportManager = stargateService.getDataExportManager();
             DataSourceManager dataSourceManager = stargateService.getDataSourceManager();
-            
+
             Recipe recipe = recipeManager.getRecipeByHash(hash);
             if(recipe != null) {
                 DataObjectMetadata metadata = recipe.getMetadata();
@@ -710,7 +825,7 @@ public class TransportManager extends AbstractManager<AbstractTransportDriver> {
                 if(dataExportEntry != null) {
                     URI sourceURI = dataExportEntry.getSourceURI();
                     AbstractDataSourceDriver driver = dataSourceManager.getDriver(sourceURI);
-                    
+
                     RecipeChunk chunk = recipe.getChunk(hash);
                     return driver.openFile(sourceURI, chunk.getOffset(), chunk.getLength());
                 }
@@ -719,16 +834,16 @@ public class TransportManager extends AbstractManager<AbstractTransportDriver> {
             LOG.error(ex);
             throw new IOException(ex);
         }
-        
+
         // step 3. go remote
         AbstractTransportDriver driver = getDriver();
         AbstractTransportClient client = driver.getClient(remoteNode);
-        
+
         // increase workload
         Cluster localCluster = null;
         Node localNode = null;
         Cluster remoteCluster = null;
-        
+
         // increase workload
         try {
             ClusterManager clusterManager = stargateService.getClusterManager();
@@ -739,19 +854,40 @@ public class TransportManager extends AbstractManager<AbstractTransportDriver> {
             LOG.error(ex);
             throw new IOException(ex);
         }
-        
+
         this.transferLayoutAlgorithm.increaseNodeWorkload(localCluster, localNode);
         this.transferLayoutAlgorithm.increaseNodeWorkload(remoteCluster, remoteNode);
-        
+
+        // add to pending chunk cache
+        putPendingDataChunkCache(hash, localNode.getName());
+
         InputStream dataChunkInputStream = client.getDataChunk(hash);
         if (dataChunkInputStream == null) {
             throw new IOException("dataChunkInputStream is null");
         }
-        
-        return new CacheableInputStream(this, dataChunkInputStream, hash);
+
+        // fully download the chunk and cache and return
+        byte[] buffer = new byte[64*1024];
+        ByteArrayOutputStream cacheData = new ByteArrayOutputStream();
+
+        int read = 0;
+        while((read = dataChunkInputStream.read(buffer, 0, 64*1024)) > 0) {
+            cacheData.write(buffer, 0, read);
+        }
+
+        cacheData.close();
+
+        byte[] cacheDataBytes = cacheData.toByteArray();
+        dataChunkInputStream.close();
+
+        // cache data
+        putDataChunkCacheData(hash, cacheDataBytes);
+        //notify
+        raiseEventForTransferCompletion(uri, hash);
+        return new ByteArrayInputStream(cacheDataBytes);
     }
     
-    public void reportNodeUnreachable(Node node) throws IOException {
+    public void reportNodeUnreachable(Node node) throws IOException, DriverNotInitializedException {
         if(node == null) {
             throw new IllegalArgumentException("node is null");
         }
@@ -778,7 +914,7 @@ public class TransportManager extends AbstractManager<AbstractTransportDriver> {
         }
     }
     
-    public TransferAssignment schedulePrefetch(DataObjectURI uri, String hash) throws IOException {
+    public TransferAssignment schedulePrefetch(DataObjectURI uri, String hash) throws IOException, DriverNotInitializedException {
         if(uri == null) {
             throw new IllegalArgumentException("uri is null");
         }
@@ -805,7 +941,7 @@ public class TransportManager extends AbstractManager<AbstractTransportDriver> {
         }
     }
     
-    public TransferAssignment schedulePrefetch(Cluster localCluster, DataObjectURI uri, String hash) throws IOException {
+    public TransferAssignment schedulePrefetch(Cluster localCluster, DataObjectURI uri, String hash) throws IOException, DriverNotInitializedException {
         if(localCluster == null) {
             throw new IllegalArgumentException("localCluster is null or empty");
         }
@@ -826,7 +962,7 @@ public class TransportManager extends AbstractManager<AbstractTransportDriver> {
         return schedulePrefetch(localCluster, recipe, hash);
     }
     
-    public TransferAssignment schedulePrefetch(Recipe recipe, String hash) throws IOException {
+    public TransferAssignment schedulePrefetch(Recipe recipe, String hash) throws IOException, DriverNotInitializedException {
         if(recipe == null) {
             throw new IllegalArgumentException("recipe is null");
         }
@@ -852,7 +988,7 @@ public class TransportManager extends AbstractManager<AbstractTransportDriver> {
         }
     }
     
-    public TransferAssignment schedulePrefetch(Cluster localCluster, Recipe recipe, String hash) throws IOException {
+    public TransferAssignment schedulePrefetch(Cluster localCluster, Recipe recipe, String hash) throws IOException, DriverNotInitializedException {
         if(localCluster == null) {
             throw new IllegalArgumentException("localCluster is null");
         }
@@ -869,8 +1005,8 @@ public class TransportManager extends AbstractManager<AbstractTransportDriver> {
             throw new IllegalStateException("Manager is not started");
         }
         
-        safeInitTransferQueueStore();
         safeInitDataChunkCacheStore();
+        safeInitTransferLayoutAlgorithm();
         
         DataObjectMetadata metadata = recipe.getMetadata();
         RecipeChunk chunk = recipe.getChunk(hash);
@@ -879,37 +1015,71 @@ public class TransportManager extends AbstractManager<AbstractTransportDriver> {
             throw new IllegalArgumentException(String.format("cannot find recipe chunk for hash %s", hash));
         }
         
-        // put a pending cache
-        this.putPendingDataChunkCache(hash);
-        
-        synchronized(this.transferSyncObj) {
-            TransferAssignment existingAssignment = (TransferAssignment) this.transferInQueueStore.get(hash);
-            if(existingAssignment != null) {
-                TransferEventType eventType = existingAssignment.getEventType();
-                if(eventType == TransferEventType.TRANSFER_EVENT_TYPE_ONDEMAND || eventType == TransferEventType.TRANSFER_EVENT_TYPE_PREFETCH) {
-                    // exist already
-                    return existingAssignment;
+        // check local recipes
+        if(!this.hasDataChunkCache(hash)) {
+            StargateService stargateService = getStargateService();
+
+            try {
+                RecipeManager recipeManager = stargateService.getRecipeManager();
+                DataExportManager dataExportManager = stargateService.getDataExportManager();
+                DataSourceManager dataSourceManager = stargateService.getDataSourceManager();
+
+                Recipe localRecipe = recipeManager.getRecipeByHash(hash);
+                if(localRecipe != null) {
+                    DataObjectMetadata localMetadata = localRecipe.getMetadata();
+                    DataExportEntry dataExportEntry = dataExportManager.getDataExportEntry(localMetadata.getURI().getPath());
+                    if(dataExportEntry != null) {
+                        URI sourceURI = dataExportEntry.getSourceURI();
+                        AbstractDataSourceDriver driver = dataSourceManager.getDriver(sourceURI);
+
+                        RecipeChunk localChunk = localRecipe.getChunk(hash);
+                        Collection<Integer> nodeIDs = localChunk.getNodeIDs();
+                        Collection<String> nodeNames = localRecipe.getNodeNames(nodeIDs);
+                        for(String nodeName : nodeNames) {
+                            TransferAssignment assignment = new TransferAssignment(recipe.getMetadata().getURI(), hash, nodeName);
+                            return assignment;
+                        }
+                    }
                 }
+            } catch (ManagerNotInstantiatedException ex) {
+                LOG.error(ex);
+                throw new IOException(ex);
             }
+        }
 
-            long timestamp = DateTimeUtils.getTimestamp();
-            long order = this.prefetchTransferQueue.size();
-
+        // check cache and go remote
+        synchronized(this.dataChunkSyncObj) {
+            // put a placeholder
+            putDataChunkCachePlaceholder(hash);
+            
+            // if the request already exists
+            DataChunkCache dataChunkCache = getDataChunkCache(hash);
+            if(dataChunkCache.getType() == DataChunkCacheType.DATA_CHUNK_CACHE_PENDING) {
+                TransferAssignment assignment = new TransferAssignment(recipe.getMetadata().getURI(), hash, dataChunkCache.getTransferNode());
+                return assignment;
+            } else if(dataChunkCache.getType() == DataChunkCacheType.DATA_CHUNK_CACHE_PRESENT) {
+                String nodeName = this.dataChunkCacheStore.getNodeForData(hash);
+                TransferAssignment assignment = new TransferAssignment(recipe.getMetadata().getURI(), hash, nodeName);
+                return assignment;
+            }
+                    
             // determine where to copy 
             Node determinedLocalNode = this.transferLayoutAlgorithm.determineLocalNode(localCluster, recipe, hash);
 
-            TransferEvent event = new TransferEvent(TransferEventType.TRANSFER_EVENT_TYPE_PREFETCH, metadata.getURI(), hash, determinedLocalNode.getName());
-            this.prefetchTransferQueue.enqueue(event);
-
-            TransferAssignment assignment = new TransferAssignment(TransferEventType.TRANSFER_EVENT_TYPE_PREFETCH, event, timestamp, order);
-            this.transferInQueueStore.put(hash, assignment);
-
+            // put to the pending chunk cache
+            putPendingDataChunkCache(hash, determinedLocalNode.getName());
+            
+            // send to remote
+            raiseEventForPrefetchTransfer(metadata.getURI(), hash, determinedLocalNode.getName());
+            
+            TransferAssignment assignment = new TransferAssignment(recipe.getMetadata().getURI(), hash, determinedLocalNode.getName());
+            
             this.lastUpdateTime = DateTimeUtils.getTimestamp();
             return assignment;
         }
     }
     
-    public Directory getDirectory(DataObjectURI uri) throws IOException {
+    public Directory getDirectory(DataObjectURI uri) throws IOException, DriverNotInitializedException {
         if(uri == null) {
             throw new IllegalArgumentException("uri is null");
         }
@@ -918,43 +1088,29 @@ public class TransportManager extends AbstractManager<AbstractTransportDriver> {
             throw new IllegalStateException("Manager is not started");
         }
         
-        safeInitRemoteDirectoryCacheStore();
-        
-        synchronized(this.remoteDirectoryCacheStoreSyncObj)  {
-            Directory cachedDirectory = (Directory) this.remoteDirectoryCacheStore.get(uri.toUri().toASCIIString());
-            if(cachedDirectory == null) {
-                String clusterName = uri.getClusterName();
-                try {
-                    StargateService stargateService = getStargateService();
-                    ClusterManager clusterManager = stargateService.getClusterManager();
-                    Cluster remoteCluster = clusterManager.getRemoteCluster(clusterName);
-                    if(remoteCluster == null) {
-                        throw new IOException(String.format("remote cluster %s does not exist", clusterName));
-                    }
-
-                    Node remoteNode = this.contactNodeDeterminationAlgorithm.getResponsibleRemoteNode(clusterManager.getLocalCluster(), clusterManager.getLocalNode(), remoteCluster);
-                    if(remoteNode == null) {
-                        throw new IOException(String.format("cannot determine a remote node for a remote cluster %s", clusterName));
-                    }
-
-                    AbstractTransportDriver driver = getDriver();
-                    AbstractTransportClient client = driver.getClient(remoteNode);
-                    Directory directory = client.getDirectory(uri);
-
-                    if(directory != null) {
-                        this.remoteDirectoryCacheStore.put(uri.toUri().toASCIIString(), directory);
-                    }
-                    cachedDirectory = directory;
-                } catch (ManagerNotInstantiatedException ex) {
-                    LOG.error(ex);
-                    throw new IOException(ex);
-                }
+        try {
+            String clusterName = uri.getClusterName();
+            
+            StargateService stargateService = getStargateService();
+            ClusterManager clusterManager = stargateService.getClusterManager();
+            Cluster remoteCluster = clusterManager.getRemoteCluster(clusterName);
+            if(remoteCluster == null) {
+                throw new IOException(String.format("remote cluster %s does not exist", clusterName));
             }
-            return cachedDirectory;
+
+            Node remoteNode = this.contactNodeDeterminationAlgorithm.getResponsibleRemoteNode(clusterManager.getLocalCluster(), clusterManager.getLocalNode(), remoteCluster);
+            if(remoteNode == null) {
+                throw new IOException(String.format("cannot determine a remote node for a remote cluster %s", clusterName));
+            }
+
+            return getDirectory(remoteNode, uri);
+        } catch (ManagerNotInstantiatedException ex) {
+            LOG.error(ex);
+            throw new IOException(ex);
         }
     }
     
-    public Directory getDirectory(Node remoteNode, DataObjectURI uri) throws IOException {
+    public Directory getDirectory(Node remoteNode, DataObjectURI uri) throws IOException, DriverNotInitializedException {
         if(remoteNode == null) {
             throw new IllegalArgumentException("remoteNode is null");
         }
@@ -969,7 +1125,7 @@ public class TransportManager extends AbstractManager<AbstractTransportDriver> {
         
         safeInitRemoteDirectoryCacheStore();
         
-        synchronized(this.remoteDirectoryCacheStoreSyncObj)  {
+        synchronized(this.remoteDirectorySyncObj)  {
             Directory cachedDirectory = (Directory) this.remoteDirectoryCacheStore.get(uri.toUri().toASCIIString());
             if(cachedDirectory == null) {
                 AbstractTransportDriver driver = getDriver();
@@ -985,7 +1141,7 @@ public class TransportManager extends AbstractManager<AbstractTransportDriver> {
         }
     }
 
-    public Collection<DataObjectMetadata> listDataObjectMetadata(DataObjectURI uri) throws IOException {
+    public Collection<DataObjectMetadata> listDataObjectMetadata(DataObjectURI uri) throws IOException, DriverNotInitializedException {
         if(uri == null) {
             throw new IllegalArgumentException("uri is null");
         }
@@ -1016,7 +1172,7 @@ public class TransportManager extends AbstractManager<AbstractTransportDriver> {
         }
     }
     
-    public Collection<DataObjectMetadata> listDataObjectMetadata(Node remoteNode, DataObjectURI uri) throws IOException {
+    public Collection<DataObjectMetadata> listDataObjectMetadata(Node remoteNode, DataObjectURI uri) throws IOException, DriverNotInitializedException {
         if(remoteNode == null) {
             throw new IllegalArgumentException("remoteNode is null");
         }
@@ -1034,7 +1190,7 @@ public class TransportManager extends AbstractManager<AbstractTransportDriver> {
         return client.listDataObjectMetadata(uri);
     }
     
-    public Recipe getRecipe(DataObjectURI uri) throws IOException {
+    public Recipe getRecipe(DataObjectURI uri) throws IOException, DriverNotInitializedException {
         if(uri == null) {
             throw new IllegalArgumentException("uri is null");
         }
@@ -1043,44 +1199,29 @@ public class TransportManager extends AbstractManager<AbstractTransportDriver> {
             throw new IllegalStateException("Manager is not started");
         }
         
-        safeInitRemoteRecipeCacheStore();
-        
-        synchronized(this.remoteRecipeCacheStoreSyncObj) {
-            Recipe cachedRecipe = (Recipe) this.remoteRecipeCacheStore.get(uri.toUri().toASCIIString());
-            if(cachedRecipe == null) {
-                String clusterName = uri.getClusterName();
-
-                try {
-                    StargateService stargateService = getStargateService();
-                    ClusterManager clusterManager = stargateService.getClusterManager();
-                    Cluster remoteCluster = clusterManager.getRemoteCluster(clusterName);
-                    if(remoteCluster == null) {
-                        throw new IOException(String.format("remote cluster %s does not exist", clusterName));
-                    }
-
-                    Node remoteNode = this.contactNodeDeterminationAlgorithm.getResponsibleRemoteNode(clusterManager.getLocalCluster(), clusterManager.getLocalNode(), remoteCluster);
-                    if(remoteNode == null) {
-                        throw new IOException(String.format("cannot determine a remote node for a remote cluster %s", clusterName));
-                    }
-
-                    AbstractTransportDriver driver = getDriver();
-                    AbstractTransportClient client = driver.getClient(remoteNode);
-                    Recipe recipe = client.getRecipe(uri);
-
-                    if(recipe != null) {
-                        this.remoteRecipeCacheStore.put(uri.toUri().toASCIIString(), recipe);
-                    }
-                    cachedRecipe = recipe;
-                } catch (ManagerNotInstantiatedException ex) {
-                    LOG.error(ex);
-                    throw new IOException(ex);
-                }
+        try {
+            String clusterName = uri.getClusterName();
+            
+            StargateService stargateService = getStargateService();
+            ClusterManager clusterManager = stargateService.getClusterManager();
+            Cluster remoteCluster = clusterManager.getRemoteCluster(clusterName);
+            if(remoteCluster == null) {
+                throw new IOException(String.format("remote cluster %s does not exist", clusterName));
             }
-            return cachedRecipe;
+
+            Node remoteNode = this.contactNodeDeterminationAlgorithm.getResponsibleRemoteNode(clusterManager.getLocalCluster(), clusterManager.getLocalNode(), remoteCluster);
+            if(remoteNode == null) {
+                throw new IOException(String.format("cannot determine a remote node for a remote cluster %s", clusterName));
+            }
+
+            return getRecipe(remoteNode, uri);
+        } catch (ManagerNotInstantiatedException ex) {
+            LOG.error(ex);
+            throw new IOException(ex);
         }
     }
     
-    public Recipe getRecipe(Node remoteNode, DataObjectURI uri) throws IOException {
+    public Recipe getRecipe(Node remoteNode, DataObjectURI uri) throws IOException, DriverNotInitializedException {
         if(remoteNode == null) {
             throw new IllegalArgumentException("remoteNode is null");
         }
@@ -1095,7 +1236,7 @@ public class TransportManager extends AbstractManager<AbstractTransportDriver> {
         
         safeInitRemoteRecipeCacheStore();
         
-        synchronized(this.remoteRecipeCacheStoreSyncObj) {
+        synchronized(this.remoteRecipeSyncObj) {
             Recipe cachedRecipe = (Recipe) this.remoteRecipeCacheStore.get(uri.toUri().toASCIIString());
             if(cachedRecipe == null) {
                 AbstractTransportDriver driver = getDriver();
@@ -1110,5 +1251,78 @@ public class TransportManager extends AbstractManager<AbstractTransportDriver> {
             }
             return cachedRecipe;
         }
+    }
+    
+    private void raiseEventForPrefetchTransfer(DataObjectURI uri, String hash, String nodeName) throws IOException, DriverNotInitializedException {
+        TransferEvent transferEvent = new TransferEvent(TransferEventType.TRANSFER_EVENT_TYPE_PREFETCH, uri, hash);
+        
+        try {
+            StargateService stargateService = getStargateService();
+            EventManager eventManager = stargateService.getEventManager();
+            ClusterManager clusterManager = stargateService.getClusterManager();
+            Node localNode = clusterManager.getLocalNode();
+            
+            StargateEvent event = new StargateEvent(StargateEventType.STARGATE_EVENT_TYPE_TRANSPORT, nodeName, localNode.getName(), transferEvent.toJson());
+            eventManager.raiseEvent(event);
+        } catch (ManagerNotInstantiatedException ex) {
+            LOG.error(ex);
+        }
+    }
+    
+    private void raiseEventForTransferCompletion(DataObjectURI uri, String hash) throws IOException, DriverNotInitializedException {
+        TransferEvent transferEvent = new TransferEvent(TransferEventType.TRANSFER_EVENT_TYPE_COMPLETE, uri, hash);
+        
+        try {
+            StargateService stargateService = getStargateService();
+            EventManager eventManager = stargateService.getEventManager();
+            ClusterManager clusterManager = stargateService.getClusterManager();
+            Cluster localCluster = clusterManager.getLocalCluster();
+            Collection<String> nodeNames = localCluster.getNodeNames();
+            Node localNode = clusterManager.getLocalNode();
+            
+            StargateEvent event = new StargateEvent(StargateEventType.STARGATE_EVENT_TYPE_TRANSPORT, nodeNames, localNode.getName(), transferEvent.toJson());
+            eventManager.raiseEvent(event);
+        } catch (ManagerNotInstantiatedException ex) {
+            LOG.error(ex);
+        }
+    }
+    
+    private void processPrefetchEvent(DataObjectURI uri, String hash) {
+        LOG.debug(String.format("Scheduling prefetching for %s - %s", uri.toUri().toASCIIString(), hash));
+        PrefetchTask task = new PrefetchTask(this, uri, hash);
+        this.prefetchThreadPool.execute(task);
+    }
+    
+    private void processTransferEvent(TransferEvent event) throws IOException, DriverNotInitializedException {
+        switch(event.getEventType()) {
+            case TRANSFER_EVENT_TYPE_ONDEMAND:
+                LOG.debug(String.format("on-demand transfser is requested : %s - %s", event.getURI().toUri().toASCIIString(), event.getHash()));
+                break;
+            case TRANSFER_EVENT_TYPE_PREFETCH:
+                LOG.debug(String.format("prefetch is requested : %s - %s", event.getURI().toUri().toASCIIString(), event.getHash()));
+                processPrefetchEvent(event.getURI(), event.getHash());
+                break;
+            case TRANSFER_EVENT_TYPE_COMPLETE:
+                LOG.debug(String.format("transfser is finished : %s - %s", event.getURI().toUri().toASCIIString(), event.getHash()));
+                
+                Object syncObj = this.waitObjects.get(event.getHash());
+                if(syncObj != null) {
+                    synchronized(syncObj) {
+                        syncObj.notifyAll();
+                    }
+                }
+                break;
+            default:
+                LOG.error(String.format("cannot handle %s", event.getEventType().name()));
+                break;
+        }
+    }
+    
+    public synchronized long getLastUpdateTime() {
+        return this.lastUpdateTime;
+    }
+    
+    public synchronized void setLastUpdateTime(long time) {
+        this.lastUpdateTime = time;
     }
 }

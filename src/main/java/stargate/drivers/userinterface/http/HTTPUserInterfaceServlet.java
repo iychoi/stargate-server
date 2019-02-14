@@ -48,6 +48,7 @@ import stargate.commons.dataobject.Directory;
 import stargate.commons.datasource.AbstractDataSourceDriver;
 import stargate.commons.datasource.DataExportEntry;
 import stargate.commons.datasource.SourceFileMetadata;
+import stargate.commons.driver.DriverNotInitializedException;
 import stargate.commons.manager.AbstractManager;
 import stargate.commons.manager.ManagerNotInstantiatedException;
 import stargate.commons.recipe.AbstractRecipeDriver;
@@ -63,8 +64,7 @@ import stargate.managers.dataexport.DataExportManagerException;
 import stargate.managers.datasource.DataSourceManager;
 import stargate.managers.recipe.RecipeManager;
 import stargate.managers.recipe.RecipeManagerException;
-import stargate.managers.transport.TransferAssignment;
-import stargate.managers.transport.TransferEvent;
+import stargate.commons.transport.TransferAssignment;
 import stargate.managers.transport.TransportManager;
 import stargate.managers.volume.VolumeManager;
 import stargate.service.StargateService;
@@ -243,6 +243,9 @@ public class HTTPUserInterfaceServlet extends AbstractUserInterfaceServer {
         } catch (ManagerNotInstantiatedException ex) {
             LOG.error(ex);
             throw new IOException(ex);
+        } catch (DriverNotInitializedException ex) {
+            LOG.error(ex);
+            throw new IOException(ex);
         }
     }
     
@@ -267,6 +270,9 @@ public class HTTPUserInterfaceServlet extends AbstractUserInterfaceServer {
             ClusterManager clusterManager = service.getClusterManager();
             return clusterManager.getLocalCluster();
         } catch (ManagerNotInstantiatedException ex) {
+            LOG.error(ex);
+            throw new IOException(ex);
+        } catch (DriverNotInitializedException ex) {
             LOG.error(ex);
             throw new IOException(ex);
         }
@@ -297,6 +303,9 @@ public class HTTPUserInterfaceServlet extends AbstractUserInterfaceServer {
         } catch (ManagerNotInstantiatedException ex) {
             LOG.error(ex);
             throw new IOException(ex);
+        } catch (DriverNotInitializedException ex) {
+            LOG.error(ex);
+            throw new IOException(ex);
         }
     }
     
@@ -324,6 +333,9 @@ public class HTTPUserInterfaceServlet extends AbstractUserInterfaceServer {
         } catch (ManagerNotInstantiatedException ex) {
             LOG.error(ex);
             throw new IOException(ex);
+        } catch (DriverNotInitializedException ex) {
+            LOG.error(ex);
+            throw new IOException(ex);
         }
     }
     
@@ -348,6 +360,9 @@ public class HTTPUserInterfaceServlet extends AbstractUserInterfaceServer {
             ClusterManager clusterManager = service.getClusterManager();
             return clusterManager.getLocalNode();
         } catch (ManagerNotInstantiatedException ex) {
+            LOG.error(ex);
+            throw new IOException(ex);
+        } catch (DriverNotInitializedException ex) {
             LOG.error(ex);
             throw new IOException(ex);
         }
@@ -385,6 +400,9 @@ public class HTTPUserInterfaceServlet extends AbstractUserInterfaceServer {
         } catch (ManagerNotInstantiatedException ex) {
             LOG.error(ex);
             throw new IOException(ex);
+        } catch (DriverNotInitializedException ex) {
+            LOG.error(ex);
+            throw new IOException(ex);
         }
     }
     
@@ -411,6 +429,9 @@ public class HTTPUserInterfaceServlet extends AbstractUserInterfaceServer {
         } catch (ManagerNotInstantiatedException ex) {
             LOG.error(ex);
             throw new IOException(ex);
+        } catch (DriverNotInitializedException ex) {
+            LOG.error(ex);
+            throw new IOException(ex);
         }
     }
     
@@ -435,6 +456,9 @@ public class HTTPUserInterfaceServlet extends AbstractUserInterfaceServer {
             ClusterManager clusterManager = service.getClusterManager();
             return clusterManager.getRemoteClusters();
         } catch (ManagerNotInstantiatedException ex) {
+            LOG.error(ex);
+            throw new IOException(ex);
+        } catch (DriverNotInitializedException ex) {
             LOG.error(ex);
             throw new IOException(ex);
         }
@@ -468,6 +492,9 @@ public class HTTPUserInterfaceServlet extends AbstractUserInterfaceServer {
         } catch (ClusterManagerException ex) {
             LOG.error(ex);
             throw new IOException(ex);
+        } catch (DriverNotInitializedException ex) {
+            LOG.error(ex);
+            throw new IOException(ex);
         }
     }
     
@@ -497,6 +524,9 @@ public class HTTPUserInterfaceServlet extends AbstractUserInterfaceServer {
             ClusterManager clusterManager = service.getClusterManager();
             clusterManager.removeRemoteCluster(name);
         } catch (ManagerNotInstantiatedException ex) {
+            LOG.error(ex);
+            throw new IOException(ex);
+        } catch (DriverNotInitializedException ex) {
             LOG.error(ex);
             throw new IOException(ex);
         }
@@ -538,6 +568,9 @@ public class HTTPUserInterfaceServlet extends AbstractUserInterfaceServer {
         } catch (ManagerNotInstantiatedException ex) {
             LOG.error(ex);
             throw new IOException(ex);
+        } catch (DriverNotInitializedException ex) {
+            LOG.error(ex);
+            throw new IOException(ex);
         }
     }
     
@@ -575,6 +608,9 @@ public class HTTPUserInterfaceServlet extends AbstractUserInterfaceServer {
         } catch (ManagerNotInstantiatedException ex) {
             LOG.error(ex);
             throw new IOException(ex);
+        } catch (DriverNotInitializedException ex) {
+            LOG.error(ex);
+            throw new IOException(ex);
         }
     }
     
@@ -609,6 +645,9 @@ public class HTTPUserInterfaceServlet extends AbstractUserInterfaceServer {
             VolumeManager volumeManager = service.getVolumeManager();
             return volumeManager.getRecipe(uri);
         } catch (ManagerNotInstantiatedException ex) {
+            LOG.error(ex);
+            throw new IOException(ex);
+        } catch (DriverNotInitializedException ex) {
             LOG.error(ex);
             throw new IOException(ex);
         }
@@ -699,6 +738,9 @@ public class HTTPUserInterfaceServlet extends AbstractUserInterfaceServer {
         } catch (RecipeManagerException ex) {
             LOG.error(ex);
             throw new IOException(ex);
+        } catch (DriverNotInitializedException ex) {
+            LOG.error(ex);
+            throw new IOException(ex);
         }
     }
     
@@ -747,6 +789,9 @@ public class HTTPUserInterfaceServlet extends AbstractUserInterfaceServer {
         } catch (ManagerNotInstantiatedException ex) {
             LOG.error(ex);
             throw new IOException(ex);
+        } catch (DriverNotInitializedException ex) {
+            LOG.error(ex);
+            throw new IOException(ex);
         }
     }
     
@@ -766,8 +811,8 @@ public class HTTPUserInterfaceServlet extends AbstractUserInterfaceServer {
         
         try {
             DataObjectURI objectUri = new DataObjectURI(PathUtils.makeAbsolutePath(path));
-            String assignedNodeName = schedulePrefetch(objectUri, hash);
-            RestfulResponse rres = new RestfulResponse(assignedNodeName);
+            TransferAssignment assignment = schedulePrefetch(objectUri, hash);
+            RestfulResponse rres = new RestfulResponse(assignment);
             return Response.status(Response.Status.OK).entity(rres).build();
         } catch(Exception ex) {
             RestfulResponse rres = new RestfulResponse(ex);
@@ -776,7 +821,7 @@ public class HTTPUserInterfaceServlet extends AbstractUserInterfaceServer {
     }
     
     @Override
-    public String schedulePrefetch(DataObjectURI uri, String hash) throws IOException {
+    public TransferAssignment schedulePrefetch(DataObjectURI uri, String hash) throws IOException {
         if(uri == null) {
             throw new IllegalArgumentException("uri is null");
         }
@@ -789,9 +834,11 @@ public class HTTPUserInterfaceServlet extends AbstractUserInterfaceServer {
             StargateService service = getStargateService();
             TransportManager transportManager = service.getTransportManager();
             TransferAssignment assignment = transportManager.schedulePrefetch(uri, hash);
-            TransferEvent event = assignment.getEvent();
-            return event.getLocalNodeName();
+            return assignment;
         } catch (ManagerNotInstantiatedException ex) {
+            LOG.error(ex);
+            throw new IOException(ex);
+        } catch (DriverNotInitializedException ex) {
             LOG.error(ex);
             throw new IOException(ex);
         }
@@ -828,6 +875,9 @@ public class HTTPUserInterfaceServlet extends AbstractUserInterfaceServer {
             VolumeManager volumeManager = service.getVolumeManager();
             return volumeManager.getRemoteRecipeWithTransferSchedule(uri);
         } catch (ManagerNotInstantiatedException ex) {
+            LOG.error(ex);
+            throw new IOException(ex);
+        } catch (DriverNotInitializedException ex) {
             LOG.error(ex);
             throw new IOException(ex);
         }
@@ -972,10 +1022,13 @@ public class HTTPUserInterfaceServlet extends AbstractUserInterfaceServer {
         } catch (DataExportManagerException ex) {
             LOG.error(ex);
             throw new IOException(ex);
+        } catch (DriverNotInitializedException ex) {
+            LOG.error(ex);
+            throw new IOException(ex);
         }
     }
     
-    private void addDataExportEntryRecursively(DataExportManager dataExportManager, String stargatePath, AbstractDataSourceDriver dataSourceDriver, SourceFileMetadata sourceDirectoryMetadata) throws IOException, DataExportManagerException {
+    private void addDataExportEntryRecursively(DataExportManager dataExportManager, String stargatePath, AbstractDataSourceDriver dataSourceDriver, SourceFileMetadata sourceDirectoryMetadata) throws IOException, FileNotFoundException, DataExportManagerException, DriverNotInitializedException {
         Collection<SourceFileMetadata> listDirectoryWithMetadata = dataSourceDriver.listDirectoryWithMetadata(sourceDirectoryMetadata.getURI());
         for(SourceFileMetadata fileMetadata : listDirectoryWithMetadata) {
             String stargateFileName = PathUtils.getFileName(fileMetadata.getURI());
@@ -1020,6 +1073,9 @@ public class HTTPUserInterfaceServlet extends AbstractUserInterfaceServer {
             DataExportManager dataExportManager = service.getDataExportManager();
             dataExportManager.removeDataExportEntry(uri.getPath());
         } catch (ManagerNotInstantiatedException ex) {
+            LOG.error(ex);
+            throw new IOException(ex);
+        } catch (DriverNotInitializedException ex) {
             LOG.error(ex);
             throw new IOException(ex);
         }

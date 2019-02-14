@@ -20,8 +20,11 @@ import org.apache.commons.logging.Log;
 import org.apache.commons.logging.LogFactory;
 import stargate.commons.datasource.DataExportEntry;
 import stargate.commons.recipe.Recipe;
+import stargate.commons.service.AbstractService;
+import stargate.managers.cluster.ClusterManager;
 import stargate.managers.recipe.RecipeManager;
 import stargate.managers.volume.VolumeManager;
+import stargate.service.StargateService;
 
 /**
  *
@@ -31,10 +34,15 @@ public class DataExportUpdateEventHandler extends AbstractDataExportEventHandler
     
     private static final Log LOG = LogFactory.getLog(DataExportUpdateEventHandler.class);
     
+    private ClusterManager clusterManager;
     private RecipeManager recipeManager;
     private VolumeManager volumeManager;
     
-    public DataExportUpdateEventHandler(RecipeManager recipeManager, VolumeManager volumeManager) {
+    public DataExportUpdateEventHandler(ClusterManager clusterManager, RecipeManager recipeManager, VolumeManager volumeManager) {
+        if(clusterManager == null) {
+            throw new IllegalArgumentException("clusterManager is null");
+        }
+        
         if(recipeManager == null) {
             throw new IllegalArgumentException("recipeManager is null");
         }
@@ -43,6 +51,7 @@ public class DataExportUpdateEventHandler extends AbstractDataExportEventHandler
             throw new IllegalArgumentException("volumeManager is null");
         }
         
+        this.clusterManager = clusterManager;
         this.recipeManager = recipeManager;
         this.volumeManager = volumeManager;
     }
@@ -50,35 +59,41 @@ public class DataExportUpdateEventHandler extends AbstractDataExportEventHandler
     @Override
     public void added(DataExportManager manager, DataExportEntry entry) {
         try {
-            // generate recipe
-            Recipe recipe = this.recipeManager.createRecipe(entry);
-            this.recipeManager.addRecipe(recipe);
-            this.volumeManager.buildLocalDirectoryHierarchy();
+            if(clusterManager.isLeaderNode()) {
+                // generate recipe
+                Recipe recipe = this.recipeManager.createRecipe(entry);
+                this.recipeManager.addRecipe(recipe);
+                this.volumeManager.buildLocalDirectoryHierarchy();
+            }
         } catch (Exception ex) {
-            LOG.error(String.format("Exception occurred while creating a recipe from a data export entry - %s", entry.getSourceURI().toASCIIString()), ex);
+            LOG.error(ex);
         }
     }
 
     @Override
     public void removed(DataExportManager manager, DataExportEntry entry) {
-        String stargatePath = entry.getStargatePath();
         try {
-            this.recipeManager.removeRecipe(stargatePath);
-            this.volumeManager.buildLocalDirectoryHierarchy();
-        } catch (IOException ex) {
-            LOG.error(String.format("Exception occurred while removing a recipe - %s", stargatePath), ex);
+            if(clusterManager.isLeaderNode()) {
+                String stargatePath = entry.getStargatePath();
+                this.recipeManager.removeRecipe(stargatePath);
+                this.volumeManager.buildLocalDirectoryHierarchy();
+            }
+        } catch (Exception ex) {
+            LOG.error(ex);
         }
     }
 
     @Override
     public void updated(DataExportManager manager, DataExportEntry entry) {
         try {
-            // regenerate recipe
-            Recipe recipe = this.recipeManager.createRecipe(entry);
-            this.recipeManager.updateRecipe(recipe);
-            this.volumeManager.buildLocalDirectoryHierarchy();
+            if(clusterManager.isLeaderNode()) {
+                // regenerate recipe
+                Recipe recipe = this.recipeManager.createRecipe(entry);
+                this.recipeManager.updateRecipe(recipe);
+                this.volumeManager.buildLocalDirectoryHierarchy();
+            }
         } catch (Exception ex) {
-            LOG.error(String.format("Exception occurred while creating a recipe from a data export entry - %s", entry.getSourceURI().toASCIIString()), ex);
+            LOG.error(ex);
         }
     }
 }

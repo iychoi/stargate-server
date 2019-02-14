@@ -25,6 +25,7 @@ import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 import org.apache.commons.collections.map.LRUMap;
 import stargate.commons.driver.AbstractDriverConfig;
+import stargate.commons.driver.DriverNotInitializedException;
 import stargate.commons.userinterface.AbstractUserInterfaceClient;
 import stargate.commons.userinterface.AbstractUserInterfaceDriver;
 import stargate.commons.userinterface.AbstractUserInterfaceDriverConfig;
@@ -104,7 +105,11 @@ public class HTTPUserInterfaceDriver extends AbstractUserInterfaceDriver {
     }
     
     @Override
-    public synchronized void startServer() throws IOException {
+    public synchronized void startServer() throws IOException, DriverNotInitializedException {
+        if(!isStarted()) {
+            throw new DriverNotInitializedException("driver is not initialized");
+        }
+        
         if(this.serverStarted) {
             throw new IllegalStateException("Server is already running");
         }
@@ -116,7 +121,11 @@ public class HTTPUserInterfaceDriver extends AbstractUserInterfaceDriver {
     }
     
     @Override
-    public synchronized void stopServer() throws IOException {
+    public synchronized void stopServer() throws IOException, DriverNotInitializedException {
+        if(!isStarted()) {
+            throw new DriverNotInitializedException("driver is not initialized");
+        }
+        
         if(!this.serverStarted) {
             throw new IllegalStateException("Server is not running");
         }
@@ -135,7 +144,11 @@ public class HTTPUserInterfaceDriver extends AbstractUserInterfaceDriver {
     }
     
     @Override
-    public URI getServiceURI() throws IOException {
+    public URI getServiceURI() throws IOException, DriverNotInitializedException {
+        if(!isStarted()) {
+            throw new DriverNotInitializedException("driver is not initialized");
+        }
+        
         try {
             Collection<String> hostAddress = IPUtils.getHostNames();
             List<String> acceptedHostAddr = new ArrayList<String>();
@@ -174,9 +187,13 @@ public class HTTPUserInterfaceDriver extends AbstractUserInterfaceDriver {
     }
     
     @Override
-    public AbstractUserInterfaceClient getClient(URI serviceURI) throws IOException {
+    public AbstractUserInterfaceClient getClient(URI serviceURI) throws IOException, DriverNotInitializedException {
         if(serviceURI == null) {
             throw new IllegalArgumentException("serviceURI is null");
+        }
+        
+        if(!isStarted()) {
+            throw new DriverNotInitializedException("driver is not initialized");
         }
         
         HTTPUserInterfaceClient existingClient = (HTTPUserInterfaceClient) this.clients.get(serviceURI.toASCIIString());

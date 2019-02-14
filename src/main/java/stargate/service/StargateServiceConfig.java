@@ -17,8 +17,6 @@ package stargate.service;
 
 import java.io.File;
 import java.io.IOException;
-import org.apache.commons.logging.Log;
-import org.apache.commons.logging.LogFactory;
 import org.codehaus.jackson.annotate.JsonIgnore;
 import org.codehaus.jackson.annotate.JsonProperty;
 import stargate.commons.driver.DriverInjection;
@@ -32,6 +30,8 @@ import stargate.drivers.datasource.localfs.LocalFSDataSourceDriver;
 import stargate.drivers.datasource.localfs.LocalFSDataSourceDriverConfig;
 import stargate.drivers.datastore.ignite.IgniteDataStoreDriver;
 import stargate.drivers.datastore.ignite.IgniteDataStoreDriverConfig;
+import stargate.drivers.event.ignite.IgniteEventDriver;
+import stargate.drivers.event.ignite.IgniteEventDriverConfig;
 import stargate.drivers.recipe.fixedsize.FixedSizeChunkRecipeDriver;
 import stargate.drivers.recipe.fixedsize.FixedSizeChunkRecipeDriverConfig;
 import stargate.drivers.schedule.ignite.IgniteScheduleDriver;
@@ -47,8 +47,6 @@ import stargate.drivers.userinterface.http.HTTPUserInterfaceDriverConfig;
  * @author iychoi
  */
 public class StargateServiceConfig extends ServiceConfig {
-    
-    private static final Log LOG = LogFactory.getLog(StargateServiceConfig.class);
     
     private UserConfig userConfig;
     
@@ -74,6 +72,7 @@ public class StargateServiceConfig extends ServiceConfig {
     
     private void initDefaults() {
         this.clusterManagerConfig = getDefaultClusterConfig();
+        this.eventManagerConfig = getDefaultEventConfig();
         this.dataSourceManagerConfig = getDefaultDataSourceConfig();
         this.dataStoreManagerConfig = getDefaultDataStoreConfig();
         this.recipeManagerConfig = getDefaultRecipeConfig();
@@ -113,6 +112,19 @@ public class StargateServiceConfig extends ServiceConfig {
         driverInjection.setDriverClass(IgniteClusterDriver.class);
         
         IgniteClusterDriverConfig driverConfiguration = new IgniteClusterDriverConfig();
+        driverInjection.setDriverConfig(driverConfiguration);
+        
+        ManagerConfig managerConfig = new ManagerConfig();
+        managerConfig.addDriverSetting(driverInjection);
+        return managerConfig;
+    }
+    
+    @JsonIgnore
+    public ManagerConfig getDefaultEventConfig() {
+        DriverInjection driverInjection = new DriverInjection();
+        driverInjection.setDriverClass(IgniteEventDriver.class);
+        
+        IgniteEventDriverConfig driverConfiguration = new IgniteEventDriverConfig();
         driverInjection.setDriverConfig(driverConfiguration);
         
         ManagerConfig managerConfig = new ManagerConfig();
@@ -208,6 +220,7 @@ public class StargateServiceConfig extends ServiceConfig {
     public ServiceConfig toServiceConfig() {
         ServiceConfig serviceConfig = new ServiceConfig();
         serviceConfig.setClusterConfig(this.clusterManagerConfig);
+        serviceConfig.setEventConfig(this.eventManagerConfig);
         serviceConfig.setDataSourceConfig(this.dataSourceManagerConfig);
         serviceConfig.setDataStoreConfig(this.dataStoreManagerConfig);
         serviceConfig.setRecipeConfig(this.recipeManagerConfig);

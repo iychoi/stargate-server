@@ -16,11 +16,9 @@
 package stargate.drivers.cluster.ignite;
 
 import java.io.IOException;
-import java.util.ArrayList;
 import java.util.Collection;
 import java.util.HashSet;
 import java.util.Iterator;
-import java.util.List;
 import java.util.Set;
 import javax.cache.Cache;
 import org.apache.commons.logging.Log;
@@ -44,6 +42,7 @@ import stargate.commons.cluster.Cluster;
 import stargate.commons.cluster.Node;
 import stargate.commons.cluster.NodeStatus;
 import stargate.commons.driver.AbstractDriverConfig;
+import stargate.commons.driver.DriverNotInitializedException;
 import stargate.commons.manager.ManagerNotInstantiatedException;
 import stargate.commons.transport.TransportServiceInfo;
 import stargate.commons.userinterface.UserInterfaceServiceInfo;
@@ -62,15 +61,15 @@ public class IgniteClusterDriver extends AbstractClusterDriver {
 
     private static final Log LOG = LogFactory.getLog(IgniteClusterDriver.class);
     
-    private static final String LOCAL_CLUSTER_NODE_STORE = "LOCAL_CLUSTER_NODES";
-    
     private IgniteClusterDriverConfig config;
     private IgniteDriver igniteDriver;
     private IgniteCache<String, String> nodes;
     private Node localNode;
     private boolean listenEvent = true;
-    private List<AbstractLocalClusterEventHandler> localClusterEventHandlers = new ArrayList<AbstractLocalClusterEventHandler>();
+    private Set<AbstractLocalClusterEventHandler> localClusterEventHandlers = new HashSet<AbstractLocalClusterEventHandler>();
     private final Object localClusterEventHandlersSyncObj = new Object();
+    
+    private static final String LOCAL_CLUSTER_NODE_STORE = "LOCAL_CLUSTER_NODES";
     
     public IgniteClusterDriver(AbstractDriverConfig config) {
         if(config == null) {
@@ -169,7 +168,7 @@ public class IgniteClusterDriver extends AbstractClusterDriver {
         return stargateService;
     }
     
-    private synchronized void safeInitNodeStore() throws IOException {
+    private void safeInitNodeStore() throws IOException {
         if(this.nodes == null) {
             Ignite ignite = this.igniteDriver.getIgnite();
             CacheConfiguration<String, String> cc = new CacheConfiguration<String, String>();
@@ -185,9 +184,7 @@ public class IgniteClusterDriver extends AbstractClusterDriver {
 
             this.nodes = ignite.getOrCreateCache(cc);
         }
-    }
-    
-    private synchronized void initLocalNode() throws IOException {
+        
         if(this.localNode == null) {
             this.localNode = makeLocalNode();
             this.nodes.put(this.localNode.getName(), this.localNode.toJson());
@@ -226,22 +223,16 @@ public class IgniteClusterDriver extends AbstractClusterDriver {
     }
     
     private Node makeLocalNode() throws IOException {
-        Ignite ignite = this.igniteDriver.getIgnite();
-        
-        IgniteCluster igniteCluster = ignite.cluster();
-        ClusterNode localNode = igniteCluster.localNode();
-
-        String nodeName = localNode.consistentId().toString();
         String clusterName = this.config.getClusterName();
+        String nodeName = this.igniteDriver.getLocalNodeName();
+        
         Set<String> hostnames = new HashSet<String>();
-        Collection<String> igniteHostNames = localNode.hostNames();
+        
+        Collection<String> igniteHostNames = this.igniteDriver.getLocalNodeHostNames();
         Collection<String> localHostNames = IPUtils.getHostNames();
+        
         hostnames.addAll(igniteHostNames);
-        for(String hostname : localHostNames) {
-            if(!hostnames.contains(hostname)) {
-                hostnames.add(hostname);
-            }
-        }
+        hostnames.addAll(localHostNames);
         
         try {    
             StargateService stargateService = getStargateService();
@@ -257,34 +248,46 @@ public class IgniteClusterDriver extends AbstractClusterDriver {
         } catch (ManagerNotInstantiatedException ex) {
             LOG.error(ex);
             throw new IOException(ex);
+        } catch (DriverNotInitializedException ex) {
+            LOG.error(ex);
+            throw new IOException(ex);
         }
     }
     
     // this must not be synchronized because this function is called while 
     // init() is blocked
     @Override
-    public void activateCluster() throws IOException {
+    public void activateCluster() throws IOException, DriverNotInitializedException {
         this.igniteDriver.activate();
     }
     
     @Override
-    public boolean isClusterActive() throws IOException {
+    public boolean isClusterActive() throws IOException, DriverNotInitializedException {
+        if(!isStarted()) {
+            throw new DriverNotInitializedException("driver is not initialized");
+        }
+        
         return this.igniteDriver.isActive();
     }
     
     @Override
-    public Node getLocalNode() throws IOException {
+    public synchronized Node getLocalNode() throws IOException, DriverNotInitializedException {
+        if(!isStarted()) {
+            throw new DriverNotInitializedException("driver is not initialized");
+        }
+        
         safeInitNodeStore();
         
-        initLocalNode();
         return this.localNode;
     }
 
     @Override
-    public synchronized Cluster getLocalCluster() throws IOException {
-        safeInitNodeStore();
+    public synchronized Cluster getLocalCluster() throws IOException, DriverNotInitializedException {
+        if(!isStarted()) {
+            throw new DriverNotInitializedException("driver is not initialized");
+        }
         
-        initLocalNode();
+        safeInitNodeStore();
         
         String clusterName = this.config.getClusterName();
         Cluster stargateCluster = new Cluster(clusterName);
@@ -302,7 +305,11 @@ public class IgniteClusterDriver extends AbstractClusterDriver {
     }
 
     @Override
-    public synchronized String getLeaderNodeName() throws IOException {
+    public synchronized String getLeaderNodeName() throws IOException, DriverNotInitializedException {
+        if(!isStarted()) {
+            throw new DriverNotInitializedException("driver is not initialized");
+        }
+        
         Ignite ignite = this.igniteDriver.getIgnite();
         IgniteCluster cluster = ignite.cluster();
         
@@ -311,11 +318,15 @@ public class IgniteClusterDriver extends AbstractClusterDriver {
         // node crashes.
         ClusterGroup oldestNode = cluster.forOldest();
         ClusterNode node = oldestNode.node();
-        return node.consistentId().toString();
+        return this.igniteDriver.getNodeNameFromClusterNode(node);
     }
 
     @Override
-    public boolean isLeaderNode() throws IOException {
+    public boolean isLeaderNode() throws IOException, DriverNotInitializedException {
+        if(!isStarted()) {
+            throw new DriverNotInitializedException("driver is not initialized");
+        }
+        
         String leaderNodeName = getLeaderNodeName();
         Node localNode = getLocalNode();
         

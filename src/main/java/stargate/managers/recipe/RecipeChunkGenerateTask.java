@@ -23,6 +23,7 @@ import java.util.concurrent.Callable;
 import java.util.concurrent.Future;
 import org.apache.commons.logging.Log;
 import org.apache.commons.logging.LogFactory;
+import stargate.commons.driver.DriverNotInitializedException;
 import stargate.commons.manager.ManagerNotInstantiatedException;
 import stargate.commons.recipe.RecipeChunk;
 import stargate.commons.schedule.DistributedTask;
@@ -39,27 +40,27 @@ public class RecipeChunkGenerateTask extends DistributedTask {
     
     class RecipeChunkGenerateTaskCallable implements Callable<Collection<RecipeChunk>> {
 
-        private Collection<RecipeChunkGenerateEvent> events;
+        private Collection<RecipeChunkGenerateTaskParameter> parameters;
                 
-        RecipeChunkGenerateTaskCallable(Collection<RecipeChunkGenerateEvent> events) {
-            if(events == null) {
-                throw new IllegalArgumentException("events is null");
+        RecipeChunkGenerateTaskCallable(Collection<RecipeChunkGenerateTaskParameter> parameters) {
+            if(parameters == null) {
+                throw new IllegalArgumentException("parameters is null");
             }
             
-            this.events = events;
+            this.parameters = parameters;
         }
 
         @Override
         public Collection<RecipeChunk> call() {
             List<RecipeChunk> generatedChunks = new ArrayList<RecipeChunk>();
             
-            for(RecipeChunkGenerateEvent event : this.events) {
-                LOG.debug(String.format("Processing chunk generation request for - %s", event.toString()));
+            for(RecipeChunkGenerateTaskParameter parameter : this.parameters) {
+                LOG.debug(String.format("Processing chunk generation request for - %s", parameter.toString()));
                 try {
                     StargateService stargateInstance = StargateService.getInstance();
                     RecipeManager recipeManager = stargateInstance.getRecipeManager();
-                    RecipeChunk recipeChunk = recipeManager.createRecipeChunk(event);
-                    LOG.debug(String.format("Generated chunk %s - %s", event.getDataExportEntry().getSourceURI().toASCIIString(), recipeChunk.getHash()));
+                    RecipeChunk recipeChunk = recipeManager.createRecipeChunk(parameter);
+                    LOG.debug(String.format("Generated chunk %s - %s", parameter.getDataExportEntry().getSourceURI().toASCIIString(), recipeChunk.getHash()));
                     generatedChunks.add(recipeChunk);
                 } catch (ServiceNotStartedException ex) {
                     LOG.error(ex);
@@ -67,16 +68,18 @@ public class RecipeChunkGenerateTask extends DistributedTask {
                     LOG.error(ex);
                 } catch (IOException ex) {
                     LOG.error(ex);
+                } catch (DriverNotInitializedException ex) {
+                    LOG.error(ex);
                 }
             }
             return generatedChunks;
         }
     }
     
-    public RecipeChunkGenerateTask(Collection<String> nodeNames, Collection<RecipeChunkGenerateEvent> events) {
-        super("RecipeChunkGenerateTask", events, nodeNames);
+    public RecipeChunkGenerateTask(Collection<String> nodeNames, Collection<RecipeChunkGenerateTaskParameter> parameters) {
+        super("RecipeChunkGenerateTask", parameters, nodeNames);
         
-        RecipeChunkGenerateTaskCallable runnable = new RecipeChunkGenerateTaskCallable(events);
+        RecipeChunkGenerateTaskCallable runnable = new RecipeChunkGenerateTaskCallable(parameters);
         super.setCallable(runnable);
     }
     

@@ -25,6 +25,7 @@ import org.apache.commons.logging.Log;
 import org.apache.commons.logging.LogFactory;
 import stargate.commons.driver.AbstractDriver;
 import stargate.commons.driver.DriverFailedToLoadException;
+import stargate.commons.driver.DriverNotInitializedException;
 import stargate.commons.manager.AbstractManager;
 import stargate.commons.manager.ManagerConfig;
 import stargate.commons.manager.ManagerNotInstantiatedException;
@@ -125,7 +126,7 @@ public class ScheduleManager extends AbstractManager<AbstractScheduleDriver> {
         super.stop();
     }
     
-    public void scheduleTask(DistributedTask task) throws IOException {
+    public void scheduleTask(DistributedTask task) throws IOException, DriverNotInitializedException {
         if(task == null) {
             throw new IllegalArgumentException("task is null");
         }

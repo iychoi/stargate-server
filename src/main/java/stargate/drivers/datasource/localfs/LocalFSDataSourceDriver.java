@@ -34,6 +34,7 @@ import stargate.commons.driver.AbstractDriverConfig;
 import stargate.commons.datasource.AbstractDataSourceDriver;
 import stargate.commons.datasource.AbstractDataSourceDriverConfig;
 import stargate.commons.datasource.SourceFileMetadata;
+import stargate.commons.driver.DriverNotInitializedException;
 import stargate.commons.utils.IPUtils;
 import stargate.commons.utils.PathUtils;
 
@@ -135,9 +136,13 @@ public class LocalFSDataSourceDriver extends AbstractDataSourceDriver {
     }
     
     @Override
-    public SourceFileMetadata getMetadata(URI uri) throws IOException, FileNotFoundException {
+    public SourceFileMetadata getMetadata(URI uri) throws IOException, FileNotFoundException, DriverNotInitializedException {
         if(uri == null) {
             throw new IllegalArgumentException("uri is null");
+        }
+        
+        if(!isStarted()) {
+            throw new DriverNotInitializedException("driver is not initialized");
         }
         
         File localPath = getSourcePath(uri);
@@ -149,9 +154,13 @@ public class LocalFSDataSourceDriver extends AbstractDataSourceDriver {
     }
     
     @Override
-    public boolean exist(URI uri) throws IOException {
+    public boolean exist(URI uri) throws IOException, DriverNotInitializedException {
         if(uri == null) {
             throw new IllegalArgumentException("uri is null");
+        }
+        
+        if(!isStarted()) {
+            throw new DriverNotInitializedException("driver is not initialized");
         }
         
         File localPath = getSourcePath(uri);
@@ -159,9 +168,13 @@ public class LocalFSDataSourceDriver extends AbstractDataSourceDriver {
     }
 
     @Override
-    public boolean isDirectory(URI uri) throws IOException, FileNotFoundException {
+    public boolean isDirectory(URI uri) throws IOException, FileNotFoundException, DriverNotInitializedException {
         if(uri == null) {
             throw new IllegalArgumentException("uri is null");
+        }
+        
+        if(!isStarted()) {
+            throw new DriverNotInitializedException("driver is not initialized");
         }
         
         File localPath = getSourcePath(uri);
@@ -173,9 +186,13 @@ public class LocalFSDataSourceDriver extends AbstractDataSourceDriver {
     }
 
     @Override
-    public boolean isFile(URI uri) throws IOException, FileNotFoundException {
+    public boolean isFile(URI uri) throws IOException, FileNotFoundException, DriverNotInitializedException {
         if(uri == null) {
             throw new IllegalArgumentException("uri is null");
+        }
+        
+        if(!isStarted()) {
+            throw new DriverNotInitializedException("driver is not initialized");
         }
         
         File localPath = getSourcePath(uri);
@@ -187,9 +204,13 @@ public class LocalFSDataSourceDriver extends AbstractDataSourceDriver {
     }
 
     @Override
-    public Collection<URI> listDirectory(URI uri) throws IOException, FileNotFoundException {
+    public Collection<URI> listDirectory(URI uri) throws IOException, FileNotFoundException, DriverNotInitializedException {
         if(uri == null) {
             throw new IllegalArgumentException("uri is null");
+        }
+        
+        if(!isStarted()) {
+            throw new DriverNotInitializedException("driver is not initialized");
         }
         
         File localPath = getSourcePath(uri);
@@ -219,9 +240,13 @@ public class LocalFSDataSourceDriver extends AbstractDataSourceDriver {
     }
 
     @Override
-    public Collection<SourceFileMetadata> listDirectoryWithMetadata(URI uri) throws IOException, FileNotFoundException {
+    public Collection<SourceFileMetadata> listDirectoryWithMetadata(URI uri) throws IOException, FileNotFoundException, DriverNotInitializedException {
         if(uri == null) {
             throw new IllegalArgumentException("uri is null");
+        }
+        
+        if(!isStarted()) {
+            throw new DriverNotInitializedException("driver is not initialized");
         }
         
         File localPath = getSourcePath(uri);
@@ -252,9 +277,13 @@ public class LocalFSDataSourceDriver extends AbstractDataSourceDriver {
     }
 
     @Override
-    public InputStream openFile(URI uri) throws IOException, FileNotFoundException {
+    public InputStream openFile(URI uri) throws IOException, FileNotFoundException, DriverNotInitializedException {
         if(uri == null) {
             throw new IllegalArgumentException("uri is null");
+        }
+        
+        if(!isStarted()) {
+            throw new DriverNotInitializedException("driver is not initialized");
         }
         
         File localPath = getSourcePath(uri);
@@ -270,7 +299,7 @@ public class LocalFSDataSourceDriver extends AbstractDataSourceDriver {
     }
 
     @Override
-    public InputStream openFile(URI uri, long offset, int size) throws IOException, FileNotFoundException {
+    public InputStream openFile(URI uri, long offset, int size) throws IOException, FileNotFoundException, DriverNotInitializedException {
         if(uri == null) {
             throw new IllegalArgumentException("uri is null");
         }
@@ -281,6 +310,10 @@ public class LocalFSDataSourceDriver extends AbstractDataSourceDriver {
         
         if(size <= 0) {
             throw new IllegalArgumentException("size is invalid");
+        }
+        
+        if(!isStarted()) {
+            throw new DriverNotInitializedException("driver is not initialized");
         }
         
         File localPath = getSourcePath(uri);
@@ -296,7 +329,7 @@ public class LocalFSDataSourceDriver extends AbstractDataSourceDriver {
     }
 
     @Override
-    public Collection<String> listBlockLocations(Cluster cluster, URI uri, long offset, int size) throws IOException, FileNotFoundException {
+    public Collection<String> listBlockLocations(Cluster cluster, URI uri, long offset, int size) throws IOException, FileNotFoundException, DriverNotInitializedException {
         if(cluster == null) {
             throw new IllegalArgumentException("cluster is null");
         }
@@ -311,6 +344,10 @@ public class LocalFSDataSourceDriver extends AbstractDataSourceDriver {
         
         if(size <= 0) {
             throw new IllegalArgumentException("size is invalid");
+        }
+        
+        if(!isStarted()) {
+            throw new DriverNotInitializedException("driver is not initialized");
         }
         
         File localPath = getSourcePath(uri);

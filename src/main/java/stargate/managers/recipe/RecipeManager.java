@@ -15,6 +15,7 @@
 */
 package stargate.managers.recipe;
 
+import java.io.FileNotFoundException;
 import java.io.IOException;
 import java.io.InputStream;
 import java.util.ArrayList;
@@ -36,6 +37,7 @@ import stargate.commons.driver.AbstractDriver;
 import stargate.commons.driver.DriverFailedToLoadException;
 import stargate.commons.datastore.AbstractKeyValueStore;
 import stargate.commons.datastore.EnumDataStoreProperty;
+import stargate.commons.driver.DriverNotInitializedException;
 import stargate.commons.manager.AbstractManager;
 import stargate.commons.manager.ManagerConfig;
 import stargate.commons.manager.ManagerNotInstantiatedException;
@@ -158,6 +160,9 @@ public class RecipeManager extends AbstractManager<AbstractRecipeDriver> {
                 } catch (ManagerNotInstantiatedException ex) {
                     LOG.error(ex);
                     throw new IOException(ex);
+                } catch (DriverNotInitializedException ex) {
+                    LOG.error(ex);
+                    throw new IOException(ex);
                 }
             }
 
@@ -167,6 +172,9 @@ public class RecipeManager extends AbstractManager<AbstractRecipeDriver> {
                     DataStoreManager keyValueStoreManager = stargateService.getDataStoreManager();
                     this.hashStore = keyValueStoreManager.getDriver().getKeyValueStore(HASH_STORE, ReverseRecipeMapping.class, EnumDataStoreProperty.DATASTORE_PROP_PERSISTENT_DISTRIBUTED);
                 } catch (ManagerNotInstantiatedException ex) {
+                    LOG.error(ex);
+                    throw new IOException(ex);
+                } catch (DriverNotInitializedException ex) {
                     LOG.error(ex);
                     throw new IOException(ex);
                 }
@@ -346,10 +354,8 @@ public class RecipeManager extends AbstractManager<AbstractRecipeDriver> {
         
         safeInitRecipeStore();
         
-        String hashKey = hash.trim().toLowerCase();
-        
         synchronized(this.recipeStoreSyncObj) {
-            ReverseRecipeMapping reverseRecipeMapping = (ReverseRecipeMapping) this.hashStore.get(hashKey);
+            ReverseRecipeMapping reverseRecipeMapping = (ReverseRecipeMapping) this.hashStore.get(hash);
             if(reverseRecipeMapping == null) {
                 return null;
             }
@@ -357,7 +363,7 @@ public class RecipeManager extends AbstractManager<AbstractRecipeDriver> {
             Collection<String> recipeNames = reverseRecipeMapping.getRecipeNames();
             for(String recipeName : recipeNames) {
                 Recipe recipe = (Recipe) this.recipeStore.get(recipeName);
-                RecipeChunk chunk = recipe.getChunk(hashKey);
+                RecipeChunk chunk = recipe.getChunk(hash);
                 if(chunk != null) {
                     return recipe;
                 }
@@ -378,10 +384,8 @@ public class RecipeManager extends AbstractManager<AbstractRecipeDriver> {
         
         safeInitRecipeStore();
         
-        String hashKey = hash.trim().toLowerCase();
-        
         synchronized(this.recipeStoreSyncObj) {
-            return this.hashStore.containsKey(hashKey);
+            return this.hashStore.containsKey(hash);
         }
     }
     
@@ -528,7 +532,7 @@ public class RecipeManager extends AbstractManager<AbstractRecipeDriver> {
         }
     }
     
-    public void syncRecipes() throws IOException, ManagerNotInstantiatedException, RecipeManagerException {
+    public void syncRecipes() throws IOException, FileNotFoundException, ManagerNotInstantiatedException, RecipeManagerException, DriverNotInitializedException {
         if(!this.started) {
             throw new IllegalStateException("Manager is not started");
         }
@@ -590,7 +594,7 @@ public class RecipeManager extends AbstractManager<AbstractRecipeDriver> {
         }
     }
     
-    public Recipe createRecipe(DataExportEntry entry) throws IOException {
+    public Recipe createRecipe(DataExportEntry entry) throws IOException, FileNotFoundException, DriverNotInitializedException {
         if(entry == null) {
             throw new IllegalArgumentException("entry is null");
         }
@@ -604,7 +608,7 @@ public class RecipeManager extends AbstractManager<AbstractRecipeDriver> {
         return createRecipeParallel(entry);
     }
     
-    private Recipe createRecipeLocal(DataExportEntry entry) throws IOException {
+    private Recipe createRecipeLocal(DataExportEntry entry) throws IOException, FileNotFoundException, DriverNotInitializedException {
         try {
             StargateService stargateService = getStargateService();
 
@@ -655,7 +659,7 @@ public class RecipeManager extends AbstractManager<AbstractRecipeDriver> {
         }
     }
     
-    public RecipeChunk createRecipeChunk(RecipeChunkGenerateEvent event) throws IOException {
+    public RecipeChunk createRecipeChunk(RecipeChunkGenerateTaskParameter event) throws IOException, FileNotFoundException, DriverNotInitializedException {
         if(event == null) {
             throw new IllegalArgumentException("event is null");
         }
@@ -689,7 +693,7 @@ public class RecipeManager extends AbstractManager<AbstractRecipeDriver> {
         }
     }
     
-    private Recipe createRecipeParallel(DataExportEntry entry) throws IOException {
+    private Recipe createRecipeParallel(DataExportEntry entry) throws IOException, FileNotFoundException, DriverNotInitializedException {
         
         synchronized(this.parallelRecipeCreationSyncObj) {
             try {
@@ -718,30 +722,30 @@ public class RecipeManager extends AbstractManager<AbstractRecipeDriver> {
                 int recipeChunkNum = 0;
 
                 // distribute tasks
-                List<RecipeChunkGenerateEvent> anyNodeTasks = new ArrayList<RecipeChunkGenerateEvent>();
+                List<RecipeChunkGenerateTaskParameter> anyNodeTasks = new ArrayList<RecipeChunkGenerateTaskParameter>();
 
                 int numNodes = nodeNames.size();
-                List<RecipeChunkGenerateEvent> nodeTasks[] = new List[numNodes];
+                List<RecipeChunkGenerateTaskParameter> nodeTasks[] = new List[numNodes];
                 for(int i=0;i<numNodes;i++) {
-                    nodeTasks[i] = new ArrayList<RecipeChunkGenerateEvent>();
+                    nodeTasks[i] = new ArrayList<RecipeChunkGenerateTaskParameter>();
                 }
 
                 while(remaining > 0) {
                     int blockSize = (int) Math.min(chunkSize, remaining);
-                    RecipeChunkGenerateEvent event = new RecipeChunkGenerateEvent(entry, sourceMetadata, offset, blockSize);
+                    RecipeChunkGenerateTaskParameter parameter = new RecipeChunkGenerateTaskParameter(entry, sourceMetadata, offset, blockSize);
 
                     Collection<String> blockLocations = dataSourceDriver.listBlockLocations(cluster, sourceMetadata.getURI(), offset, chunkSize);
                     if(blockLocations.contains("*")) {
                         // distribute to any
-                        anyNodeTasks.add(event);
+                        anyNodeTasks.add(parameter);
                     } else {
                         // simply use the primary host
                         for(String nodeName : blockLocations) {
                             int nodeID = recipe.getNodeID(nodeName);
                             if(nodeID >= 0) {
-                                nodeTasks[nodeID].add(event);
+                                nodeTasks[nodeID].add(parameter);
                             } else {
-                                anyNodeTasks.add(event);
+                                anyNodeTasks.add(parameter);
                             }
                             break;
                         }
@@ -768,7 +772,7 @@ public class RecipeManager extends AbstractManager<AbstractRecipeDriver> {
                     int toAdd = optimalTasksPerNode - nodeTasks[i].size();
                     for(int j=0;j<toAdd;j++) {
                         if(anyNodeTasks.size() > 0) {
-                            RecipeChunkGenerateEvent event = anyNodeTasks.remove(0);
+                            RecipeChunkGenerateTaskParameter event = anyNodeTasks.remove(0);
                             nodeTasks[i].add(event);
                             remainingTasks--;
                         } else {

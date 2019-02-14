@@ -19,6 +19,7 @@ import java.io.IOException;
 import java.util.concurrent.TimeUnit;
 import org.apache.commons.logging.Log;
 import org.apache.commons.logging.LogFactory;
+import stargate.commons.driver.DriverNotInitializedException;
 import stargate.commons.manager.ManagerNotInstantiatedException;
 import stargate.commons.service.AbstractService;
 import stargate.commons.service.ServiceNotStartedException;
@@ -52,6 +53,7 @@ public class StargateService extends AbstractService {
     private boolean started = false;
     
     private ClusterManager clusterManager;
+    private EventManager eventManager;
     private DataSourceManager dataSourceManager;
     private DataExportManager dataExportManager;
     private RecipeManager recipeManager;
@@ -61,7 +63,6 @@ public class StargateService extends AbstractService {
     private UserInterfaceManager userInterfaceManager;
     private PolicyManager policyManager;
     private VolumeManager volumeManager;
-    private EventManager eventManager;
     
     private DataExportUpdateEventHandler dataExportUpdateEventHandler;
     
@@ -106,8 +107,8 @@ public class StargateService extends AbstractService {
         // init managers
         LOG.debug("Initializing managers");
         try {
-            this.eventManager = EventManager.getInstance(this);
             this.clusterManager = ClusterManager.getInstance(this, this.config.getClusterConfig());
+            this.eventManager = EventManager.getInstance(this, this.config.getEventConfig());
             this.dataSourceManager = DataSourceManager.getInstance(this, this.config.getDataSourceConfig());
             this.dataExportManager = DataExportManager.getInstance(this);
             this.recipeManager = RecipeManager.getInstance(this, this.config.getRecipeConfig());
@@ -123,8 +124,8 @@ public class StargateService extends AbstractService {
         LOG.debug("Managers are initialized");
         
         LOG.info("Starting managers");
-        this.eventManager.start();
         this.clusterManager.start();
+        this.eventManager.start();
         this.dataStoreManager.start();
         this.dataSourceManager.start();
         this.policyManager.start();
@@ -137,7 +138,7 @@ public class StargateService extends AbstractService {
         LOG.info("Managers are started");
         
         LOG.debug("Registering event handlers");
-        this.dataExportUpdateEventHandler = new DataExportUpdateEventHandler(this.recipeManager, this.volumeManager);
+        this.dataExportUpdateEventHandler = new DataExportUpdateEventHandler(this.clusterManager, this.recipeManager, this.volumeManager);
         this.dataExportManager.addDataExportEventHandler(this.dataExportUpdateEventHandler);
         LOG.debug("Event handlers are registered");
         
@@ -148,6 +149,8 @@ public class StargateService extends AbstractService {
         } catch (ManagerNotInstantiatedException ex) {
             throw new IOException(ex);
         } catch (RecipeManagerException ex) {
+            throw new IOException(ex);
+        } catch (DriverNotInitializedException ex) {
             throw new IOException(ex);
         }
         LOG.info("States are synchronized");
@@ -186,8 +189,8 @@ public class StargateService extends AbstractService {
         this.policyManager.stop();
         this.dataSourceManager.stop();
         this.dataStoreManager.stop();
-        this.clusterManager.stop();
         this.eventManager.stop();
+        this.clusterManager.stop();
         LOG.info("Managers are stopped");
         
         this.started = false;
@@ -210,6 +213,14 @@ public class StargateService extends AbstractService {
         }
         
         return this.clusterManager;
+    }
+    
+    public EventManager getEventManager() throws ManagerNotInstantiatedException {
+        if(this.eventManager == null || !this.eventManager.isStarted()) {
+            throw new ManagerNotInstantiatedException("EventManager is not started");
+        }
+        
+        return this.eventManager;
     }
     
     public DataSourceManager getDataSourceManager() throws ManagerNotInstantiatedException {
@@ -282,13 +293,5 @@ public class StargateService extends AbstractService {
         }
         
         return this.volumeManager;
-    }
-    
-    public EventManager getEventManager() throws ManagerNotInstantiatedException {
-        if(this.eventManager == null || !this.eventManager.isStarted()) {
-            throw new ManagerNotInstantiatedException("EventManager is not started");
-        }
-        
-        return this.eventManager;
     }
 }

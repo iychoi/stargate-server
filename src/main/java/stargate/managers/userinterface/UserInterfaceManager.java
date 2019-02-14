@@ -24,6 +24,7 @@ import org.apache.commons.logging.Log;
 import org.apache.commons.logging.LogFactory;
 import stargate.commons.driver.AbstractDriver;
 import stargate.commons.driver.DriverFailedToLoadException;
+import stargate.commons.driver.DriverNotInitializedException;
 import stargate.commons.manager.AbstractManager;
 import stargate.commons.manager.ManagerConfig;
 import stargate.commons.manager.ManagerNotInstantiatedException;
@@ -111,20 +112,28 @@ public class UserInterfaceManager extends AbstractManager<AbstractUserInterfaceD
         super.start();
         
         for(AbstractUserInterfaceDriver driver : drivers) {
-            driver.startServer();
+            try {
+                driver.startServer();
+            } catch (DriverNotInitializedException ex) {
+                throw new IOException(ex);
+            }
         }
     }
     
     @Override
     public synchronized void stop() throws IOException {
         for(AbstractUserInterfaceDriver driver : drivers) {
-            driver.stopServer();
+            try {
+                driver.stopServer();
+            } catch (DriverNotInitializedException ex) {
+                throw new IOException(ex);
+            }
         }
         
         super.stop();
     }
 
-    public UserInterfaceServiceInfo getServiceInfo() throws IOException {
+    public UserInterfaceServiceInfo getServiceInfo() throws IOException, DriverNotInitializedException {
         AbstractUserInterfaceDriver driver = getDriver();
         URI serviceURI = driver.getServiceURI();
         return new UserInterfaceServiceInfo(driver.getClass().getName(), serviceURI);

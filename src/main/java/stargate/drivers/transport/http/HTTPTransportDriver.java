@@ -28,6 +28,7 @@ import org.apache.commons.logging.Log;
 import org.apache.commons.logging.LogFactory;
 import stargate.commons.cluster.Node;
 import stargate.commons.driver.AbstractDriverConfig;
+import stargate.commons.driver.DriverNotInitializedException;
 import stargate.commons.transport.AbstractTransportClient;
 import stargate.commons.transport.AbstractTransportDriver;
 import stargate.commons.transport.AbstractTransportDriverConfig;
@@ -111,7 +112,11 @@ public class HTTPTransportDriver extends AbstractTransportDriver {
     }
     
     @Override
-    public synchronized void startServer() throws IOException {
+    public synchronized void startServer() throws IOException, DriverNotInitializedException {
+        if(!isStarted()) {
+            throw new DriverNotInitializedException("driver is not initialized");
+        }
+        
         if(this.serverStarted) {
             throw new IllegalStateException("Server is already running");
         }
@@ -123,7 +128,11 @@ public class HTTPTransportDriver extends AbstractTransportDriver {
     }
     
     @Override
-    public synchronized void stopServer() throws IOException {
+    public synchronized void stopServer() throws IOException, DriverNotInitializedException {
+        if(!isStarted()) {
+            throw new DriverNotInitializedException("driver is not initialized");
+        }
+        
         if(!this.serverStarted) {
             throw new IllegalStateException("Server is not running");
         }
@@ -142,7 +151,11 @@ public class HTTPTransportDriver extends AbstractTransportDriver {
     }
 
     @Override
-    public URI getServiceURI() throws IOException {
+    public URI getServiceURI() throws IOException, DriverNotInitializedException {
+        if(!isStarted()) {
+            throw new DriverNotInitializedException("driver is not initialized");
+        }
+        
         try {
             Collection<String> hostAddress = IPUtils.getHostNames();
             List<String> acceptedHostAddr = new ArrayList<String>();
@@ -180,18 +193,14 @@ public class HTTPTransportDriver extends AbstractTransportDriver {
         }
     }
     
-    private TransportManager getTransportManager() {
-        if(this.manager == null) {
-            throw new IllegalStateException("manager is not initialized");
-        }
-        
-        return (TransportManager) this.manager;
-    }
-    
     @Override
-    public AbstractTransportClient getClient(Node node) throws IOException {
+    public AbstractTransportClient getClient(Node node) throws IOException, DriverNotInitializedException {
         if(node == null) {
             throw new IllegalArgumentException("node is null");
+        }
+        
+        if(!isStarted()) {
+            throw new DriverNotInitializedException("driver is not initialized");
         }
         
         TransportServiceInfo transportServiceInfo = node.getTransportServiceInfo();

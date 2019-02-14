@@ -24,6 +24,7 @@ import stargate.commons.datasource.DataExportEntry;
 import stargate.commons.driver.NullDriver;
 import stargate.commons.datastore.AbstractKeyValueStore;
 import stargate.commons.datastore.EnumDataStoreProperty;
+import stargate.commons.driver.DriverNotInitializedException;
 import stargate.commons.manager.AbstractManager;
 import stargate.commons.manager.ManagerNotInstantiatedException;
 import stargate.commons.utils.DateTimeUtils;
@@ -100,6 +101,9 @@ public class PolicyManager extends AbstractManager<NullDriver> {
                     DataStoreManager keyValueStoreManager = stargateService.getDataStoreManager();
                     this.policyStore = keyValueStoreManager.getDriver().getKeyValueStore(POLICY_STORE, DataExportEntry.class, EnumDataStoreProperty.DATASTORE_PROP_PERSISTENT_REPLICATED);
                 } catch (ManagerNotInstantiatedException ex) {
+                    LOG.error(ex);
+                    throw new IOException(ex);
+                } catch (DriverNotInitializedException ex) {
                     LOG.error(ex);
                     throw new IOException(ex);
                 }

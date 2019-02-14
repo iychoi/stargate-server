@@ -18,9 +18,7 @@ package stargate.drivers.schedule.ignite;
 import java.io.IOException;
 import java.util.ArrayList;
 import java.util.Collection;
-import java.util.HashMap;
 import java.util.List;
-import java.util.Map;
 import java.util.UUID;
 import java.util.concurrent.Callable;
 import org.apache.commons.logging.Log;
@@ -29,16 +27,14 @@ import org.apache.ignite.Ignite;
 import org.apache.ignite.IgniteCluster;
 import org.apache.ignite.IgniteCompute;
 import org.apache.ignite.cluster.ClusterGroup;
-import org.apache.ignite.cluster.ClusterNode;
 import org.apache.ignite.compute.ComputeTaskFuture;
 import org.apache.ignite.lang.IgniteCallable;
 import stargate.commons.driver.AbstractDriverConfig;
+import stargate.commons.driver.DriverNotInitializedException;
 import stargate.commons.schedule.AbstractScheduleDriver;
 import stargate.commons.schedule.AbstractScheduleDriverConfig;
 import stargate.commons.schedule.DistributedTask;
 import stargate.drivers.ignite.IgniteDriver;
-import stargate.managers.schedule.ScheduleManager;
-import stargate.service.StargateService;
 
 /**
  *
@@ -48,25 +44,8 @@ public class IgniteScheduleDriver extends AbstractScheduleDriver {
 
     private static final Log LOG = LogFactory.getLog(IgniteScheduleDriver.class);
     
-    public static class IgniteCallableWrapper implements IgniteCallable {
-        private Callable callable;
-        
-        IgniteCallableWrapper() {
-        }
-        
-        public IgniteCallableWrapper(Callable callable) {
-            this.callable = callable;
-        }
-        
-        @Override
-        public Object call() throws Exception {
-            return this.callable.call();
-        }
-    }
-    
     private IgniteScheduleDriverConfig config;
     private IgniteDriver igniteDriver;
-    private Map<String, UUID> clusterNodeNameMappings = new HashMap<String, UUID>(); // name to ID mappings
     
     public IgniteScheduleDriver(AbstractDriverConfig config) {
         if(config == null) {
@@ -123,28 +102,18 @@ public class IgniteScheduleDriver extends AbstractScheduleDriver {
         super.uninit();
     }
     
-    private ScheduleManager getScheduleManager() {
-        if(this.manager == null) {
-            throw new IllegalStateException("manager is not initialized");
-        }
-        
-        return (ScheduleManager) this.manager;
-    }
-    
-    private StargateService getStargateService() {
-        ScheduleManager scheduleManager = getScheduleManager();
-        StargateService stargateService = (StargateService) scheduleManager.getService();
-        return stargateService;
-    }
-    
     @Override
-    public void scheduleTask(DistributedTask task) throws IOException {
+    public void scheduleTask(DistributedTask task) throws IOException, DriverNotInitializedException {
         if(task == null) {
             throw new IllegalArgumentException("task is null");
         }
         
         if(task.getNodeNames().isEmpty()) {
             throw new IllegalArgumentException("nodenames is empty");
+        }
+        
+        if(!isStarted()) {
+            throw new DriverNotInitializedException("driver is not initialized");
         }
 
         try {
@@ -185,38 +154,13 @@ public class IgniteScheduleDriver extends AbstractScheduleDriver {
         if(all) {
             return servers;
         } else {
-            if(this.clusterNodeNameMappings.isEmpty()) {
-                // fill mapping
-                for(ClusterNode node : servers.nodes()) {
-                    String consistentNodeName = node.consistentId().toString();
-                    this.clusterNodeNameMappings.put(consistentNodeName, node.id());
-                }
-            }
-            
             List<UUID> nodeIDs = new ArrayList<UUID>();
             for(String nodeName : nodeNames) {
-                UUID nodeID = this.clusterNodeNameMappings.get(nodeName);
+                UUID nodeID = this.igniteDriver.getClusterNodeIDFromName(nodeName);
                 if(nodeID == null) {
-                    // check if there is a missing node
-                    boolean foundNode = false;
-                    for(ClusterNode node : servers.nodes()) {
-                        String consistentNodeName = node.consistentId().toString();
-                        if(nodeName.equals(consistentNodeName)) {
-                            //found
-                            foundNode = true;
-                            this.clusterNodeNameMappings.put(consistentNodeName, node.id());
-                            nodeIDs.add(node.id());
-                            break;
-                        }
-                    }
-                    
-                    if(!foundNode) {
-                        // error
-                        throw new IOException(String.format("cannot find matching node : %s", nodeName));
-                    }
-                } else {
-                    nodeIDs.add(nodeID);
+                    throw new IllegalArgumentException(String.format("Cannot find a node for nodeName %s", nodeName));
                 }
+                nodeIDs.add(nodeID);
             }
             return servers.forNodeIds(nodeIDs);
         }

@@ -33,15 +33,16 @@ import stargate.commons.driver.AbstractDriver;
 import stargate.commons.driver.DriverFailedToLoadException;
 import stargate.commons.datastore.AbstractKeyValueStore;
 import stargate.commons.datastore.EnumDataStoreProperty;
+import stargate.commons.driver.DriverNotInitializedException;
 import stargate.commons.manager.AbstractManager;
 import stargate.commons.manager.ManagerConfig;
 import stargate.commons.manager.ManagerNotInstantiatedException;
 import stargate.commons.utils.DateTimeUtils;
 import stargate.managers.datastore.DataStoreManager;
-import stargate.managers.event.AbstractStargateEventHandler;
+import stargate.commons.event.AbstractEventHandler;
 import stargate.managers.event.EventManager;
-import stargate.managers.event.StargateEvent;
-import stargate.managers.event.StargateEventType;
+import stargate.commons.event.StargateEvent;
+import stargate.commons.event.StargateEventType;
 import stargate.managers.policy.ClusterPolicy;
 import stargate.managers.policy.PolicyManager;
 import stargate.service.StargateService;
@@ -66,7 +67,7 @@ public class ClusterManager extends AbstractManager<AbstractClusterDriver> {
     private final Object remoteClusterEventHandlersSyncObj = new Object();
     protected long lastUpdateTime;
     
-    private static final String REMOTE_CLUSTER_STORE = "rcluster";
+    private static final String REMOTE_CLUSTER_STORE = "remote_cluster";
     
     public static ClusterManager getInstance(StargateService service, Collection<AbstractClusterDriver> drivers) throws ManagerNotInstantiatedException {
         synchronized (ClusterManager.class) {
@@ -154,19 +155,23 @@ public class ClusterManager extends AbstractManager<AbstractClusterDriver> {
     }
     
     private void setEventHandler() throws IOException {
-        AbstractStargateEventHandler hander = new AbstractStargateEventHandler() {
+        AbstractEventHandler hander = new AbstractEventHandler() {
+            private final StargateEventType[] acceptedEventTypes = {StargateEventType.STARGATE_EVENT_TYPE_REMOTECLUSTER};
+                    
             @Override
-            public boolean accept(StargateEventType eventType) {
-                if(eventType == StargateEventType.STARGATE_EVENT_TYPE_REMOTECLUSTER) {
-                    return true;
-                }
-                return false;
+            public StargateEventType[] getAcceptedTypes() {
+                return this.acceptedEventTypes;
             }
-
+            
             @Override
-            public void raised(EventManager manager, StargateEvent event) {
-                RemoteClusterEvent evt = (RemoteClusterEvent) event.getValue();
-                processRemoteClusterEvent(evt);
+            public void raised(StargateEvent event) {
+                String jsonValue = event.getJsonValue();
+                try {
+                    RemoteClusterEvent evt = RemoteClusterEvent.createInstance(jsonValue);
+                    processRemoteClusterEvent(evt);
+                } catch (IOException ex) {
+                    LOG.error(ex);
+                }
             }
         };
         
@@ -181,17 +186,22 @@ public class ClusterManager extends AbstractManager<AbstractClusterDriver> {
     }
     
     private void safeInitLocalCluster() throws IOException {
-        AbstractClusterDriver driver = getDriver();
-        
-        long currentTime = DateTimeUtils.getTimestamp();
-        if(this.localCluster == null) {
-            this.localCluster = driver.getLocalCluster();
-            this.lastUpdateTime = currentTime;
-        }
-        
-        if(this.localNode == null) {
-            this.localNode = driver.getLocalNode();
-            this.lastUpdateTime = currentTime;
+        try {
+            AbstractClusterDriver driver = getDriver();
+
+            long currentTime = DateTimeUtils.getTimestamp();
+            if(this.localCluster == null) {
+                this.localCluster = driver.getLocalCluster();
+                this.lastUpdateTime = currentTime;
+            }
+
+            if(this.localNode == null) {
+                this.localNode = driver.getLocalNode();
+                this.lastUpdateTime = currentTime;
+            }
+        } catch (DriverNotInitializedException ex) {
+            LOG.error(ex);
+            throw new IOException(ex);
         }
     }
     
@@ -204,6 +214,9 @@ public class ClusterManager extends AbstractManager<AbstractClusterDriver> {
 
                     this.remoteClusterStore = keyValueStoreManager.getDriver().getKeyValueStore(REMOTE_CLUSTER_STORE, Cluster.class, EnumDataStoreProperty.DATASTORE_PROP_PERSISTENT_REPLICATED);
                 } catch (ManagerNotInstantiatedException ex) {
+                    LOG.error(ex);
+                    throw new IOException(ex);
+                } catch (DriverNotInitializedException ex) {
                     LOG.error(ex);
                     throw new IOException(ex);
                 }
@@ -224,7 +237,7 @@ public class ClusterManager extends AbstractManager<AbstractClusterDriver> {
         }
     }
     
-    public synchronized Node getLeaderNode() throws IOException {
+    public synchronized Node getLeaderNode() throws IOException, DriverNotInitializedException {
         if(!this.started) {
             throw new IllegalStateException("Manager is not started");
         }
@@ -237,7 +250,7 @@ public class ClusterManager extends AbstractManager<AbstractClusterDriver> {
         return this.localCluster.getNode(leaderNodeName); 
     }
     
-    public synchronized boolean isLeaderNode() throws IOException {
+    public synchronized boolean isLeaderNode() throws IOException, DriverNotInitializedException {
         if(!this.started) {
             throw new IllegalStateException("Manager is not started");
         }
@@ -248,7 +261,7 @@ public class ClusterManager extends AbstractManager<AbstractClusterDriver> {
         return driver.isLeaderNode();
     }
     
-    public synchronized Node getLocalNode() throws IOException {
+    public synchronized Node getLocalNode() throws IOException, DriverNotInitializedException {
         if(!this.started) {
             throw new IllegalStateException("Manager is not started");
         }
@@ -258,7 +271,7 @@ public class ClusterManager extends AbstractManager<AbstractClusterDriver> {
         return this.localNode;
     }
     
-    public synchronized Cluster getLocalCluster() throws IOException {
+    public synchronized Cluster getLocalCluster() throws IOException, DriverNotInitializedException {
         if(!this.started) {
             throw new IllegalStateException("Manager is not started");
         }
@@ -268,7 +281,7 @@ public class ClusterManager extends AbstractManager<AbstractClusterDriver> {
         return this.localCluster;
     }
     
-    public synchronized String getLocalClusterName() throws IOException {
+    public synchronized String getLocalClusterName() throws IOException, DriverNotInitializedException {
         if(!this.started) {
             throw new IllegalStateException("Manager is not started");
         }
@@ -278,7 +291,7 @@ public class ClusterManager extends AbstractManager<AbstractClusterDriver> {
         return this.localCluster.getName();
     }
     
-    public synchronized boolean isLocalNode(String name) throws IOException {
+    public synchronized boolean isLocalNode(String name) throws IOException, DriverNotInitializedException {
         if(!this.started) {
             throw new IllegalStateException("Manager is not started");
         }
@@ -288,7 +301,7 @@ public class ClusterManager extends AbstractManager<AbstractClusterDriver> {
         return this.localCluster.hasNode(name);
     }
     
-    public Collection<Cluster> getRemoteClusters() throws IOException {
+    public Collection<Cluster> getRemoteClusters() throws IOException, DriverNotInitializedException {
         if(!this.started) {
             throw new IllegalStateException("Manager is not started");
         }
@@ -319,7 +332,7 @@ public class ClusterManager extends AbstractManager<AbstractClusterDriver> {
         }
     }
     
-    public Collection<String> getRemoteClusterNames() throws IOException {
+    public Collection<String> getRemoteClusterNames() throws IOException, DriverNotInitializedException {
         if(!this.started) {
             throw new IllegalStateException("Manager is not started");
         }
@@ -335,7 +348,7 @@ public class ClusterManager extends AbstractManager<AbstractClusterDriver> {
         }
     }
     
-    public Cluster getRemoteCluster(String name) throws IOException {
+    public Cluster getRemoteCluster(String name) throws IOException, DriverNotInitializedException {
         if(name == null || name.isEmpty()) {
             throw new IllegalArgumentException("name is null or empty");
         }
@@ -351,7 +364,7 @@ public class ClusterManager extends AbstractManager<AbstractClusterDriver> {
         }
     }
     
-    public boolean hasRemoteCluster(String name) throws IOException {
+    public boolean hasRemoteCluster(String name) throws IOException, DriverNotInitializedException {
         if(name == null || name.isEmpty()) {
             throw new IllegalArgumentException("name is null or empty");
         }
@@ -367,7 +380,7 @@ public class ClusterManager extends AbstractManager<AbstractClusterDriver> {
         }
     }
     
-    public void clearRemoteClusters() throws IOException {
+    public void clearRemoteClusters() throws IOException, DriverNotInitializedException {
         if(!this.started) {
             throw new IllegalStateException("Manager is not started");
         }
@@ -383,7 +396,7 @@ public class ClusterManager extends AbstractManager<AbstractClusterDriver> {
         }
     }
     
-    public void addRemoteClusters(Collection<Cluster> clusters) throws ClusterManagerException, IOException {
+    public void addRemoteClusters(Collection<Cluster> clusters) throws ClusterManagerException, IOException, DriverNotInitializedException {
         if(clusters == null) {
             throw new IllegalArgumentException("clusters is null");
         }
@@ -418,7 +431,7 @@ public class ClusterManager extends AbstractManager<AbstractClusterDriver> {
         }
     }
     
-    public void addRemoteCluster(Cluster cluster) throws ClusterManagerException, IOException {
+    public void addRemoteCluster(Cluster cluster) throws ClusterManagerException, IOException, DriverNotInitializedException {
         if(cluster == null) {
             throw new IllegalArgumentException("cluster is null");
         }
@@ -440,15 +453,11 @@ public class ClusterManager extends AbstractManager<AbstractClusterDriver> {
 
             this.lastUpdateTime = DateTimeUtils.getTimestamp();
 
-            try {
-                raiseEventForRemoteClusterAdded(cluster);
-            } catch (InterruptedException ex) {
-                throw new IOException(ex);
-            }
+            raiseEventForRemoteClusterAdded(cluster);
         }
     }
     
-    public void removeRemoteCluster(Cluster cluster) throws IOException {
+    public void removeRemoteCluster(Cluster cluster) throws IOException, DriverNotInitializedException {
         if(cluster == null) {
             throw new IllegalArgumentException("cluster is null");
         }
@@ -464,7 +473,7 @@ public class ClusterManager extends AbstractManager<AbstractClusterDriver> {
         }
     }
     
-    public void removeRemoteCluster(String name) throws IOException {
+    public void removeRemoteCluster(String name) throws IOException, DriverNotInitializedException {
         if(name == null || name.isEmpty()) {
             throw new IllegalArgumentException("name is null or empty");
         }
@@ -484,16 +493,12 @@ public class ClusterManager extends AbstractManager<AbstractClusterDriver> {
 
                 this.lastUpdateTime = DateTimeUtils.getTimestamp();
 
-                try {
-                    raiseEventForRemoteClusterRemoved(cluster);
-                } catch (InterruptedException ex) {
-                    throw new IOException(ex);
-                }
+                raiseEventForRemoteClusterRemoved(cluster);
             }
         }
     }
     
-    public void updateRemoteClusters(Collection<Cluster> clusters) throws IOException {
+    public void updateRemoteClusters(Collection<Cluster> clusters) throws IOException, DriverNotInitializedException {
         if(clusters == null) {
             throw new IllegalArgumentException("clusters is null");
         }
@@ -511,7 +516,7 @@ public class ClusterManager extends AbstractManager<AbstractClusterDriver> {
         }
     }
     
-    public void updateRemoteCluster(Cluster cluster) throws IOException {
+    public void updateRemoteCluster(Cluster cluster) throws IOException, DriverNotInitializedException {
         if(cluster == null) {
             throw new IllegalArgumentException("cluster is null");
         }
@@ -529,11 +534,7 @@ public class ClusterManager extends AbstractManager<AbstractClusterDriver> {
 
             this.lastUpdateTime = DateTimeUtils.getTimestamp();
 
-            try {
-                raiseEventForRemoteClusterUpdated(cluster);
-            } catch (InterruptedException ex) {
-                throw new IOException(ex);
-            }
+            raiseEventForRemoteClusterUpdated(cluster);
         }
     }
     
@@ -575,49 +576,61 @@ public class ClusterManager extends AbstractManager<AbstractClusterDriver> {
         }
     }
 
-    private void raiseEventForRemoteClusterAdded(Cluster cluster) throws InterruptedException {
+    private void raiseEventForRemoteClusterAdded(Cluster cluster) throws IOException, DriverNotInitializedException {
         RemoteClusterEvent remoteClusterEvent = new RemoteClusterEvent(RemoteClusterEventType.REMOTECLUSTER_EVENT_TYPE_ADD, cluster);
         
         try {
             StargateService stargateService = getStargateService();
             EventManager eventManager = stargateService.getEventManager();
+            ClusterManager clusterManager = stargateService.getClusterManager();
+            Cluster localCluster = clusterManager.getLocalCluster();
+            Node localNode = clusterManager.getLocalNode();
+            Collection<String> nodeNames = localCluster.getNodeNames();
             
-            StargateEvent event = new StargateEvent(StargateEventType.STARGATE_EVENT_TYPE_REMOTECLUSTER, remoteClusterEvent);
-            eventManager.raiseStargateEvent(event);
+            StargateEvent event = new StargateEvent(StargateEventType.STARGATE_EVENT_TYPE_REMOTECLUSTER, nodeNames, localNode.getName(), remoteClusterEvent.toJson());
+            eventManager.raiseEvent(event);
         } catch (ManagerNotInstantiatedException ex) {
             LOG.error(ex);
         }
     }
     
-    private void raiseEventForRemoteClusterRemoved(Cluster cluster) throws InterruptedException {
+    private void raiseEventForRemoteClusterRemoved(Cluster cluster) throws IOException, DriverNotInitializedException {
         RemoteClusterEvent remoteClusterEvent = new RemoteClusterEvent(RemoteClusterEventType.REMOTECLUSTER_EVENT_TYPE_REMOVE, cluster);
         
         try {
             StargateService stargateService = getStargateService();
             EventManager eventManager = stargateService.getEventManager();
+            ClusterManager clusterManager = stargateService.getClusterManager();
+            Cluster localCluster = clusterManager.getLocalCluster();
+            Node localNode = clusterManager.getLocalNode();
+            Collection<String> nodeNames = localCluster.getNodeNames();
             
-            StargateEvent event = new StargateEvent(StargateEventType.STARGATE_EVENT_TYPE_REMOTECLUSTER, remoteClusterEvent);
-            eventManager.raiseStargateEvent(event);
+            StargateEvent event = new StargateEvent(StargateEventType.STARGATE_EVENT_TYPE_REMOTECLUSTER, nodeNames, localNode.getName(), remoteClusterEvent.toJson());
+            eventManager.raiseEvent(event);
         } catch (ManagerNotInstantiatedException ex) {
             LOG.error(ex);
         }
     }
     
-    private void raiseEventForRemoteClusterUpdated(Cluster cluster) throws InterruptedException {
+    private void raiseEventForRemoteClusterUpdated(Cluster cluster) throws IOException, DriverNotInitializedException {
         RemoteClusterEvent remoteClusterEvent = new RemoteClusterEvent(RemoteClusterEventType.REMOTECLUSTER_EVENT_TYPE_UPDATE, cluster);
         
         try {
             StargateService stargateService = getStargateService();
             EventManager eventManager = stargateService.getEventManager();
+            ClusterManager clusterManager = stargateService.getClusterManager();
+            Cluster localCluster = clusterManager.getLocalCluster();
+            Node localNode = clusterManager.getLocalNode();
+            Collection<String> nodeNames = localCluster.getNodeNames();
             
-            StargateEvent event = new StargateEvent(StargateEventType.STARGATE_EVENT_TYPE_REMOTECLUSTER, remoteClusterEvent);
-            eventManager.raiseStargateEvent(event);
+            StargateEvent event = new StargateEvent(StargateEventType.STARGATE_EVENT_TYPE_REMOTECLUSTER, nodeNames, localNode.getName(), remoteClusterEvent.toJson());
+            eventManager.raiseEvent(event);
         } catch (ManagerNotInstantiatedException ex) {
             LOG.error(ex);
         }
     }
     
-    public synchronized void reportLocalNodeUnreachable(String name) throws IOException {
+    public synchronized void reportLocalNodeUnreachable(String name) throws IOException, DriverNotInitializedException {
         if(name == null || name.isEmpty()) {
             throw new IllegalArgumentException("name is null or empty");
         }
@@ -648,7 +661,7 @@ public class ClusterManager extends AbstractManager<AbstractClusterDriver> {
         }
     }
     
-    public void reportRemoteNodeUnreachable(String clusterName, String nodeName) throws IOException {
+    public void reportRemoteNodeUnreachable(String clusterName, String nodeName) throws IOException, DriverNotInitializedException {
         if(clusterName == null || clusterName.isEmpty()) {
             throw new IllegalArgumentException("clusterName is null or empty");
         }

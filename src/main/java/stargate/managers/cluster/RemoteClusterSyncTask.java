@@ -23,6 +23,7 @@ import java.util.TimerTask;
 import org.apache.commons.logging.Log;
 import org.apache.commons.logging.LogFactory;
 import stargate.commons.cluster.Cluster;
+import stargate.commons.driver.DriverNotInitializedException;
 import stargate.managers.transport.TransportManager;
 
 /**
@@ -48,7 +49,7 @@ public class RemoteClusterSyncTask extends TimerTask {
         this.transportManager = transportManager;
     }
     
-    public void sync() throws IOException {
+    public void sync() throws IOException, DriverNotInitializedException {
         try {
             if(this.clusterManager.isLeaderNode()) {
                 List<Cluster> syncedRemoteClusters = new ArrayList<Cluster>();
@@ -75,6 +76,8 @@ public class RemoteClusterSyncTask extends TimerTask {
         try {
             sync();
         } catch (IOException ex) {
+            LOG.error(ex);
+        } catch (DriverNotInitializedException ex) {
             LOG.error(ex);
         }
     }

@@ -15,40 +15,61 @@
 */
 package stargate.managers.event;
 
+import stargate.commons.event.AbstractEventHandler;
+import stargate.commons.event.StargateEvent;
 import java.io.IOException;
 import java.util.ArrayList;
+import java.util.Collection;
 import java.util.List;
-import java.util.concurrent.BlockingQueue;
-import java.util.concurrent.LinkedBlockingDeque;
-import java.util.concurrent.TimeUnit;
 import org.apache.commons.logging.Log;
 import org.apache.commons.logging.LogFactory;
-import stargate.commons.driver.NullDriver;
+import stargate.commons.driver.AbstractDriver;
+import stargate.commons.driver.DriverFailedToLoadException;
+import stargate.commons.driver.DriverNotInitializedException;
+import stargate.commons.event.AbstractEventDriver;
 import stargate.commons.manager.AbstractManager;
+import stargate.commons.manager.ManagerConfig;
 import stargate.commons.manager.ManagerNotInstantiatedException;
-import stargate.commons.utils.DateTimeUtils;
 import stargate.service.StargateService;
 
 /**
  *
  * @author iychoi
  */
-public class EventManager extends AbstractManager<NullDriver> {
+public class EventManager extends AbstractManager<AbstractEventDriver> {
     
     private static final Log LOG = LogFactory.getLog(EventManager.class);
     
     private static EventManager instance;
-    private List<AbstractStargateEventHandler> stargateEventHandlers = new ArrayList<AbstractStargateEventHandler>();
-    private final Object stargateEventHandlersSyncObj = new Object();
-    private BlockingQueue<StargateEvent> eventQueue = new LinkedBlockingDeque<StargateEvent>();
-    private Thread eventDispatchThread;
-    private boolean dispatchEvent = true;
-    protected long lastUpdateTime;
     
-    public static EventManager getInstance(StargateService service) throws ManagerNotInstantiatedException {
+    public static EventManager getInstance(StargateService service, Collection<AbstractEventDriver> drivers) throws ManagerNotInstantiatedException {
         synchronized (EventManager.class) {
             if(instance == null) {
-                instance = new EventManager(service);
+                instance = new EventManager(service, drivers);
+            }
+            return instance;
+        }
+    }
+    
+    public static EventManager getInstance(StargateService service, ManagerConfig config) throws ManagerNotInstantiatedException {
+        synchronized (EventManager.class) {
+            if(instance == null) {
+                if(config == null) {
+                    throw new IllegalArgumentException("config is null");
+                }
+                
+                try {
+                    // type cast
+                    Collection<AbstractDriver> drivers = (Collection<AbstractDriver>) config.getDrivers();
+                    List<AbstractEventDriver> eventDrivers = new ArrayList<AbstractEventDriver>();
+                    for(AbstractDriver driver : drivers) {
+                        eventDrivers.add((AbstractEventDriver) driver);
+                    }
+                    instance = new EventManager(service, eventDrivers);
+                } catch (DriverFailedToLoadException ex) {
+                    LOG.error(ex);
+                    throw new ManagerNotInstantiatedException(ex.toString());
+                }
             }
             return instance;
         }
@@ -63,107 +84,59 @@ public class EventManager extends AbstractManager<NullDriver> {
         }
     }
     
-    EventManager(StargateService service) throws ManagerNotInstantiatedException {
+    EventManager(StargateService service, Collection<AbstractEventDriver> drivers) throws ManagerNotInstantiatedException {
         if(service == null) {
             throw new IllegalArgumentException("service is null");
         }
         
+        if(drivers == null || drivers.isEmpty()) {
+            throw new IllegalArgumentException("drivers is null or empty");
+        }
+        
         this.setService(service);
+        
+        for(AbstractEventDriver driver : drivers) {
+            this.drivers.add(driver);
+        }
+    }
+    
+    public AbstractEventDriver getDriver() {
+        if(this.drivers.size() > 0) {
+            return this.drivers.get(0);
+        }
+        return null;
     }
     
     @Override
     public synchronized void start() throws IOException {
         super.start();
-        
-        runEventDispatchThread();
     }
     
     @Override
     public synchronized void stop() throws IOException {
-        this.dispatchEvent = false;
-        this.eventQueue.clear();
-        if(this.eventDispatchThread != null) {
-            if(this.eventDispatchThread.isAlive()) {
-                this.eventDispatchThread.interrupt();
-            }
-            this.eventDispatchThread = null;
-        }
-        
-        synchronized(this.stargateEventHandlersSyncObj) {
-            this.stargateEventHandlers.clear();
-        }
-        
         super.stop();
     }
     
-    private void runEventDispatchThread() {
-        this.dispatchEvent = true;
-        this.eventDispatchThread = new Thread(new Runnable() {
-            @Override
-            public void run() {
-                try {
-                    while(dispatchEvent) {
-                        StargateEvent event = eventQueue.poll(1, TimeUnit.SECONDS);
-                        if(event != null) {
-                            LOG.debug(String.format("Dequeued an event : %s", event.getEventType().toString()));
-                            processStargateEvent(event);
-                        }
-                    }
-                } catch (Exception ex) {
-                    LOG.error(ex);
-                }
-            }
-        });
-        this.eventDispatchThread.start();
+    public void raiseEvent(StargateEvent event) throws IOException, DriverNotInitializedException {
+        AbstractEventDriver driver = getDriver();
+        driver.raiseEvent(event);
     }
     
-    private void processStargateEvent(StargateEvent event) throws IOException {
-        synchronized(this.stargateEventHandlersSyncObj) {
-            for(AbstractStargateEventHandler handler: this.stargateEventHandlers) {
-                if(handler.accept(event.getEventType())) {
-                    handler.raised(this, event);
-                }
-            }
-        }
-    }
-    
-    public void raiseStargateEvent(StargateEvent event) throws InterruptedException {
-        LOG.debug(String.format("Enqueue an event : %s", event.getEventType().toString()));
-        this.eventQueue.put(event);
-        
-        // update
-        this.lastUpdateTime = DateTimeUtils.getTimestamp();
-    }
-    
-    public void addEventHandler(AbstractStargateEventHandler eventHandler) {
+    public void addEventHandler(AbstractEventHandler eventHandler) {
         if(eventHandler == null) {
             throw new IllegalArgumentException("eventHandler is null");
         }
         
-        synchronized(this.stargateEventHandlersSyncObj) {
-            this.stargateEventHandlers.add(eventHandler);
-        }
+        AbstractEventDriver driver = getDriver();
+        driver.addEventHandler(eventHandler);
     }
     
-    public void removeEventHandler(AbstractStargateEventHandler eventHandler) {
+    public void removeEventHandler(AbstractEventHandler eventHandler) {
         if(eventHandler == null) {
             throw new IllegalArgumentException("eventHandler is null");
         }
         
-        synchronized(this.stargateEventHandlersSyncObj) {
-            this.stargateEventHandlers.remove(eventHandler);
-        }
-    }
-    
-    public long getLastUpdateTime() {
-        return this.lastUpdateTime;
-    }
-    
-    public void setLastUpdateTime(long time) {
-        if(time < 0) {
-            throw new IllegalArgumentException("time is negative");
-        }
-        
-        this.lastUpdateTime = time;
+        AbstractEventDriver driver = getDriver();
+        driver.removeEventHandler(eventHandler);
     }
 }

@@ -29,6 +29,7 @@ import stargate.commons.datasource.DataExportEntry;
 import stargate.commons.recipe.Recipe;
 import stargate.commons.restful.RestfulClient;
 import stargate.commons.service.FSServiceInfo;
+import stargate.commons.transport.TransferAssignment;
 import stargate.commons.userinterface.AbstractUserInterfaceClient;
 import stargate.commons.utils.DateTimeUtils;
 import stargate.commons.utils.PathUtils;
@@ -435,7 +436,7 @@ public class HTTPUserInterfaceClient extends AbstractUserInterfaceClient {
     }
     
     @Override
-    public String schedulePrefetch(DataObjectURI uri, String hash) throws IOException {
+    public TransferAssignment schedulePrefetch(DataObjectURI uri, String hash) throws IOException {
         if(!this.connected) {
             throw new IOException("Client is not connected");
         }
@@ -452,10 +453,10 @@ public class HTTPUserInterfaceClient extends AbstractUserInterfaceClient {
         String path = PathUtils.concatPath(uri.getClusterName(), uri.getPath());
         String pathHash = PathUtils.concatPath(path, hash);
         String url = makeAPIPath(HTTPUserInterfaceRestfulConstants.API_SCHEDULE_PREFETCH_PATH, pathHash);
-        String assignedNodeName = (String) this.restfulClient.post(url, null);
+        TransferAssignment assignment = (TransferAssignment) this.restfulClient.post(url, null);
 
         updateLastActivetime();
-        return assignedNodeName;
+        return assignment;
     }
     
     @Override

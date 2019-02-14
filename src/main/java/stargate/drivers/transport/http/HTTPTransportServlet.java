@@ -20,6 +20,8 @@ import java.io.IOException;
 import java.io.InputStream;
 import java.io.OutputStream;
 import java.util.Collection;
+import java.util.logging.Level;
+import java.util.logging.Logger;
 import javax.ws.rs.DefaultValue;
 import javax.ws.rs.GET;
 import javax.ws.rs.Path;
@@ -35,6 +37,7 @@ import stargate.commons.cluster.Cluster;
 import stargate.commons.dataobject.DataObjectMetadata;
 import stargate.commons.dataobject.DataObjectURI;
 import stargate.commons.dataobject.Directory;
+import stargate.commons.driver.DriverNotInitializedException;
 import stargate.commons.manager.AbstractManager;
 import stargate.commons.manager.ManagerNotInstantiatedException;
 import stargate.commons.recipe.AbstractRecipeDriver;
@@ -186,6 +189,9 @@ public class HTTPTransportServlet extends AbstractTransportServer {
         } catch (ManagerNotInstantiatedException ex) {
             LOG.error(ex);
             throw new IOException(ex);
+        } catch (DriverNotInitializedException ex) {
+            LOG.error(ex);
+            throw new IOException(ex);
         }
     }
 
@@ -226,6 +232,9 @@ public class HTTPTransportServlet extends AbstractTransportServer {
         } catch (ManagerNotInstantiatedException ex) {
             LOG.error(ex);
             throw new IOException(ex);
+        } catch (DriverNotInitializedException ex) {
+            LOG.error(ex);
+            throw new IOException(ex);
         }
     }
     
@@ -262,6 +271,9 @@ public class HTTPTransportServlet extends AbstractTransportServer {
             Directory directory = volumeManager.getDirectory(uri);
             return directory.getEntries();
         } catch (ManagerNotInstantiatedException ex) {
+            LOG.error(ex);
+            throw new IOException(ex);
+        } catch (DriverNotInitializedException ex) {
             LOG.error(ex);
             throw new IOException(ex);
         }
@@ -301,6 +313,9 @@ public class HTTPTransportServlet extends AbstractTransportServer {
         } catch (ManagerNotInstantiatedException ex) {
             LOG.error(ex);
             throw new IOException(ex);
+        } catch (DriverNotInitializedException ex) {
+            LOG.error(ex);
+            throw new IOException(ex);
         }
     }
     
@@ -336,6 +351,9 @@ public class HTTPTransportServlet extends AbstractTransportServer {
             VolumeManager volumeManager = service.getVolumeManager();
             return volumeManager.getDirectory(uri);
         } catch (ManagerNotInstantiatedException ex) {
+            LOG.error(ex);
+            throw new IOException(ex);
+        } catch (DriverNotInitializedException ex) {
             LOG.error(ex);
             throw new IOException(ex);
         }
@@ -374,6 +392,9 @@ public class HTTPTransportServlet extends AbstractTransportServer {
             VolumeManager volumeManager = service.getVolumeManager();
             return volumeManager.getLocalDataChunk(hash);
         } catch (ManagerNotInstantiatedException ex) {
+            LOG.error(ex);
+            throw new IOException(ex);
+        } catch (DriverNotInitializedException ex) {
             LOG.error(ex);
             throw new IOException(ex);
         }

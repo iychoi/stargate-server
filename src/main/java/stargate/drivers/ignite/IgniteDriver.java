@@ -20,7 +20,10 @@ import java.io.IOException;
 import java.net.InetSocketAddress;
 import java.util.ArrayList;
 import java.util.Collection;
+import java.util.HashMap;
 import java.util.List;
+import java.util.Map;
+import java.util.UUID;
 import java.util.concurrent.locks.Condition;
 import java.util.concurrent.locks.Lock;
 import java.util.concurrent.locks.ReentrantLock;
@@ -31,6 +34,7 @@ import org.apache.ignite.IgniteCheckedException;
 import org.apache.ignite.IgniteCluster;
 import org.apache.ignite.IgniteLogger;
 import org.apache.ignite.Ignition;
+import org.apache.ignite.cluster.ClusterNode;
 import org.apache.ignite.configuration.DataRegionConfiguration;
 import org.apache.ignite.configuration.DataStorageConfiguration;
 import org.apache.ignite.configuration.IgniteConfiguration;
@@ -73,6 +77,7 @@ public class IgniteDriver {
     private Lock clusterActivationLock = new ReentrantLock();
     private Condition clusterActivationCondition = this.clusterActivationLock.newCondition();
     private boolean checkActive = true;
+    private Map<String, UUID> clusterNodeNameIDMappings = new HashMap<String, UUID>(); // node name to nodeID mappings
     
     public static IgniteDriver getInstance() {
         synchronized (IgniteDriver.class) {
@@ -333,5 +338,80 @@ public class IgniteDriver {
     
     public Ignite getIgnite() {
         return this.igniteInstance;
+    }
+    
+    public String getLocalNodeName() {
+        IgniteCluster igniteCluster = this.igniteInstance.cluster();
+        ClusterNode localNode = igniteCluster.localNode();
+    
+        return getNodeNameFromClusterNode(localNode);
+    }
+    
+    public Collection<String> getLocalNodeHostNames() {
+        IgniteCluster igniteCluster = this.igniteInstance.cluster();
+        ClusterNode localNode = igniteCluster.localNode();
+        
+        Collection<String> igniteHostNames = localNode.hostNames();
+        return igniteHostNames;
+    }
+    
+    public String getNodeNameFromNodeID(UUID nodeId) {
+        if(nodeId == null) {
+            throw new IllegalArgumentException("nodeId is null");
+        }
+        
+        IgniteCluster igniteCluster = this.igniteInstance.cluster();
+        ClusterNode node = igniteCluster.node(nodeId);
+        return getNodeNameFromClusterNode(node);
+    }
+    
+    public String getNodeNameFromClusterNode(ClusterNode node) {
+        if(node == null) {
+            throw new IllegalArgumentException("node is null");
+        }
+        
+        String nodeName = node.consistentId().toString();
+        
+        if(!this.clusterNodeNameIDMappings.containsKey(nodeName)) {
+            this.clusterNodeNameIDMappings.put(nodeName, node.id());
+        }
+        return nodeName;
+    }
+    
+    public ClusterNode getClusterNodeFromName(String nodeName) {
+        if(nodeName == null || nodeName.isEmpty()) {
+            throw new IllegalArgumentException("nodeName is null or empty");
+        }
+        
+        IgniteCluster igniteCluster = this.igniteInstance.cluster();
+        
+        UUID nodeId = getClusterNodeIDFromName(nodeName);
+        if(nodeId == null) {
+            return null;
+        }
+        
+        return igniteCluster.node(nodeId);
+    }
+    
+    public UUID getClusterNodeIDFromName(String nodeName) {
+        if(nodeName == null || nodeName.isEmpty()) {
+            throw new IllegalArgumentException("nodeName is null or empty");
+        }
+        
+        IgniteCluster igniteCluster = this.igniteInstance.cluster();
+        
+        UUID nodeId = this.clusterNodeNameIDMappings.get(nodeName);
+        if(nodeId == null) {
+            Collection<ClusterNode> nodes = igniteCluster.nodes();
+            for(ClusterNode node : nodes) {
+                String nodeName2 = node.consistentId().toString();
+                
+                if(!this.clusterNodeNameIDMappings.containsKey(nodeName2)) {
+                    this.clusterNodeNameIDMappings.put(nodeName2, node.id());
+                }
+            }
+        }
+        
+        return this.clusterNodeNameIDMappings.get(nodeName);
     }
 }

@@ -26,6 +26,7 @@ import stargate.commons.cluster.Cluster;
 import stargate.commons.cluster.Node;
 import stargate.commons.datastore.AbstractKeyValueStore;
 import stargate.commons.datastore.EnumDataStoreProperty;
+import stargate.commons.driver.DriverNotInitializedException;
 import stargate.commons.manager.ManagerNotInstantiatedException;
 import stargate.commons.service.AbstractService;
 import stargate.managers.datastore.DataStoreManager;
@@ -98,6 +99,9 @@ public class RoundRobinContactNodeDeterminationAlgorithm extends AbstractContact
                     DataStoreManager keyValueStoreManager = stargateService.getDataStoreManager();
                     this.responsibleNodeMappingStore = keyValueStoreManager.getDriver().getKeyValueStore(RESPONSIBLE_NODE_MAPPING_STORE, ResponsibleNodeMapping.class, EnumDataStoreProperty.DATASTORE_PROP_VOLATILE_REPLICATED, TimeUnit.MINUTES, 5);
                 } catch (ManagerNotInstantiatedException ex) {
+                    LOG.error(ex);
+                    throw new IOException(ex);
+                } catch (DriverNotInitializedException ex) {
                     LOG.error(ex);
                     throw new IOException(ex);
                 }

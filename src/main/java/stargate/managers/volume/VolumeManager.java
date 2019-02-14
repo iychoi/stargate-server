@@ -27,7 +27,6 @@ import java.util.Map;
 import org.apache.commons.logging.Log;
 import org.apache.commons.logging.LogFactory;
 import stargate.commons.cluster.Cluster;
-import stargate.commons.cluster.Node;
 import stargate.commons.dataobject.DataObjectMetadata;
 import stargate.commons.dataobject.DataObjectURI;
 import stargate.commons.dataobject.Directory;
@@ -37,6 +36,7 @@ import stargate.commons.datasource.SourceFileMetadata;
 import stargate.commons.driver.NullDriver;
 import stargate.commons.datastore.AbstractKeyValueStore;
 import stargate.commons.datastore.EnumDataStoreProperty;
+import stargate.commons.driver.DriverNotInitializedException;
 import stargate.commons.manager.AbstractManager;
 import stargate.commons.manager.ManagerNotInstantiatedException;
 import stargate.commons.recipe.Recipe;
@@ -48,7 +48,7 @@ import stargate.managers.dataexport.DataExportManager;
 import stargate.managers.datasource.DataSourceManager;
 import stargate.managers.datastore.DataStoreManager;
 import stargate.managers.recipe.RecipeManager;
-import stargate.managers.transport.TransferAssignment;
+import stargate.commons.transport.TransferAssignment;
 import stargate.managers.transport.TransferEvent;
 import stargate.managers.transport.TransportManager;
 import stargate.service.StargateService;
@@ -119,11 +119,14 @@ public class VolumeManager extends AbstractManager<NullDriver> {
             } catch (ManagerNotInstantiatedException ex) {
                 LOG.error(ex);
                 throw new IOException(ex);
+            } catch (DriverNotInitializedException ex) {
+                LOG.error(ex);
+                throw new IOException(ex);
             }
         }
     }
     
-    private boolean isLocalCluster(String clusterName) throws IOException {
+    private boolean isLocalCluster(String clusterName) throws IOException, DriverNotInitializedException {
         if(clusterName == null || clusterName.isEmpty()) {
             throw new IllegalArgumentException("clusterName is null or empty");
         }
@@ -146,7 +149,7 @@ public class VolumeManager extends AbstractManager<NullDriver> {
         }
     }
     
-    private boolean isLocalDataObject(DataObjectURI uri) throws IOException {
+    private boolean isLocalDataObject(DataObjectURI uri) throws IOException, DriverNotInitializedException {
         if(uri == null) {
             throw new IllegalArgumentException("uri is null");
         }
@@ -161,7 +164,7 @@ public class VolumeManager extends AbstractManager<NullDriver> {
         return false;
     }
     
-    private DataObjectURI makeAbsolutePath(DataObjectURI uri) throws IOException {
+    private DataObjectURI makeAbsolutePath(DataObjectURI uri) throws IOException, DriverNotInitializedException {
         if(uri.isRoot()) {
             return uri;
         }
@@ -182,7 +185,7 @@ public class VolumeManager extends AbstractManager<NullDriver> {
         return uri;
     }
     
-    private synchronized Directory getRootDirectory() throws IOException {
+    private synchronized Directory getRootDirectory() throws IOException, DriverNotInitializedException {
         // don't need to put into the store
         // we cache root directory because it may take long time
         try {
@@ -226,7 +229,7 @@ public class VolumeManager extends AbstractManager<NullDriver> {
         }
     }
     
-    private synchronized void buildLocalDirectoryHierarchy(Collection<DataObjectMetadata> metadatas) throws IOException {
+    private synchronized void buildLocalDirectoryHierarchy(Collection<DataObjectMetadata> metadatas) throws IOException, DriverNotInitializedException {
         if(metadatas == null) {
             throw new IllegalArgumentException("metadatas is null or empty");
         }
@@ -292,7 +295,7 @@ public class VolumeManager extends AbstractManager<NullDriver> {
     }
     
     //TODO: Need to rework for better efficiency
-    public synchronized void buildLocalDirectoryHierarchy() throws IOException {
+    public synchronized void buildLocalDirectoryHierarchy() throws IOException, DriverNotInitializedException {
         if(!this.started) {
             throw new IllegalStateException("Manager is not started");
         }
@@ -324,7 +327,7 @@ public class VolumeManager extends AbstractManager<NullDriver> {
         return dir;
     }
     
-    private Directory getRemoteDirectory(DataObjectURI uri) throws IOException, FileNotFoundException {
+    private Directory getRemoteDirectory(DataObjectURI uri) throws IOException, FileNotFoundException, DriverNotInitializedException {
         try {
             StargateService stargateService = getStargateService();
             TransportManager transportManager = stargateService.getTransportManager();
@@ -339,7 +342,7 @@ public class VolumeManager extends AbstractManager<NullDriver> {
         }
     }
     
-    public Directory getDirectory(DataObjectURI uri) throws IOException, FileNotFoundException {
+    public Directory getDirectory(DataObjectURI uri) throws IOException, FileNotFoundException, DriverNotInitializedException {
         if(uri == null) {
             throw new IllegalArgumentException("uri is null");
         }
@@ -361,7 +364,7 @@ public class VolumeManager extends AbstractManager<NullDriver> {
         }
     }
     
-    public DataObjectMetadata getDataObjectMetadata(DataObjectURI uri) throws IOException, FileNotFoundException {
+    public DataObjectMetadata getDataObjectMetadata(DataObjectURI uri) throws IOException, FileNotFoundException, DriverNotInitializedException {
         if(uri == null) {
             throw new IllegalArgumentException("uri is null");
         }
@@ -418,7 +421,7 @@ public class VolumeManager extends AbstractManager<NullDriver> {
         }
     }
     
-    private Recipe getRemoteRecipe(DataObjectURI uri) throws IOException, FileNotFoundException {
+    private Recipe getRemoteRecipe(DataObjectURI uri) throws IOException, FileNotFoundException, DriverNotInitializedException {
         try {
             StargateService stargateService = getStargateService();
             TransportManager transportManager = stargateService.getTransportManager();
@@ -434,7 +437,7 @@ public class VolumeManager extends AbstractManager<NullDriver> {
         }
     }
     
-    public Recipe getRecipe(DataObjectURI uri) throws IOException, FileNotFoundException {
+    public Recipe getRecipe(DataObjectURI uri) throws IOException, FileNotFoundException, DriverNotInitializedException {
         if(uri == null) {
             throw new IllegalArgumentException("uri is null");
         }
@@ -453,7 +456,7 @@ public class VolumeManager extends AbstractManager<NullDriver> {
         }
     }
     
-    public Recipe getRemoteRecipeWithTransferSchedule(DataObjectURI uri) throws IOException, FileNotFoundException {
+    public Recipe getRemoteRecipeWithTransferSchedule(DataObjectURI uri) throws IOException, FileNotFoundException, DriverNotInitializedException {
         if(uri == null) {
             throw new IllegalArgumentException("uri is null");
         }
@@ -481,8 +484,7 @@ public class VolumeManager extends AbstractManager<NullDriver> {
                 Collection<RecipeChunk> recipeChunks = remoteRecipe.getChunks();
                 for(RecipeChunk chunk : recipeChunks) {
                     TransferAssignment assignment = transportManager.schedulePrefetch(localCluster, remoteRecipe, chunk.getHash());
-                    TransferEvent transferEvent = assignment.getEvent();
-                    String assignedNodeName = transferEvent.getLocalNodeName();
+                    String assignedNodeName = assignment.getTransferNode();
                     int assignedNodeID = newRecipe.getNodeID(assignedNodeName);
                     
                     RecipeChunk newChunk = new RecipeChunk(chunk.getOffset(), chunk.getLength(), chunk.getHash());
@@ -499,7 +501,7 @@ public class VolumeManager extends AbstractManager<NullDriver> {
         }
     }
     
-    public InputStream getLocalDataChunk(String hash) throws IOException, FileNotFoundException {
+    public InputStream getLocalDataChunk(String hash) throws IOException, FileNotFoundException, DriverNotInitializedException {
         if(hash == null || hash.isEmpty()) {
             throw new IllegalArgumentException("hash is null or empty");
         }
@@ -523,7 +525,7 @@ public class VolumeManager extends AbstractManager<NullDriver> {
         }
     }
     
-    public InputStream getLocalDataChunk(DataObjectURI uri, String hash) throws IOException, FileNotFoundException {
+    public InputStream getLocalDataChunk(DataObjectURI uri, String hash) throws IOException, FileNotFoundException, DriverNotInitializedException {
         if(uri == null) {
             throw new IllegalArgumentException("uri is null");
         }
@@ -551,7 +553,7 @@ public class VolumeManager extends AbstractManager<NullDriver> {
         }
     }
     
-    public InputStream getLocalDataChunk(Recipe recipe, String hash) throws IOException, FileNotFoundException {
+    public InputStream getLocalDataChunk(Recipe recipe, String hash) throws IOException, FileNotFoundException, DriverNotInitializedException {
         if(recipe == null) {
             throw new IllegalArgumentException("recipe is null");
         }
@@ -600,7 +602,7 @@ public class VolumeManager extends AbstractManager<NullDriver> {
         }
     }
     
-    private InputStream getRemoteDataChunk(DataObjectURI uri, String hash) throws IOException, FileNotFoundException {
+    private InputStream getRemoteDataChunk(DataObjectURI uri, String hash) throws IOException, FileNotFoundException, DriverNotInitializedException {
         try {
             StargateService stargateService = getStargateService();
             TransportManager transportManager = stargateService.getTransportManager();
@@ -616,7 +618,7 @@ public class VolumeManager extends AbstractManager<NullDriver> {
         }
     }
     
-    public InputStream getDataChunk(DataObjectURI uri, String hash) throws IOException, FileNotFoundException {
+    public InputStream getDataChunk(DataObjectURI uri, String hash) throws IOException, FileNotFoundException, DriverNotInitializedException {
         if(uri == null) {
             throw new IllegalArgumentException("uri is null or empty");
         }

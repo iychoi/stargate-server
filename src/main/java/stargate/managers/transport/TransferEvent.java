@@ -22,17 +22,14 @@ import org.codehaus.jackson.annotate.JsonProperty;
 import stargate.commons.dataobject.DataObjectURI;
 import stargate.commons.utils.JsonSerializer;
 
-
 /**
  *
  * @author iychoi
  */
 public class TransferEvent {
-
     private TransferEventType eventType;
     private DataObjectURI uri;
     private String hash;
-    private String localNodeName;
     
     public static TransferEvent createInstance(File file) throws IOException {
         if(file == null) {
@@ -53,7 +50,7 @@ public class TransferEvent {
     TransferEvent() {
     }
     
-    TransferEvent(TransferEventType eventType, DataObjectURI uri, String hash, String targetNodeName) {
+    public TransferEvent(TransferEventType eventType, DataObjectURI uri, String hash) {
         if(eventType == null) {
             throw new IllegalArgumentException("eventType is null");
         }
@@ -68,8 +65,7 @@ public class TransferEvent {
         
         this.eventType = eventType;
         this.uri = uri;
-        this.hash = hash.toLowerCase();
-        this.localNodeName = targetNodeName;
+        this.hash = hash;
     }
     
     @JsonProperty("event_type")
@@ -87,54 +83,31 @@ public class TransferEvent {
     }
     
     @JsonProperty("uri")
-    public DataObjectURI getDataObjectURI() {
-        return uri;
+    public DataObjectURI getURI() {
+        return this.uri;
     }
     
     @JsonProperty("uri")
-    public void setDataObjectURI(DataObjectURI uri) {
+    public void setURI(DataObjectURI uri) {
         if(uri == null) {
             throw new IllegalArgumentException("uri is null");
         }
         
         this.uri = uri;
     }
-
+    
     @JsonProperty("hash")
     public String getHash() {
-        if(this.hash == null) {
-            return null;
-        }
-        return this.hash.toLowerCase();
+        return this.hash;
     }
     
     @JsonProperty("hash")
     public void setHash(String hash) {
-        if(hash == null) {
-            this.hash = null;
-        } else {
-            this.hash = hash.toLowerCase();
-        }
-    }
-    
-    @JsonProperty("local_node_name")
-    public String getLocalNodeName() {
-        return this.localNodeName;
-    }
-    
-    @JsonProperty("local_node_name")
-    public void setLocalNodeName(String localNodeName) {
-        if(localNodeName == null || localNodeName.isEmpty()) {
-            throw new IllegalArgumentException("localNodeName is null or empty");
+        if(hash == null || hash.isEmpty()) {
+            throw new IllegalArgumentException("hash is null or empty");
         }
         
-        this.localNodeName = localNodeName;
-    }
-    
-    @Override
-    @JsonIgnore
-    public String toString() {
-        return "TransferEvent{" + "eventType=" + eventType + ", uri=" + uri + ", hash=" + hash + '}';
+        this.hash = hash;
     }
     
     @JsonIgnore

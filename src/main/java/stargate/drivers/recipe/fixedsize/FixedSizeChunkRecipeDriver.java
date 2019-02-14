@@ -20,9 +20,8 @@ import java.io.InputStream;
 import java.security.DigestInputStream;
 import java.security.MessageDigest;
 import java.security.NoSuchAlgorithmException;
-import org.apache.commons.logging.Log;
-import org.apache.commons.logging.LogFactory;
 import stargate.commons.driver.AbstractDriverConfig;
+import stargate.commons.driver.DriverNotInitializedException;
 import stargate.commons.recipe.AbstractRecipeDriver;
 import stargate.commons.recipe.AbstractRecipeDriverConfig;
 import stargate.commons.recipe.RecipeChunk;
@@ -33,8 +32,6 @@ import stargate.commons.recipe.RecipeChunk;
  */
 public class FixedSizeChunkRecipeDriver extends AbstractRecipeDriver {
 
-    private static final Log LOG = LogFactory.getLog(FixedSizeChunkRecipeDriver.class);
-    
     private FixedSizeChunkRecipeDriverConfig config;
     private int chunkSize;
     private String hashAlgorithm;
@@ -107,9 +104,13 @@ public class FixedSizeChunkRecipeDriver extends AbstractRecipeDriver {
     }
     
     @Override
-    public byte[] calculateHash(byte[] buf) throws IOException {
+    public byte[] calculateHash(byte[] buf) throws IOException, DriverNotInitializedException {
         if(buf == null) {
             throw new IllegalArgumentException("buf is null");
+        }
+        
+        if(!isStarted()) {
+            throw new DriverNotInitializedException("driver is not initialized");
         }
         
         try {    
@@ -124,13 +125,17 @@ public class FixedSizeChunkRecipeDriver extends AbstractRecipeDriver {
     }
     
     @Override
-    public RecipeChunk produceRecipeChunk(InputStream is, long offset) throws IOException {
+    public RecipeChunk produceRecipeChunk(InputStream is, long offset) throws IOException, DriverNotInitializedException {
         if(is == null) {
             throw new IllegalArgumentException("is is null");
         }
         
         if(offset < 0) {
             throw new IllegalArgumentException("offset is negative");
+        }
+        
+        if(!isStarted()) {
+            throw new DriverNotInitializedException("driver is not initialized");
         }
         
         try {
@@ -165,7 +170,7 @@ public class FixedSizeChunkRecipeDriver extends AbstractRecipeDriver {
     }
 
     @Override
-    public RecipeChunk produceRecipeChunk(byte[] buf, long offset, int len) throws IOException {
+    public RecipeChunk produceRecipeChunk(byte[] buf, long offset, int len) throws IOException, DriverNotInitializedException {
         if(buf == null) {
             throw new IllegalArgumentException("buf is null");
         }
@@ -176,6 +181,10 @@ public class FixedSizeChunkRecipeDriver extends AbstractRecipeDriver {
         
         if(len < 0) {
             throw new IllegalArgumentException("len is negative");
+        }
+        
+        if(!isStarted()) {
+            throw new DriverNotInitializedException("driver is not initialized");
         }
         
         try {
