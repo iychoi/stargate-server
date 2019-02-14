@@ -132,6 +132,7 @@ public class IgniteDriver {
             }
             
             igniteConfig.setMetricsLogFrequency(0);
+            igniteConfig.setCollisionSpi(null); // disable collisionSPI
             
             // discovery
             IgniteDiscoverySpi discoveryConfig = null;
@@ -153,7 +154,8 @@ public class IgniteDriver {
             igniteConfig.setCollisionSpi(colConfig);
             
             // enable events
-            igniteConfig.setIncludeEventTypes(EventType.EVTS_DISCOVERY);
+            // we don't use this yet
+            //igniteConfig.setIncludeEventTypes(EventType.EVTS_DISCOVERY);
             
             this.igniteInstance = Ignition.start(igniteConfig);
             

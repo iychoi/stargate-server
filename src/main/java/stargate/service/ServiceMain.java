@@ -35,6 +35,7 @@ public class ServiceMain {
     public static void main(String[] args) {
         try {
             setLogger();
+            disableIPv6();
             
             StargateServiceConfig serviceConfig = null;
             if(args.length != 0) {
@@ -88,5 +89,9 @@ public class ServiceMain {
         File log_property_file = new File(ResourceUtils.getStargateRoot(), LOG4J_PROPERTY_PATH);
         LogManager.resetConfiguration();
         DOMConfigurator.configure(log_property_file.getAbsolutePath());
+    }
+
+    private static void disableIPv6() {
+        System.setProperty("java.net.preferIPv4Stack", "true");
     }
 }
