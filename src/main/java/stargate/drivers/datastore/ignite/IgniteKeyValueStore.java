@@ -59,6 +59,7 @@ public class IgniteKeyValueStore extends AbstractKeyValueStore {
     private EnumDataStoreProperty property;
     private TimeUnit expiryTimeUnit;
     private long expiryTimeValue;
+    private boolean allowKeyLock;
     private List<AbstractDataStoreLayoutEventHandler> layoutEventHandlers = new ArrayList<AbstractDataStoreLayoutEventHandler>();
     private final Object layoutEventHandlersSyncObj = new Object();
     
@@ -93,6 +94,7 @@ public class IgniteKeyValueStore extends AbstractKeyValueStore {
         this.property = property;
         this.expiryTimeUnit = TimeUnit.SECONDS;
         this.expiryTimeValue = 0;
+        this.allowKeyLock = false;
         
         CacheConfiguration<String, byte[]> cc = new CacheConfiguration<String, byte[]>();
         if(EnumDataStoreProperty.isDistributed(property)) {
@@ -119,7 +121,7 @@ public class IgniteKeyValueStore extends AbstractKeyValueStore {
         this.affinity = this.ignite.affinity(name);
     }
     
-    public IgniteKeyValueStore(IgniteDataStoreDriver driver, Ignite ignite, String name, Class valueClass, EnumDataStoreProperty property, TimeUnit timeunit, long timeval) {
+    public IgniteKeyValueStore(IgniteDataStoreDriver driver, Ignite ignite, String name, Class valueClass, EnumDataStoreProperty property, TimeUnit timeunit, long timeval, boolean allowKeyLock) {
         if(driver == null) {
             throw new IllegalArgumentException("driver is null");
         }
@@ -155,6 +157,7 @@ public class IgniteKeyValueStore extends AbstractKeyValueStore {
         this.property = property;
         this.expiryTimeUnit = timeunit;
         this.expiryTimeValue = timeval;
+        this.allowKeyLock = allowKeyLock;
         
         CacheConfiguration<String, byte[]> cc = new CacheConfiguration<String, byte[]>();
         if(EnumDataStoreProperty.isDistributed(property)) {
@@ -170,7 +173,11 @@ public class IgniteKeyValueStore extends AbstractKeyValueStore {
         }
         
         cc.setWriteSynchronizationMode(CacheWriteSynchronizationMode.FULL_SYNC);
-        cc.setAtomicityMode(CacheAtomicityMode.ATOMIC);
+        if(allowKeyLock) {
+            cc.setAtomicityMode(CacheAtomicityMode.TRANSACTIONAL);
+        } else {
+            cc.setAtomicityMode(CacheAtomicityMode.ATOMIC);
+        }
         cc.setEvictionPolicy(null);
         cc.setCopyOnRead(false);
         cc.setOnheapCacheEnabled(true);
@@ -178,8 +185,14 @@ public class IgniteKeyValueStore extends AbstractKeyValueStore {
         cc.setName(name);
         
         Duration duration = new Duration(timeunit, timeval);
-        CreatedExpiryPolicy expiryPolicy = new CreatedExpiryPolicy(duration);
-        this.store = this.ignite.getOrCreateCache(cc).withExpiryPolicy(expiryPolicy);
+        
+        if(timeval > 0) {
+            CreatedExpiryPolicy expiryPolicy = new CreatedExpiryPolicy(duration);
+            this.store = this.ignite.getOrCreateCache(cc).withExpiryPolicy(expiryPolicy);
+        } else {
+            this.store = this.ignite.getOrCreateCache(cc);
+        }
+        
         this.affinity = this.ignite.affinity(name);
     }
     
@@ -199,6 +212,10 @@ public class IgniteKeyValueStore extends AbstractKeyValueStore {
     
     public long getExpiryTime() {
         return this.expiryTimeValue;
+    }
+    
+    public boolean getAllowKeyLock() {
+        return this.allowKeyLock;
     }
     
     @Override
@@ -268,11 +285,16 @@ public class IgniteKeyValueStore extends AbstractKeyValueStore {
             throw new IllegalArgumentException("value is null");
         }
         
-        if(!this.store.containsKey(key)) {
-            put(key, value);
-            return true;
+        byte[] valueBytes = ObjectSerializer.toByteArray(value);
+        boolean retval = this.store.putIfAbsent(key, valueBytes);
+        
+        // call event
+        if(retval) {
+            ClusterNode primaryNode = this.affinity.mapKeyToNode(key);
+            raiseEventForLayoutEventDataAdded(key, primaryNode.consistentId().toString());
         }
-        return false;
+        
+        return retval;
     }
     
     @Override
@@ -326,6 +348,10 @@ public class IgniteKeyValueStore extends AbstractKeyValueStore {
     
     @Override
     public Lock getKeyLock(String key) {
+        if(!this.allowKeyLock) {
+            throw new IllegalStateException("key lock is not supported");
+        }
+        
         if(key == null || key.isEmpty()) {
             throw new IllegalArgumentException("key is null or empty");
         }

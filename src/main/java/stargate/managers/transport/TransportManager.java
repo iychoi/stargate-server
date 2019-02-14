@@ -232,7 +232,7 @@ public class TransportManager extends AbstractManager<AbstractTransportDriver> {
                 try {
                     StargateService stargateService = getStargateService();
                     DataStoreManager keyValueStoreManager = stargateService.getDataStoreManager();
-                    this.remoteDirectoryCacheStore = keyValueStoreManager.getDriver().getKeyValueStore(REMOTE_DIRECTORY_CACHE_STORE, Directory.class, EnumDataStoreProperty.DATASTORE_PROP_VOLATILE_REPLICATED, TimeUnit.MINUTES, 5);
+                    this.remoteDirectoryCacheStore = keyValueStoreManager.getDriver().getKeyValueStore(REMOTE_DIRECTORY_CACHE_STORE, Directory.class, EnumDataStoreProperty.DATASTORE_PROP_VOLATILE_REPLICATED, TimeUnit.MINUTES, 5, false);
                 } catch (ManagerNotInstantiatedException ex) {
                     LOG.error(ex);
                     throw new IOException(ex);
@@ -250,7 +250,7 @@ public class TransportManager extends AbstractManager<AbstractTransportDriver> {
                 try {
                     StargateService stargateService = getStargateService();
                     DataStoreManager keyValueStoreManager = stargateService.getDataStoreManager();
-                    this.remoteRecipeCacheStore = keyValueStoreManager.getDriver().getKeyValueStore(REMOTE_RECIPE_CACHE_STORE, Recipe.class, EnumDataStoreProperty.DATASTORE_PROP_VOLATILE_REPLICATED, TimeUnit.DAYS, 1);
+                    this.remoteRecipeCacheStore = keyValueStoreManager.getDriver().getKeyValueStore(REMOTE_RECIPE_CACHE_STORE, Recipe.class, EnumDataStoreProperty.DATASTORE_PROP_VOLATILE_REPLICATED, TimeUnit.DAYS, 1, false);
                 } catch (ManagerNotInstantiatedException ex) {
                     LOG.error(ex);
                     throw new IOException(ex);
@@ -268,7 +268,7 @@ public class TransportManager extends AbstractManager<AbstractTransportDriver> {
                 try {
                     StargateService stargateService = getStargateService();
                     DataStoreManager keyValueStoreManager = stargateService.getDataStoreManager();
-                    this.dataChunkCacheStore = keyValueStoreManager.getDriver().getKeyValueStore(DATA_CHUNK_CACHE_STORE, byte[].class, EnumDataStoreProperty.DATASTORE_PROP_PERSISTENT_DISTRIBUTED);
+                    this.dataChunkCacheStore = keyValueStoreManager.getDriver().getKeyValueStore(DATA_CHUNK_CACHE_STORE, byte[].class, EnumDataStoreProperty.DATASTORE_PROP_PERSISTENT_DISTRIBUTED, TimeUnit.DAYS, 0, true);
                 } catch (ManagerNotInstantiatedException ex) {
                     LOG.error(ex);
                     throw new IOException(ex);
@@ -485,9 +485,9 @@ public class TransportManager extends AbstractManager<AbstractTransportDriver> {
             Lock lock = this.dataChunkCacheStore.getKeyLock(hash);
             lock.lock();
             try {
-                if(!this.dataChunkCacheStore.containsKey(hash)) {
-                    DataChunkCache dataChunkCache = new DataChunkCache(DataChunkCacheType.DATA_CHUNK_CACHE_PLACEHOLDER, hash, 1, null, null);
-                    this.dataChunkCacheStore.put(hash, dataChunkCache.toBytes());
+                DataChunkCache dataChunkCache = new DataChunkCache(DataChunkCacheType.DATA_CHUNK_CACHE_PLACEHOLDER, hash, 1, null, null);
+                boolean retval = this.dataChunkCacheStore.putIfAbsent(hash, dataChunkCache.toBytes());
+                if(retval) {
                     this.lastUpdateTime = DateTimeUtils.getTimestamp();
                 }
             } finally {
@@ -515,9 +515,13 @@ public class TransportManager extends AbstractManager<AbstractTransportDriver> {
             Lock lock = this.dataChunkCacheStore.getKeyLock(hash);
             lock.lock();
             try {
-                if(this.dataChunkCacheStore.containsKey(hash)) {
+                DataChunkCache dataChunkCache = new DataChunkCache(DataChunkCacheType.DATA_CHUNK_CACHE_PENDING, hash, 1, nodeName, nodeName, null);
+                boolean retval = this.dataChunkCacheStore.putIfAbsent(hash, dataChunkCache.toBytes());
+                if(retval) {
+                    this.lastUpdateTime = DateTimeUtils.getTimestamp();
+                } else {
                     // there already is
-                    DataChunkCache dataChunkCache = (DataChunkCache) this.dataChunkCacheStore.get(hash);
+                    dataChunkCache = (DataChunkCache) this.dataChunkCacheStore.get(hash);
                     if(dataChunkCache.getType() == DataChunkCacheType.DATA_CHUNK_CACHE_PLACEHOLDER) {
                         // escalate
                         dataChunkCache.setType(DataChunkCacheType.DATA_CHUNK_CACHE_PENDING);
@@ -535,12 +539,6 @@ public class TransportManager extends AbstractManager<AbstractTransportDriver> {
                         
                         this.lastUpdateTime = DateTimeUtils.getTimestamp();
                     }
-                } else {
-                    // if there's no existing cache
-                    DataChunkCache dataChunkCache = new DataChunkCache(DataChunkCacheType.DATA_CHUNK_CACHE_PENDING, hash, 1, nodeName, nodeName, null);
-                    this.dataChunkCacheStore.put(hash, dataChunkCache.toBytes());
-                    
-                    this.lastUpdateTime = DateTimeUtils.getTimestamp();
                 }
             } finally {
                 lock.unlock();
@@ -567,8 +565,12 @@ public class TransportManager extends AbstractManager<AbstractTransportDriver> {
             Lock lock = this.dataChunkCacheStore.getKeyLock(hash);
             lock.lock();
             try {
-                if(this.dataChunkCacheStore.containsKey(hash)) {
-                    DataChunkCache dataChunkCache = (DataChunkCache) this.dataChunkCacheStore.get(hash);
+                DataChunkCache dataChunkCache = new DataChunkCache(DataChunkCacheType.DATA_CHUNK_CACHE_PRESENT, hash, 1, data);
+                boolean retval = this.dataChunkCacheStore.putIfAbsent(hash, dataChunkCache.toBytes());
+                if(retval) {
+                    this.lastUpdateTime = DateTimeUtils.getTimestamp();
+                } else {
+                    dataChunkCache = (DataChunkCache) this.dataChunkCacheStore.get(hash);
                     if(dataChunkCache.getType() == DataChunkCacheType.DATA_CHUNK_CACHE_PLACEHOLDER) {
                         // escalate
                         dataChunkCache.setType(DataChunkCacheType.DATA_CHUNK_CACHE_PRESENT);
@@ -590,11 +592,6 @@ public class TransportManager extends AbstractManager<AbstractTransportDriver> {
                         
                         this.lastUpdateTime = DateTimeUtils.getTimestamp();
                     }
-                } else {
-                    DataChunkCache dataChunkCache = new DataChunkCache(DataChunkCacheType.DATA_CHUNK_CACHE_PRESENT, hash, 1, data);
-                    this.dataChunkCacheStore.put(hash, dataChunkCache.toBytes());
-                    
-                    this.lastUpdateTime = DateTimeUtils.getTimestamp();
                 }
             } finally {
                 lock.unlock();

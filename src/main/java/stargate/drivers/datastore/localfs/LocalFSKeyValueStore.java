@@ -45,6 +45,7 @@ public class LocalFSKeyValueStore extends AbstractKeyValueStore {
     private EnumDataStoreProperty property;
     private TimeUnit expiryTimeUnit;
     private long expiryTimeVal;
+    private boolean allowKeyLock;
     private List<AbstractDataStoreLayoutEventHandler> layoutEventHandlers = new ArrayList<AbstractDataStoreLayoutEventHandler>();
     private final Object layoutEventHandlersSyncObj = new Object();
     
@@ -71,9 +72,10 @@ public class LocalFSKeyValueStore extends AbstractKeyValueStore {
         this.property = property;
         this.expiryTimeUnit = TimeUnit.SECONDS;
         this.expiryTimeVal = 0;
+        this.allowKeyLock = false;
     }
 
-    public LocalFSKeyValueStore(LocalFSDataStoreDriver driver, String name, Class valueClass, EnumDataStoreProperty property, TimeUnit timeunit, long timeval) {
+    public LocalFSKeyValueStore(LocalFSDataStoreDriver driver, String name, Class valueClass, EnumDataStoreProperty property, TimeUnit timeunit, long timeval, boolean allowKeyLock) {
         if(driver == null) {
             throw new IllegalArgumentException("driver is null");
         }
@@ -96,6 +98,7 @@ public class LocalFSKeyValueStore extends AbstractKeyValueStore {
         this.property = property;
         this.expiryTimeUnit = timeunit;
         this.expiryTimeVal = timeval;
+        this.allowKeyLock = allowKeyLock;
     }
     
     @Override
