@@ -218,14 +218,8 @@ public class TransportManager extends AbstractManager<AbstractTransportDriver> {
             }
         };
         
-        try {
-            StargateService stargateService = getStargateService();
-            EventManager eventManager = stargateService.getEventManager();
-            eventManager.addEventHandler(hander);
-        } catch (ManagerNotInstantiatedException ex) {
-            LOG.error(ex);
-            throw new IOException(ex);
-        }
+        StargateService stargateService = getStargateService();
+        stargateService.addEventHandler(hander);
     }
     
     public TransportServiceInfo getServiceInfo() throws IOException, DriverNotInitializedException {

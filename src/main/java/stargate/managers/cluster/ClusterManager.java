@@ -175,14 +175,8 @@ public class ClusterManager extends AbstractManager<AbstractClusterDriver> {
             }
         };
         
-        try {
-            StargateService stargateService = getStargateService();
-            EventManager eventManager = stargateService.getEventManager();
-            eventManager.addEventHandler(hander);
-        } catch (ManagerNotInstantiatedException ex) {
-            LOG.error(ex);
-            throw new IOException(ex);
-        }
+        StargateService stargateService = getStargateService();
+        stargateService.addEventHandler(hander);
     }
     
     private void safeInitLocalCluster() throws IOException {

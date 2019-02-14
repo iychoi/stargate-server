@@ -77,5 +77,13 @@
         "@class" : "stargate.drivers.schedule.ignite.IgniteScheduleDriverConfig"
       }
     } ]
+  },
+  "event" : {
+    "driver_setting" : [ {
+      "driver_class" : "stargate.drivers.event.ignite.IgniteEventDriver",
+      "driver_config" : {
+        "@class" : "stargate.drivers.event.ignite.IgniteEventDriverConfig"
+      }
+    } ]
   }
 }

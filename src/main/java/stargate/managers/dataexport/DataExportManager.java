@@ -123,14 +123,8 @@ public class DataExportManager extends AbstractManager<NullDriver> {
             }
         };
         
-        try {
-            StargateService stargateService = getStargateService();
-            EventManager eventManager = stargateService.getEventManager();
-            eventManager.addEventHandler(hander);
-        } catch (ManagerNotInstantiatedException ex) {
-            LOG.error(ex);
-            throw new IOException(ex);
-        }
+        StargateService stargateService = getStargateService();
+        stargateService.addEventHandler(hander);
     }
     
     private synchronized void safeInitDataExportEntryStore() throws IOException {

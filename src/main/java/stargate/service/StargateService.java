@@ -16,10 +16,13 @@
 package stargate.service;
 
 import java.io.IOException;
+import java.util.ArrayList;
+import java.util.List;
 import java.util.concurrent.TimeUnit;
 import org.apache.commons.logging.Log;
 import org.apache.commons.logging.LogFactory;
 import stargate.commons.driver.DriverNotInitializedException;
+import stargate.commons.event.AbstractEventHandler;
 import stargate.commons.manager.ManagerNotInstantiatedException;
 import stargate.commons.service.AbstractService;
 import stargate.commons.service.ServiceNotStartedException;
@@ -65,6 +68,8 @@ public class StargateService extends AbstractService {
     private VolumeManager volumeManager;
     
     private DataExportUpdateEventHandler dataExportUpdateEventHandler;
+    
+    private List<AbstractEventHandler> eventHandlers = new ArrayList<AbstractEventHandler>();
     
     public static StargateService getInstance(StargateServiceConfig config) throws ServiceNotStartedException {
         synchronized (DataStoreManager.class) {
@@ -138,6 +143,8 @@ public class StargateService extends AbstractService {
         LOG.info("Managers are started");
         
         LOG.debug("Registering event handlers");
+        setEventHandlers();
+        
         this.dataExportUpdateEventHandler = new DataExportUpdateEventHandler(this.clusterManager, this.recipeManager, this.volumeManager);
         this.dataExportManager.addDataExportEventHandler(this.dataExportUpdateEventHandler);
         LOG.debug("Event handlers are registered");
@@ -293,5 +300,15 @@ public class StargateService extends AbstractService {
         }
         
         return this.volumeManager;
+    }
+    
+    public void addEventHandler(AbstractEventHandler handler) {
+        this.eventHandlers.add(handler);
+    }
+    
+    private void setEventHandlers() {
+        for(AbstractEventHandler handler : this.eventHandlers) {
+            this.eventManager.addEventHandler(handler);
+        }
     }
 }
