@@ -175,8 +175,6 @@ public class TransportManager extends AbstractManager<AbstractTransportDriver> {
             }
         }
         
-        this.contactNodeDeterminationAlgorithm = new RoundRobinContactNodeDeterminationAlgorithm(this.service, this);
-        
         setEventHandler();
     }
     
@@ -282,12 +280,17 @@ public class TransportManager extends AbstractManager<AbstractTransportDriver> {
         }
     }
     
-    private void safeInitTransferLayoutAlgorithm() throws IOException {
+    private void safeInitLayoutAlgorithm() throws IOException {
         // init algorithms
         safeInitDataChunkCacheStore(); //  chunk cache store must be called before next line is executed
         if(this.transferLayoutAlgorithm == null) {
             StargateService stargateService = getStargateService();
             this.transferLayoutAlgorithm = new StaticTransferLayoutAlgorithm(stargateService, this, this.dataChunkCacheStore);
+        }
+        
+        if(this.contactNodeDeterminationAlgorithm == null) {
+            StargateService stargateService = getStargateService();
+            this.contactNodeDeterminationAlgorithm = new RoundRobinContactNodeDeterminationAlgorithm(stargateService, this);
         }
     }
     
@@ -608,6 +611,8 @@ public class TransportManager extends AbstractManager<AbstractTransportDriver> {
             throw new IllegalStateException("Manager is not started");
         }
         
+        safeInitLayoutAlgorithm();
+        
         try {
             StargateService stargateService = getStargateService();
             ClusterManager clusterManager = stargateService.getClusterManager();
@@ -651,7 +656,7 @@ public class TransportManager extends AbstractManager<AbstractTransportDriver> {
             throw new IllegalStateException("Manager is not started");
         }
         
-        safeInitTransferLayoutAlgorithm();
+        safeInitLayoutAlgorithm();
         
         try {
             StargateService stargateService = getStargateService();
@@ -728,7 +733,7 @@ public class TransportManager extends AbstractManager<AbstractTransportDriver> {
             throw new IllegalStateException("Manager is not started");
         }
         
-        safeInitTransferLayoutAlgorithm();
+        safeInitLayoutAlgorithm();
         
         try {
             StargateService stargateService = getStargateService();
@@ -768,7 +773,7 @@ public class TransportManager extends AbstractManager<AbstractTransportDriver> {
             throw new IllegalStateException("Manager is not started");
         }
         
-        safeInitTransferLayoutAlgorithm();
+        safeInitLayoutAlgorithm();
         
         // step 1. check cache
         if(hasDataChunkCache(hash)) {
@@ -1000,7 +1005,7 @@ public class TransportManager extends AbstractManager<AbstractTransportDriver> {
         }
         
         safeInitDataChunkCacheStore();
-        safeInitTransferLayoutAlgorithm();
+        safeInitLayoutAlgorithm();
         
         DataObjectMetadata metadata = recipe.getMetadata();
         RecipeChunk chunk = recipe.getChunk(hash);
@@ -1082,6 +1087,8 @@ public class TransportManager extends AbstractManager<AbstractTransportDriver> {
             throw new IllegalStateException("Manager is not started");
         }
         
+        safeInitLayoutAlgorithm();
+        
         try {
             String clusterName = uri.getClusterName();
             
@@ -1144,6 +1151,8 @@ public class TransportManager extends AbstractManager<AbstractTransportDriver> {
             throw new IllegalStateException("Manager is not started");
         }
         
+        safeInitLayoutAlgorithm();
+        
         String clusterName = uri.getClusterName();
         
         try {
@@ -1192,6 +1201,8 @@ public class TransportManager extends AbstractManager<AbstractTransportDriver> {
         if(!this.started) {
             throw new IllegalStateException("Manager is not started");
         }
+        
+        safeInitLayoutAlgorithm();
         
         try {
             String clusterName = uri.getClusterName();
