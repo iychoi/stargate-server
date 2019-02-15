@@ -20,8 +20,6 @@ import java.io.IOException;
 import java.io.InputStream;
 import java.io.OutputStream;
 import java.util.Collection;
-import java.util.logging.Level;
-import java.util.logging.Logger;
 import javax.ws.rs.DefaultValue;
 import javax.ws.rs.GET;
 import javax.ws.rs.Path;
@@ -151,6 +149,8 @@ public class HTTPTransportServlet extends AbstractTransportServer {
     
     @Override
     public FSServiceInfo getFSServiceInfo() throws IOException {
+        LOG.info("getFSServiceInfo");
+        
         try {
             StargateService stargateService = getStargateService();
             RecipeManager recipeManager = stargateService.getRecipeManager();
@@ -182,6 +182,8 @@ public class HTTPTransportServlet extends AbstractTransportServer {
     
     @Override
     public Cluster getLocalCluster() throws IOException {
+        LOG.info("getLocalCluster");
+        
         try {
             StargateService service = getStargateService();
             ClusterManager clusterManager = service.getClusterManager();
@@ -225,6 +227,8 @@ public class HTTPTransportServlet extends AbstractTransportServer {
             throw new IllegalArgumentException("uri is null");
         }
         
+        LOG.info(String.format("getDataObjectMetadata - %s", uri.toUri().toASCIIString()));
+        
         try {
             StargateService service = getStargateService();
             VolumeManager volumeManager = service.getVolumeManager();
@@ -264,6 +268,8 @@ public class HTTPTransportServlet extends AbstractTransportServer {
         if(uri == null) {
             throw new IllegalArgumentException("uri is null");
         }
+        
+        LOG.info(String.format("listDataObjectMetadata - %s", uri.toUri().toASCIIString()));
         
         try {
             StargateService service = getStargateService();
@@ -306,6 +312,8 @@ public class HTTPTransportServlet extends AbstractTransportServer {
             throw new IllegalArgumentException("uri is null");
         }
         
+        LOG.info(String.format("getRecipe - %s", uri.toUri().toASCIIString()));
+        
         try {
             StargateService service = getStargateService();
             VolumeManager volumeManager = service.getVolumeManager();
@@ -345,6 +353,8 @@ public class HTTPTransportServlet extends AbstractTransportServer {
         if(uri == null) {
             throw new IllegalArgumentException("uri is null");
         }
+        
+        LOG.info(String.format("getDirectory - %s", uri.toUri().toASCIIString()));
         
         try {
             StargateService service = getStargateService();
@@ -386,6 +396,8 @@ public class HTTPTransportServlet extends AbstractTransportServer {
         if(hash == null || hash.isEmpty()) {
             throw new IllegalArgumentException("hash is null or empty");
         }
+        
+        LOG.info(String.format("getDataChunk - %s", hash));
         
         try {
             StargateService service = getStargateService();

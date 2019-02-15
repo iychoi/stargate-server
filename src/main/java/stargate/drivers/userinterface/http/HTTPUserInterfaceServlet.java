@@ -170,6 +170,8 @@ public class HTTPUserInterfaceServlet extends AbstractUserInterfaceServer {
     
     @Override
     public String getServiceConfig() throws IOException {
+        LOG.info("getServiceConfig");
+        
         StargateService stargateService = getStargateService();
         StargateServiceConfig config = stargateService.getConfig();
         return config.toJson();
@@ -191,6 +193,8 @@ public class HTTPUserInterfaceServlet extends AbstractUserInterfaceServer {
     
     @Override
     public FSServiceInfo getFSServiceInfo() throws IOException {
+        LOG.info("getFSServiceInfo");
+        
         try {
             StargateService stargateService = getStargateService();
             RecipeManager recipeManager = stargateService.getRecipeManager();
@@ -231,6 +235,8 @@ public class HTTPUserInterfaceServlet extends AbstractUserInterfaceServer {
             throw new IllegalArgumentException("name is null or empty");
         }
         
+        LOG.info(String.format("getCluster - %s", name));
+        
         try {
             StargateService service = getStargateService();
             ClusterManager clusterManager = service.getClusterManager();
@@ -265,6 +271,8 @@ public class HTTPUserInterfaceServlet extends AbstractUserInterfaceServer {
     
     @Override
     public Cluster getLocalCluster() throws IOException {
+        LOG.info("getLocalCluster");
+        
         try {
             StargateService service = getStargateService();
             ClusterManager clusterManager = service.getClusterManager();
@@ -295,6 +303,8 @@ public class HTTPUserInterfaceServlet extends AbstractUserInterfaceServer {
     
     @Override
     public void activateCluster() throws IOException {
+        LOG.info("activateCluster");
+        
         try {
             StargateService service = getStargateService();
             ClusterManager clusterManager = service.getClusterManager();
@@ -325,6 +335,8 @@ public class HTTPUserInterfaceServlet extends AbstractUserInterfaceServer {
     
     @Override
     public boolean isClusterActive() throws IOException {
+        LOG.info("isClusterActive");
+        
         try {
             StargateService service = getStargateService();
             ClusterManager clusterManager = service.getClusterManager();
@@ -355,6 +367,8 @@ public class HTTPUserInterfaceServlet extends AbstractUserInterfaceServer {
     
     @Override
     public Node getLocalNode() throws IOException {
+        LOG.info("getLocalNode");
+        
         try {
             StargateService service = getStargateService();
             ClusterManager clusterManager = service.getClusterManager();
@@ -393,6 +407,8 @@ public class HTTPUserInterfaceServlet extends AbstractUserInterfaceServer {
             throw new IllegalArgumentException("name is null or empty");
         }
         
+        LOG.info(String.format("getRemoteCluster - %s", name));
+        
         try {
             StargateService service = getStargateService();
             ClusterManager clusterManager = service.getClusterManager();
@@ -422,6 +438,8 @@ public class HTTPUserInterfaceServlet extends AbstractUserInterfaceServer {
     
     @Override
     public Collection<String> listRemoteClusters() throws IOException {
+        LOG.info("listRemoteClusters");
+        
         try {
             StargateService service = getStargateService();
             ClusterManager clusterManager = service.getClusterManager();
@@ -451,6 +469,8 @@ public class HTTPUserInterfaceServlet extends AbstractUserInterfaceServer {
 
     @Override
     public Collection<Cluster> getRemoteClusters() throws IOException {
+        LOG.info("getRemoteClusters");
+        
         try {
             StargateService service = getStargateService();
             ClusterManager clusterManager = service.getClusterManager();
@@ -482,6 +502,8 @@ public class HTTPUserInterfaceServlet extends AbstractUserInterfaceServer {
     
     @Override
     public void addRemoteCluster(Cluster cluster) throws IOException {
+        LOG.info(String.format("getRemoteClusters - %s", cluster.getName()));
+        
         try {
             StargateService service = getStargateService();
             ClusterManager clusterManager = service.getClusterManager();
@@ -519,6 +541,8 @@ public class HTTPUserInterfaceServlet extends AbstractUserInterfaceServer {
     
     @Override
     public void removeRemoteCluster(String name) throws IOException {
+        LOG.info(String.format("removeRemoteCluster - %s", name));
+        
         try {
             StargateService service = getStargateService();
             ClusterManager clusterManager = service.getClusterManager();
@@ -561,6 +585,8 @@ public class HTTPUserInterfaceServlet extends AbstractUserInterfaceServer {
             throw new IllegalArgumentException("uri is null");
         }
         
+        LOG.info(String.format("getDataObjectMetadata - %s", uri.toUri().toASCIIString()));
+        
         try {
             StargateService service = getStargateService();
             VolumeManager volumeManager = service.getVolumeManager();
@@ -599,6 +625,8 @@ public class HTTPUserInterfaceServlet extends AbstractUserInterfaceServer {
         if(uri == null) {
             throw new IllegalArgumentException("uri is null");
         }
+        
+        LOG.info(String.format("listDataObjectMetadata - %s", uri.toUri().toASCIIString()));
         
         try {
             StargateService service = getStargateService();
@@ -640,6 +668,8 @@ public class HTTPUserInterfaceServlet extends AbstractUserInterfaceServer {
             throw new IllegalArgumentException("uri is null");
         }
         
+        LOG.info(String.format("getRecipe - %s", uri.toUri().toASCIIString()));
+        
         try {
             StargateService service = getStargateService();
             VolumeManager volumeManager = service.getVolumeManager();
@@ -669,6 +699,8 @@ public class HTTPUserInterfaceServlet extends AbstractUserInterfaceServer {
     
     @Override
     public Collection<String> listRecipes() throws IOException {
+        LOG.info("listRecipes");
+        
         try {
             StargateService service = getStargateService();
             RecipeManager recipeManager = service.getRecipeManager();
@@ -702,6 +734,8 @@ public class HTTPUserInterfaceServlet extends AbstractUserInterfaceServer {
     
     @Override
     public void removeRecipe(DataObjectURI uri) throws IOException {
+        LOG.info(String.format("removeRecipe - %s", uri.toUri().toASCIIString()));
+        
         try {
             StargateService service = getStargateService();
             RecipeManager recipeManager = service.getRecipeManager();
@@ -728,6 +762,8 @@ public class HTTPUserInterfaceServlet extends AbstractUserInterfaceServer {
     
     @Override
     public void syncRecipes() throws IOException {
+        LOG.info("syncRecipes");
+        
         try {
             StargateService service = getStargateService();
             RecipeManager recipeManager = service.getRecipeManager();
@@ -782,6 +818,8 @@ public class HTTPUserInterfaceServlet extends AbstractUserInterfaceServer {
             throw new IllegalArgumentException("hash is null or empty");
         }
         
+        LOG.info(String.format("getDataChunk - %s, %s", uri.toUri().toASCIIString(), hash));
+        
         try {
             StargateService service = getStargateService();
             VolumeManager volumeManager = service.getVolumeManager();
@@ -830,6 +868,8 @@ public class HTTPUserInterfaceServlet extends AbstractUserInterfaceServer {
             throw new IllegalArgumentException("hash is null or empty");
         }
         
+        LOG.info(String.format("schedulePrefetch - %s, %s", uri.toUri().toASCIIString(), hash));
+        
         try {
             StargateService service = getStargateService();
             TransportManager transportManager = service.getTransportManager();
@@ -869,6 +909,8 @@ public class HTTPUserInterfaceServlet extends AbstractUserInterfaceServer {
         if(uri == null) {
             throw new IllegalArgumentException("uri is null");
         }
+        
+        LOG.info(String.format("getRemoteRecipeWithTransferSchedule - %s", uri.toUri().toASCIIString()));
         
         try {
             StargateService service = getStargateService();
@@ -910,6 +952,8 @@ public class HTTPUserInterfaceServlet extends AbstractUserInterfaceServer {
             throw new IllegalArgumentException("uri is null");
         }
         
+        LOG.info(String.format("getDataExportEntry - %s", uri.toUri().toASCIIString()));
+        
         try {
             StargateService service = getStargateService();
             DataExportManager dataExportManager = service.getDataExportManager();
@@ -936,6 +980,8 @@ public class HTTPUserInterfaceServlet extends AbstractUserInterfaceServer {
     
     @Override
     public Collection<String> listDataExportEntries() throws IOException {
+        LOG.info("listDataExportEntries");
+        
         try {
             StargateService service = getStargateService();
             DataExportManager dataExportManager = service.getDataExportManager();
@@ -970,6 +1016,8 @@ public class HTTPUserInterfaceServlet extends AbstractUserInterfaceServer {
 
     @Override
     public Collection<DataExportEntry> getDataExportEntries() throws IOException {
+        LOG.info("getDataExportEntries");
+        
         try {
             StargateService service = getStargateService();
             DataExportManager dataExportManager = service.getDataExportManager();
@@ -998,6 +1046,8 @@ public class HTTPUserInterfaceServlet extends AbstractUserInterfaceServer {
     
     @Override
     public void addDataExportEntry(DataExportEntry entry) throws IOException {
+        LOG.info(String.format("addDataExportEntry - %s", entry.getStargatePath()));
+        
         try {
             StargateService service = getStargateService();
             DataSourceManager dataSourceManager = service.getDataSourceManager();
@@ -1029,6 +1079,8 @@ public class HTTPUserInterfaceServlet extends AbstractUserInterfaceServer {
     }
     
     private void addDataExportEntryRecursively(DataExportManager dataExportManager, String stargatePath, AbstractDataSourceDriver dataSourceDriver, SourceFileMetadata sourceDirectoryMetadata) throws IOException, FileNotFoundException, DataExportManagerException, DriverNotInitializedException {
+        LOG.info(String.format("addDataExportEntryRecursively - %s", stargatePath));
+        
         Collection<SourceFileMetadata> listDirectoryWithMetadata = dataSourceDriver.listDirectoryWithMetadata(sourceDirectoryMetadata.getURI());
         for(SourceFileMetadata fileMetadata : listDirectoryWithMetadata) {
             String stargateFileName = PathUtils.getFileName(fileMetadata.getURI());
@@ -1068,6 +1120,8 @@ public class HTTPUserInterfaceServlet extends AbstractUserInterfaceServer {
 
     @Override
     public void removeDataExportEntry(DataObjectURI uri) throws IOException {
+        LOG.info(String.format("removeDataExportEntry - %s", uri.toUri().toASCIIString()));
+        
         try {
             StargateService service = getStargateService();
             DataExportManager dataExportManager = service.getDataExportManager();
@@ -1097,6 +1151,8 @@ public class HTTPUserInterfaceServlet extends AbstractUserInterfaceServer {
     
     @Override
     public Collection<String> listDataSources() throws IOException {
+        LOG.info("listDataSources");
+        
         try {
             StargateService service = getStargateService();
             DataSourceManager dataSourceManager = service.getDataSourceManager();
