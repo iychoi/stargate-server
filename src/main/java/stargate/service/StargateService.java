@@ -164,7 +164,7 @@ public class StargateService extends AbstractService {
         
         LOG.info("Scheduling background tasks");
         RemoteClusterSyncTask remoteClusterSyncTask = new RemoteClusterSyncTask(this.clusterManager, this.transportManager);
-        long tenMin = DateTimeUtils.getMilliseconds(TimeUnit.MINUTES, 10);
+        long tenMin = DateTimeUtils.getMilliseconds(TimeUnit.HOURS, 1);
         this.scheduleManager.scheduleTask(remoteClusterSyncTask, tenMin, tenMin);
         LOG.info("Background tasks are scheduled");
         
