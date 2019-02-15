@@ -312,34 +312,9 @@ public class FileSystem {
                         String clusterName = uri.getClusterName();
                         LOG.debug(String.format("Downloading a cluster information for %s", clusterName));
    
-                        Cluster cluster = client.getCluster(clusterName);
-                        if(cluster == null) {
-                            throw new IOException(String.format("Cannot retrieve cluster information for %s", clusterName));
-                        }
-                        
                         Map<String, HTTPUserInterfaceClient> clients = new HashMap<String, HTTPUserInterfaceClient>();
-                        Collection<String> nodeNames = recipe.getNodeNames();
-                        for(String nodeName : nodeNames) {
-                            // find from cluster
-                            Node node = cluster.getNode(nodeName);
-                            UserInterfaceServiceInfo userInterfaceServiceInfo = node.getUserInterfaceServiceInfo();
-                            URI svcURI = userInterfaceServiceInfo.getServiceURI();
-                            
-                            HTTPUserInterfaceClient c = HTTPUIClient.getClient(svcURI);
-                            clients.put(nodeName, c);
-                            break;
-                        }
                         
-                        // add local node
-                        Node local_node = get_local_node(cluster);
-                        if(local_node != null) {
-                            UserInterfaceServiceInfo userInterfaceServiceInfo = local_node.getUserInterfaceServiceInfo();
-                            URI svcURI = userInterfaceServiceInfo.getServiceURI();
-                            
-                            HTTPUserInterfaceClient c = HTTPUIClient.getClient(svcURI);
-                            clients.put(HTTPChunkInputStream.LOCAL_NODE_NAME, c);
-                        }
-                        
+                        // need to contact local cluster to download the file
                         // add default
                         clients.put(HTTPChunkInputStream.DEFAULT_NODE_NAME, client);
                         
