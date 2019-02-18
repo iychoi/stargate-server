@@ -81,39 +81,6 @@ public class HTTPUserInterfaceServlet extends AbstractUserInterfaceServer {
 
     private static HTTPUserInterfaceDriver driver = null;
 
-    public class StreamingOutputData implements StreamingOutput {
-
-        private static final int BUFFER_SIZE = 64*1024; // 64k
-        private InputStream is;
-        private byte[] buffer;
-        
-        StreamingOutputData(InputStream is) {
-            if(is == null) {
-                throw new IllegalArgumentException("is is null");
-            }
-            
-            this.is = is;
-            this.buffer = new byte[BUFFER_SIZE];
-        }
-        
-        @Override
-        public void write(OutputStream out) throws IOException, WebApplicationException {
-            if(out == null) {
-                throw new IllegalArgumentException("out is null");
-            }
-            
-            try {
-                int read = 0;
-                while ((read = this.is.read(this.buffer)) > 0) {
-                    out.write(this.buffer, 0, read);
-                }
-                this.is.close();
-            } catch (Exception ex) {
-                throw new WebApplicationException(ex);
-            }
-        }
-    }
-    
     static void setDriver(HTTPUserInterfaceDriver driver) {
         if(driver == null) {
             throw new IllegalArgumentException("driver is null");

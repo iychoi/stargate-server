@@ -634,7 +634,7 @@ public class TransportManager extends AbstractManager<AbstractTransportDriver> {
                             newDataChunkCache.addWaitingNodes(dataChunkCache.getWaitingNodes());
                             newDataChunkCache.addWaitingNode(localNode.getName());
                             
-                            boolean replaced = this.dataChunkCacheStore.replace(hash, dataChunkCache.toBytes(), newDataChunkCache.toBytes());
+                            boolean replaced = this.dataChunkCacheStore.replace(hash, bytes, newDataChunkCache.toBytes());
                             if(replaced) {
                                 this.lastUpdateTime = DateTimeUtils.getTimestamp();
                                 break;
@@ -906,7 +906,7 @@ public class TransportManager extends AbstractManager<AbstractTransportDriver> {
                 newDataChunkCache.addWaitingNode(determinedLocalNode.getName());
                 newDataChunkCache.addWaitingNodes(dataChunkCache.getWaitingNodes());
 
-                boolean replaced = this.dataChunkCacheStore.replace(hash, dataChunkCache.toBytes(), newDataChunkCache.toBytes());
+                boolean replaced = this.dataChunkCacheStore.replace(hash, bytes, newDataChunkCache.toBytes());
                 if(replaced) {
                     this.lastUpdateTime = DateTimeUtils.getTimestamp();
                     break;

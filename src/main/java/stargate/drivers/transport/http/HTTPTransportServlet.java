@@ -18,17 +18,14 @@ package stargate.drivers.transport.http;
 import java.io.FileNotFoundException;
 import java.io.IOException;
 import java.io.InputStream;
-import java.io.OutputStream;
 import java.util.Collection;
 import javax.ws.rs.DefaultValue;
 import javax.ws.rs.GET;
 import javax.ws.rs.Path;
 import javax.ws.rs.PathParam;
 import javax.ws.rs.Produces;
-import javax.ws.rs.WebApplicationException;
 import javax.ws.rs.core.MediaType;
 import javax.ws.rs.core.Response;
-import javax.ws.rs.core.StreamingOutput;
 import org.apache.commons.logging.Log;
 import org.apache.commons.logging.LogFactory;
 import stargate.commons.cluster.Cluster;
@@ -59,39 +56,6 @@ public class HTTPTransportServlet extends AbstractTransportServer {
     private static final Log LOG = LogFactory.getLog(HTTPTransportServlet.class);
 
     private static HTTPTransportDriver driver = null;
-    
-    public class StreamingOutputData implements StreamingOutput {
-
-        private static final int BUFFER_SIZE = 64*1024; // 64k
-        private InputStream is;
-        private byte[] buffer;
-        
-        StreamingOutputData(InputStream is) {
-            if(is == null) {
-                throw new IllegalArgumentException("is is null");
-            }
-            
-            this.is = is;
-            this.buffer = new byte[BUFFER_SIZE];
-        }
-        
-        @Override
-        public void write(OutputStream out) throws IOException, WebApplicationException {
-            if(out == null) {
-                throw new IllegalArgumentException("out is null");
-            }
-            
-            try {
-                int read = 0;
-                while ((read = this.is.read(this.buffer)) > 0) {
-                    out.write(this.buffer, 0, read);
-                }
-                this.is.close();
-            } catch (Exception ex) {
-                throw new WebApplicationException(ex);
-            }
-        }
-    }
     
     static void setDriver(HTTPTransportDriver driver) {
         if(driver == null) {
