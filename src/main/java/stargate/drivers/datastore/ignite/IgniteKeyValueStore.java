@@ -298,6 +298,34 @@ public class IgniteKeyValueStore extends AbstractKeyValueStore {
     }
     
     @Override
+    public synchronized boolean replace(String key, Object oldValue, Object newValue) throws IOException {
+        if(key == null || key.isEmpty()) {
+            throw new IllegalArgumentException("key is null or empty");
+        }
+        
+        if(oldValue == null) {
+            throw new IllegalArgumentException("oldValue is null");
+        }
+        
+        if(newValue == null) {
+            throw new IllegalArgumentException("newValue is null");
+        }
+        
+        byte[] oldValueBytes = ObjectSerializer.toByteArray(oldValue);
+        byte[] newValueBytes = ObjectSerializer.toByteArray(newValue);
+        
+        boolean retval = this.store.replace(key, oldValueBytes, newValueBytes);
+        
+        // call event
+        if(retval) {
+            ClusterNode primaryNode = this.affinity.mapKeyToNode(key);
+            raiseEventForLayoutEventDataAdded(key, primaryNode.consistentId().toString());
+        }
+        
+        return retval;
+    }
+    
+    @Override
     public String getNodeForData(String key) throws IOException {
         ClusterNode primaryNode = this.affinity.mapKeyToNode(key);
         return primaryNode.consistentId().toString();

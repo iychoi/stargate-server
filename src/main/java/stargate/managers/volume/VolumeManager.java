@@ -49,7 +49,6 @@ import stargate.managers.datasource.DataSourceManager;
 import stargate.managers.datastore.DataStoreManager;
 import stargate.managers.recipe.RecipeManager;
 import stargate.commons.transport.TransferAssignment;
-import stargate.managers.transport.TransferEvent;
 import stargate.managers.transport.TransportManager;
 import stargate.service.StargateService;
 

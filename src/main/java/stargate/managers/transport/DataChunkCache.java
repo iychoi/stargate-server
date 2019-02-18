@@ -224,6 +224,9 @@ public class DataChunkCache {
     
     @JsonIgnore
     public void increaseVersion() {
+        if(this.version == Integer.MAX_VALUE) {
+            throw new IllegalArgumentException("Cannot increase version as it is already the max value");
+        }
         this.version++;
     }
     

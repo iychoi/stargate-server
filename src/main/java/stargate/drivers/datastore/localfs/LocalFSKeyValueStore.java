@@ -275,6 +275,31 @@ public class LocalFSKeyValueStore extends AbstractKeyValueStore {
     }
     
     @Override
+    public boolean replace(String key, Object oldValue, Object newValue) throws IOException {
+        if(key == null || key.isEmpty()) {
+            throw new IllegalArgumentException("key is null or empty");
+        }
+        
+        if(oldValue == null) {
+            throw new IllegalArgumentException("oldValue is null");
+        }
+        
+        if(newValue == null) {
+            throw new IllegalArgumentException("newValue is null");
+        }
+        
+        this.cleanUp();
+        
+        Object old = this.get(key);
+        if(oldValue.equals(old)) {
+            put(key, newValue);
+            return true;
+        }
+        
+        return false;
+    }
+    
+    @Override
     public String getNodeForData(String key) throws IOException {
         return "*";
     }
