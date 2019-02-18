@@ -278,23 +278,10 @@ public class FileSystem {
         }
     }
     
-    private static Node get_local_node(Cluster cluster) throws IOException {
-        for(Node node : cluster.getNodes()) {
-            Collection<String> hostnames = node.getHostnames();
-            if(IPUtils.containLocalIPAddress(hostnames)) {
-                return node;
-            }
-        }
-        return null;
-    }
-    
     private static void process_fs_get(URI serviceURI, String stargatePath, String targetPath) {
         DataObjectURI uri = new DataObjectURI(stargatePath);
         
         try {
-            long startTimeG = DateTimeUtils.getTimestamp();
-            System.out.println(String.format("start get - %d", startTimeG));
-            
             HTTPUserInterfaceClient client = HTTPUIClient.getClient(serviceURI);
             client.connect();
             try {
@@ -309,47 +296,30 @@ public class FileSystem {
                     if(recipe == null) {
                         System.out.println("<Recipe does not exist!>");
                     } else {
-                        String clusterName = uri.getClusterName();
-                        LOG.debug(String.format("Downloading a cluster information for %s", clusterName));
+                        LOG.debug(String.format("Downloading a file %s", stargatePath));
    
-                        Map<String, HTTPUserInterfaceClient> clients = new HashMap<String, HTTPUserInterfaceClient>();
-                        
-                        // need to contact local cluster to download the file
-                        // add default
-                        clients.put(HTTPChunkInputStream.DEFAULT_NODE_NAME, client);
-                        
                         File f = (new File(targetPath)).getAbsoluteFile();
                         if(f.isDirectory()) {
                             f = new File(f, PathUtils.getFileName(stargatePath));
                         }
 
                         long startTimeC = DateTimeUtils.getTimestamp();
-                        System.out.println(String.format("start copy - %d", startTimeC));
+                        LOG.debug(String.format("start copy - %d", startTimeC));
                         
                         FileOutputStream fos = new FileOutputStream(f);
                         int bufferlen = 1024*1024;
                         byte[] buffer = new byte[bufferlen];
                         
-                        HTTPChunkInputStream cis = new HTTPChunkInputStream(clients, recipe);
+                        HTTPChunkInputStream cis = new HTTPChunkInputStream(client, recipe);
                         int readLen = 0;
                         while((readLen = cis.read(buffer, 0, bufferlen)) > 0) {
                             fos.write(buffer, 0, readLen);
                         }
                         cis.close();
                         long endTimeC = DateTimeUtils.getTimestamp();
-                        System.out.println(String.format("copy took - %d ms", endTimeC - startTimeC));
+                        LOG.debug(String.format("copy took - %d ms", endTimeC - startTimeC));
                         
                         fos.close();
-                        Set<Map.Entry<String, HTTPUserInterfaceClient>> entrySet = clients.entrySet();
-                        for(Map.Entry<String, HTTPUserInterfaceClient> entry : entrySet) {
-                            String key = entry.getKey();
-                            HTTPUserInterfaceClient c = entry.getValue();
-                            if(!key.equals(HTTPChunkInputStream.DEFAULT_NODE_NAME)) {
-                                if(c.isConnected()) {
-                                    c.disconnect();
-                                }
-                            }
-                        }
                     }
                 }
             } catch (FileNotFoundException ex) {
@@ -358,8 +328,6 @@ public class FileSystem {
             String dateTimeString = DateTimeUtils.getDateTimeString(client.getLastActiveTime());
             System.out.println(String.format("<Request processed %s>", dateTimeString));
             client.disconnect();
-            long endTimeG = DateTimeUtils.getTimestamp();
-            System.out.println(String.format("took - %d ms", endTimeG - startTimeG));
             System.exit(0);
         } catch (IOException ex) {
             ex.printStackTrace();
