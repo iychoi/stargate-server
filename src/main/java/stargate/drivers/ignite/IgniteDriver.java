@@ -120,6 +120,9 @@ public class IgniteDriver {
         if(!this.initialized) {
             LOG.debug("Initializing Ignite Master Driver");
             
+            // no shutdown hook
+            System.setProperty("IGNITE_NO_SHUTDOWN_HOOK", "true");
+            
             //IGNITE_LOG_DIR 
             IgniteConfiguration igniteConfig = new IgniteConfiguration();
             

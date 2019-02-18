@@ -73,7 +73,8 @@ public class ServiceMain {
                     // service loop
                     Thread.sleep(1000);
                 } catch(InterruptedException ex) {
-                    Thread.currentThread().interrupt();
+                    //Thread.currentThread().interrupt();
+                    break;
                 }
             }
             
