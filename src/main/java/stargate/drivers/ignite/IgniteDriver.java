@@ -65,6 +65,7 @@ public class IgniteDriver {
     
     private static IgniteDriver instance;
     private static File storageRootPath;
+    private static String clusterName;
     private static List<String> clusterNodes = new ArrayList<String>();
     
     private boolean initialized = false;
@@ -104,6 +105,14 @@ public class IgniteDriver {
         }
     }
     
+    public static void setClusterName(String name) {
+        if(name == null || name.isEmpty()) {
+            throw new IllegalArgumentException("name is null or empty");
+        }
+        
+        clusterName = name;
+    }
+    
     IgniteDriver() {
     }
     
@@ -113,6 +122,8 @@ public class IgniteDriver {
             
             //IGNITE_LOG_DIR 
             IgniteConfiguration igniteConfig = new IgniteConfiguration();
+            
+            igniteConfig.setIgniteInstanceName(clusterName);
             
             // logging
             File stargateRoot = ResourceUtils.getStargateRoot();

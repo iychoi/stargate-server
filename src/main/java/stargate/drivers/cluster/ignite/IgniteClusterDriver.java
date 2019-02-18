@@ -107,6 +107,7 @@ public class IgniteClusterDriver extends AbstractClusterDriver {
     }
     
     private void setIgniteDriver() {
+        IgniteDriver.setClusterName(this.config.getClusterName());
         IgniteDriver.setStorageRootPath(this.config.getStorageRootPath());
         IgniteDriver.addClusterNodes(this.config.getClusterNodes());
     }
