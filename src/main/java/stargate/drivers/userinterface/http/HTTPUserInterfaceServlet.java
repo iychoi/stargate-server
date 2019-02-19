@@ -18,7 +18,6 @@ package stargate.drivers.userinterface.http;
 import java.io.FileNotFoundException;
 import java.io.IOException;
 import java.io.InputStream;
-import java.io.OutputStream;
 import java.net.URI;
 import java.util.ArrayList;
 import java.util.Collection;
@@ -33,10 +32,8 @@ import javax.ws.rs.POST;
 import javax.ws.rs.Path;
 import javax.ws.rs.PathParam;
 import javax.ws.rs.Produces;
-import javax.ws.rs.WebApplicationException;
 import javax.ws.rs.core.MediaType;
 import javax.ws.rs.core.Response;
-import javax.ws.rs.core.StreamingOutput;
 import org.apache.commons.logging.Log;
 import org.apache.commons.logging.LogFactory;
 import stargate.commons.cluster.AbstractClusterDriver;
@@ -340,6 +337,37 @@ public class HTTPUserInterfaceServlet extends AbstractUserInterfaceServer {
             StargateService service = getStargateService();
             ClusterManager clusterManager = service.getClusterManager();
             return clusterManager.getLocalNode();
+        } catch (ManagerNotInstantiatedException ex) {
+            LOG.error(ex);
+            throw new IOException(ex);
+        } catch (DriverNotInitializedException ex) {
+            LOG.error(ex);
+            throw new IOException(ex);
+        }
+    }
+    
+    @GET
+    @Path(HTTPUserInterfaceRestfulConstants.API_PATH + "/" + HTTPUserInterfaceRestfulConstants.API_GET_LEADER_NODE_PATH)
+    @Produces(MediaType.APPLICATION_JSON)
+    public Response getLeaderNodeRestful() throws IOException {
+        try {
+            Node leaderNode = getLeaderNode();
+            RestfulResponse rres = new RestfulResponse(leaderNode);
+            return Response.status(Response.Status.OK).entity(rres).build();
+        } catch(Exception ex) {
+            RestfulResponse rres = new RestfulResponse(ex);
+            return Response.status(Response.Status.INTERNAL_SERVER_ERROR).entity(rres).build();
+        }
+    }
+    
+    @Override
+    public Node getLeaderNode() throws IOException {
+        LOG.info("getLeaderNode");
+        
+        try {
+            StargateService service = getStargateService();
+            ClusterManager clusterManager = service.getClusterManager();
+            return clusterManager.getLeaderNode();
         } catch (ManagerNotInstantiatedException ex) {
             LOG.error(ex);
             throw new IOException(ex);

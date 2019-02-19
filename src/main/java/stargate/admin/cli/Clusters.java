@@ -21,8 +21,6 @@ import java.net.URI;
 import java.net.URISyntaxException;
 import java.util.Arrays;
 import java.util.Collection;
-import java.util.logging.Level;
-import java.util.logging.Logger;
 import org.apache.commons.logging.Log;
 import org.apache.commons.logging.LogFactory;
 import org.apache.ignite.internal.commandline.CommandHandler;
@@ -65,6 +63,7 @@ public class Clusters {
     
     private enum COMMAND_LV2_LOCAL_CLUSTER {
         CMD_LV2_LOCAL_CLUSTER_SHOW("show"),
+        CMD_LV2_LOCAL_CLUSTER_LEADER("leader"),
         CMD_LV2_LOCAL_CLUSTER_ACTIVATE("activate"),
         CMD_LV2_LOCAL_CLUSTER_ACTIVE("active"),
         CMD_LV2_LOCAL_CLUSTER_UNKNOWN("unknown");
@@ -167,6 +166,9 @@ public class Clusters {
                 case CMD_LV2_LOCAL_CLUSTER_SHOW:
                     process_local_cluster_show(parser.getServiceURI());
                     break;
+                case CMD_LV2_LOCAL_CLUSTER_LEADER:
+                    process_local_cluster_leader(parser.getServiceURI());
+                    break;
                 case CMD_LV2_LOCAL_CLUSTER_ACTIVATE:
                     process_local_cluster_activate(parser.getServiceURI());
                     break;
@@ -242,6 +244,25 @@ public class Clusters {
         try {
             HTTPUserInterfaceClient client = HTTPUIClient.getClient(serviceURI);
             client.connect();
+            Cluster cluster = client.getLocalCluster();
+
+            String json = JsonSerializer.formatPretty(cluster.toJson());
+            System.out.println(json);
+            String dateTimeString = DateTimeUtils.getDateTimeString(client.getLastActiveTime());
+            System.out.println(String.format("<Request processed %s>", dateTimeString));
+            client.disconnect();
+            System.exit(0);
+        } catch (IOException ex) {
+            ex.printStackTrace();
+            System.exit(1);
+        }
+    }
+    
+    private static void process_local_cluster_leader(URI serviceURI) {
+        try {
+            HTTPUserInterfaceClient client = HTTPUIClient.getClient(serviceURI);
+            client.connect();
+            
             Cluster cluster = client.getLocalCluster();
 
             String json = JsonSerializer.formatPretty(cluster.toJson());

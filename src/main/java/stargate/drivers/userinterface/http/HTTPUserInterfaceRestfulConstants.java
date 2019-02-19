@@ -40,6 +40,7 @@ public abstract class HTTPUserInterfaceRestfulConstants {
     public static final String API_ADD_REMOTE_CLUSTER_PATH = "rcluster";
     public static final String API_REMOVE_REMOTE_CLUSTER_PATH = "rcluster";
     public static final String API_GET_LOCAL_NODE_PATH = "lnode";
+    public static final String API_GET_LEADER_NODE_PATH = "leadernode";
     public static final String API_GET_DATA_EXPORT_ENTRY_PATH = "export";
     public static final String API_LIST_DATA_EXPORT_ENTRIES_PATH = "lexport";
     public static final String API_GET_DATA_EXPORT_ENTRIES_PATH = "exports";

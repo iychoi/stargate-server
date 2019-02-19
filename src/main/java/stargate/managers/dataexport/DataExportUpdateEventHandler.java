@@ -15,16 +15,13 @@
 */
 package stargate.managers.dataexport;
 
-import java.io.IOException;
 import org.apache.commons.logging.Log;
 import org.apache.commons.logging.LogFactory;
 import stargate.commons.datasource.DataExportEntry;
 import stargate.commons.recipe.Recipe;
-import stargate.commons.service.AbstractService;
 import stargate.managers.cluster.ClusterManager;
 import stargate.managers.recipe.RecipeManager;
 import stargate.managers.volume.VolumeManager;
-import stargate.service.StargateService;
 
 /**
  *

@@ -230,6 +230,20 @@ public class HTTPUserInterfaceClient extends AbstractUserInterfaceClient {
     }
     
     @Override
+    public Node getLeaderNode() throws IOException {
+        if(!this.connected) {
+            throw new IOException("Client is not connected");
+        }
+        
+        // URL pattern = http://xxx.xxx.xxx.xxx/api/leadernode
+        String url = makeAPIPath(HTTPUserInterfaceRestfulConstants.API_GET_LEADER_NODE_PATH);
+        Node node = (Node) this.restfulClient.get(url);
+
+        updateLastActivetime();
+        return node;
+    }
+    
+    @Override
     public Cluster getRemoteCluster(String name) throws IOException {
         if(!this.connected) {
             throw new IOException("Client is not connected");
