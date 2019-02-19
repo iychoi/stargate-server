@@ -1228,4 +1228,32 @@ public class HTTPUserInterfaceServlet extends AbstractUserInterfaceServer {
             throw new IOException(ex);
         }
     }
+
+    @DELETE
+    @Path(HTTPUserInterfaceRestfulConstants.API_PATH + "/" + HTTPUserInterfaceRestfulConstants.API_CLEAR_ALL_STATISTICS_PATH)
+    @Produces(MediaType.APPLICATION_JSON)
+    public Response clearAllStatisticsRestful() throws IOException {
+        try {
+            clearAllStatistics();    
+            RestfulResponse rres = new RestfulResponse(true);
+            return Response.status(Response.Status.OK).entity(rres).build();
+        } catch(Exception ex) {
+            RestfulResponse rres = new RestfulResponse(ex);
+            return Response.status(Response.Status.INTERNAL_SERVER_ERROR).entity(rres).build();
+        }
+    }
+    
+    @Override
+    public void clearAllStatistics() throws IOException {
+        LOG.info("clearAllStatistics");
+        
+        try {
+            StargateService service = getStargateService();
+            StatisticsManager statisticsManager = service.getStatisticsManager();
+            statisticsManager.clearAllStatistics();
+        } catch (ManagerNotInstantiatedException ex) {
+            LOG.error(ex);
+            throw new IOException(ex);
+        }
+    }
 }

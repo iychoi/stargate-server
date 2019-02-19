@@ -623,4 +623,17 @@ public class HTTPUserInterfaceClient extends AbstractUserInterfaceClient {
 
         updateLastActivetime();
     }
+
+    @Override
+    public void clearAllStatistics() throws IOException {
+        if(!this.connected) {
+            throw new IOException("Client is not connected");
+        }
+        
+        // URL pattern = http://xxx.xxx.xxx.xxx/api/allstat
+        String url = makeAPIPath(HTTPUserInterfaceRestfulConstants.API_CLEAR_ALL_STATISTICS_PATH);
+        Boolean result = (Boolean) this.restfulClient.delete(url);
+
+        updateLastActivetime();
+    }
 }

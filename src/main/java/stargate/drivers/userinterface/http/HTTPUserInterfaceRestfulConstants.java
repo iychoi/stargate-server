@@ -55,4 +55,5 @@ public abstract class HTTPUserInterfaceRestfulConstants {
     
     public static final String API_GET_STATISTICS_PATH = "stat";
     public static final String API_CLEAR_STATISTICS_PATH = "stat";
+    public static final String API_CLEAR_ALL_STATISTICS_PATH = "allstat";
 }
