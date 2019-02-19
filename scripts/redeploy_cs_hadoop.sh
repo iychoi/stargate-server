@@ -7,6 +7,9 @@ ROOT_DIR=~
 work() {
     local node=$1
     scp ${RELLIBDIR}/stargate* ${node}:${ROOT_DIR}/${RELEASE_NAME}/libs
+    ssh ${node} "rm -rf ${ROOT_DIR}/${RELEASE_NAME}/work/*" < /dev/null
+    ssh ${node} "rm -rf ${ROOT_DIR}/${RELEASE_NAME}/storage/*" < /dev/null
+    ssh ${node} "rm -rf ${ROOT_DIR}/${RELEASE_NAME}/bin/stargate.log*" < /dev/null
     echo "Done ${node}"
 }
 
