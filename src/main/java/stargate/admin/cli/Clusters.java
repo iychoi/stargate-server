@@ -25,6 +25,7 @@ import org.apache.commons.logging.Log;
 import org.apache.commons.logging.LogFactory;
 import org.apache.ignite.internal.commandline.CommandHandler;
 import stargate.commons.cluster.Cluster;
+import stargate.commons.cluster.Node;
 import stargate.commons.utils.DateTimeUtils;
 import stargate.commons.utils.JsonSerializer;
 import stargate.drivers.userinterface.http.HTTPUserInterfaceClient;
@@ -263,9 +264,9 @@ public class Clusters {
             HTTPUserInterfaceClient client = HTTPUIClient.getClient(serviceURI);
             client.connect();
             
-            Cluster cluster = client.getLocalCluster();
+            Node node = client.getLeaderNode();
 
-            String json = JsonSerializer.formatPretty(cluster.toJson());
+            String json = JsonSerializer.formatPretty(node.toJson());
             System.out.println(json);
             String dateTimeString = DateTimeUtils.getDateTimeString(client.getLastActiveTime());
             System.out.println(String.format("<Request processed %s>", dateTimeString));
