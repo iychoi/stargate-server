@@ -62,6 +62,7 @@ import stargate.managers.datasource.DataSourceManager;
 import stargate.managers.datastore.DataStoreManager;
 import stargate.managers.event.EventManager;
 import stargate.managers.recipe.RecipeManager;
+import stargate.managers.statistics.StatisticsManager;
 import stargate.service.StargateService;
 
 /**
@@ -489,6 +490,9 @@ public class TransportManager extends AbstractManager<AbstractTransportDriver> {
                 
                 //notify
                 raiseEventForTransferCompletion(uri, hash);
+                
+                StatisticsManager statisticsManager = stargateService.getStatisticsManager();
+                statisticsManager.addDataChunkTransferReceiveStatistics(uri.toUri().toASCIIString(), hash);
             }
         } catch (ManagerNotInstantiatedException ex) {
             LOG.error(ex);
@@ -714,6 +718,9 @@ public class TransportManager extends AbstractManager<AbstractTransportDriver> {
                 
                 //notify
                 raiseEventForTransferCompletion(uri, hash);
+                
+                StatisticsManager statisticsManager = stargateService.getStatisticsManager();
+                statisticsManager.addDataChunkTransferReceiveStatistics(uri.toUri().toASCIIString(), hash);
                 
                 return new ByteArrayInputStream(cacheDataBytes);
             }

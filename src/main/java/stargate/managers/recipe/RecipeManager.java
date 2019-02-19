@@ -44,12 +44,14 @@ import stargate.commons.manager.ManagerNotInstantiatedException;
 import stargate.commons.recipe.AbstractRecipeDriver;
 import stargate.commons.recipe.Recipe;
 import stargate.commons.recipe.RecipeChunk;
+import stargate.commons.statistics.StatisticsType;
 import stargate.commons.utils.DateTimeUtils;
 import stargate.managers.cluster.ClusterManager;
 import stargate.managers.dataexport.DataExportManager;
 import stargate.managers.datasource.DataSourceManager;
 import stargate.managers.datastore.DataStoreManager;
 import stargate.managers.schedule.ScheduleManager;
+import stargate.managers.statistics.StatisticsManager;
 import stargate.service.StargateService;
 
 /**
@@ -674,6 +676,8 @@ public class RecipeManager extends AbstractManager<AbstractRecipeDriver> {
             
             StargateService stargateService = getStargateService();
             DataSourceManager dataSourceManager = stargateService.getDataSourceManager();
+            StatisticsManager statisticsManager = stargateService.getStatisticsManager();
+            
             AbstractDataSourceDriver dataSourceDriver = dataSourceManager.getDriver(dataExportEntry.getSourceURI());
             
             // create recipe chunk
@@ -685,6 +689,8 @@ public class RecipeManager extends AbstractManager<AbstractRecipeDriver> {
             recipeChunk.setOffset(event.getOffset());
             
             is.close();
+            
+            statisticsManager.addRecipeChunkCreationStatistics(sourceFileMetadata.getURI().toASCIIString(), recipeChunk.getOffset(), recipeChunk.getLength(), recipeChunk.getHash());
             
             return recipeChunk;
         } catch (ManagerNotInstantiatedException ex) {

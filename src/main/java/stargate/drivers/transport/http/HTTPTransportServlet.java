@@ -43,6 +43,7 @@ import stargate.commons.transport.AbstractTransportServer;
 import stargate.commons.utils.PathUtils;
 import stargate.managers.cluster.ClusterManager;
 import stargate.managers.recipe.RecipeManager;
+import stargate.managers.statistics.StatisticsManager;
 import stargate.managers.volume.VolumeManager;
 import stargate.service.StargateService;
 
@@ -366,7 +367,11 @@ public class HTTPTransportServlet extends AbstractTransportServer {
         try {
             StargateService service = getStargateService();
             VolumeManager volumeManager = service.getVolumeManager();
-            return volumeManager.getLocalDataChunk(hash);
+            InputStream is = volumeManager.getLocalDataChunk(hash);
+            
+            StatisticsManager statisticsManager = service.getStatisticsManager();
+            statisticsManager.addDataChunkTransferSendStatistics(hash);
+            return is;
         } catch (ManagerNotInstantiatedException ex) {
             LOG.error(ex);
             throw new IOException(ex);

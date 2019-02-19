@@ -52,6 +52,8 @@ import stargate.commons.recipe.AbstractRecipeDriver;
 import stargate.commons.recipe.Recipe;
 import stargate.commons.restful.RestfulResponse;
 import stargate.commons.service.FSServiceInfo;
+import stargate.commons.statistics.StatisticsEntry;
+import stargate.commons.statistics.StatisticsType;
 import stargate.commons.userinterface.AbstractUserInterfaceServer;
 import stargate.commons.utils.PathUtils;
 import stargate.managers.cluster.ClusterManager;
@@ -62,6 +64,7 @@ import stargate.managers.datasource.DataSourceManager;
 import stargate.managers.recipe.RecipeManager;
 import stargate.managers.recipe.RecipeManagerException;
 import stargate.commons.transport.TransferAssignment;
+import stargate.managers.statistics.StatisticsManager;
 import stargate.managers.transport.TransportManager;
 import stargate.managers.volume.VolumeManager;
 import stargate.service.StargateService;
@@ -1152,6 +1155,74 @@ public class HTTPUserInterfaceServlet extends AbstractUserInterfaceServer {
             StargateService service = getStargateService();
             DataSourceManager dataSourceManager = service.getDataSourceManager();
             return dataSourceManager.getRegisteredSchemes();
+        } catch (ManagerNotInstantiatedException ex) {
+            LOG.error(ex);
+            throw new IOException(ex);
+        }
+    }
+    
+    @GET
+    @Path(HTTPUserInterfaceRestfulConstants.API_PATH + "/" + HTTPUserInterfaceRestfulConstants.API_GET_STATISTICS_PATH + "/{type: .*}")
+    @Produces(MediaType.APPLICATION_JSON)
+    public Response getStatisticsRestful(
+            @DefaultValue("") @PathParam("type") String type) throws IOException {
+        if(type == null || type.isEmpty()) {
+            throw new IllegalArgumentException("type is null or empty");
+        }
+        
+        try {
+            StatisticsType sType = StatisticsType.valueOf(type);
+            Collection<StatisticsEntry> statistics = getStatistics(sType);    
+            RestfulResponse rres = new RestfulResponse(statistics.toArray(new StatisticsEntry[0]));
+            return Response.status(Response.Status.OK).entity(rres).build();
+        } catch(Exception ex) {
+            RestfulResponse rres = new RestfulResponse(ex);
+            return Response.status(Response.Status.INTERNAL_SERVER_ERROR).entity(rres).build();
+        }
+    }
+
+    @Override
+    public Collection<StatisticsEntry> getStatistics(StatisticsType type) throws IOException {
+        LOG.info("getStatistics");
+        
+        try {
+            StargateService service = getStargateService();
+            StatisticsManager statisticsManager = service.getStatisticsManager();
+            return statisticsManager.getStatisticsEntries(type);
+        } catch (ManagerNotInstantiatedException ex) {
+            LOG.error(ex);
+            throw new IOException(ex);
+        }
+    }
+
+    @DELETE
+    @Path(HTTPUserInterfaceRestfulConstants.API_PATH + "/" + HTTPUserInterfaceRestfulConstants.API_CLEAR_STATISTICS_PATH + "/{type: .*}")
+    @Produces(MediaType.APPLICATION_JSON)
+    public Response clearStatisticsRestful(
+            @DefaultValue("") @PathParam("type") String type) throws IOException {
+        if(type == null || type.isEmpty()) {
+            throw new IllegalArgumentException("type is null or empty");
+        }
+        
+        try {
+            StatisticsType sType = StatisticsType.valueOf(type);
+            clearStatistics(sType);    
+            RestfulResponse rres = new RestfulResponse(true);
+            return Response.status(Response.Status.OK).entity(rres).build();
+        } catch(Exception ex) {
+            RestfulResponse rres = new RestfulResponse(ex);
+            return Response.status(Response.Status.INTERNAL_SERVER_ERROR).entity(rres).build();
+        }
+    }
+    
+    @Override
+    public void clearStatistics(StatisticsType type) throws IOException {
+        LOG.info("clearStatistics");
+        
+        try {
+            StargateService service = getStargateService();
+            StatisticsManager statisticsManager = service.getStatisticsManager();
+            statisticsManager.clearStatistics(type);
         } catch (ManagerNotInstantiatedException ex) {
             LOG.error(ex);
             throw new IOException(ex);

@@ -41,6 +41,7 @@ import stargate.managers.volume.VolumeManager;
 import stargate.managers.dataexport.DataExportUpdateEventHandler;
 import stargate.managers.event.EventManager;
 import stargate.managers.cluster.RemoteClusterSyncTask;
+import stargate.managers.statistics.StatisticsManager;
 
 /**
  *
@@ -66,6 +67,7 @@ public class StargateService extends AbstractService {
     private UserInterfaceManager userInterfaceManager;
     private PolicyManager policyManager;
     private VolumeManager volumeManager;
+    private StatisticsManager statisticsManager;
     
     private DataExportUpdateEventHandler dataExportUpdateEventHandler;
     
@@ -112,6 +114,7 @@ public class StargateService extends AbstractService {
         // init managers
         LOG.debug("Initializing managers");
         try {
+            this.statisticsManager = StatisticsManager.getInstance(this);
             this.clusterManager = ClusterManager.getInstance(this, this.config.getClusterConfig());
             this.eventManager = EventManager.getInstance(this, this.config.getEventConfig());
             this.dataSourceManager = DataSourceManager.getInstance(this, this.config.getDataSourceConfig());
@@ -129,6 +132,7 @@ public class StargateService extends AbstractService {
         LOG.debug("Managers are initialized");
         
         LOG.info("Starting managers");
+        this.statisticsManager.start();
         this.clusterManager.start();
         this.eventManager.start();
         this.dataStoreManager.start();
@@ -198,6 +202,7 @@ public class StargateService extends AbstractService {
         this.dataStoreManager.stop();
         this.eventManager.stop();
         this.clusterManager.stop();
+        this.statisticsManager.stop();
         LOG.info("Managers are stopped");
         
         this.started = false;
@@ -300,6 +305,14 @@ public class StargateService extends AbstractService {
         }
         
         return this.volumeManager;
+    }
+    
+    public StatisticsManager getStatisticsManager() throws ManagerNotInstantiatedException {
+        if(this.statisticsManager == null || !this.statisticsManager.isStarted()) {
+            throw new ManagerNotInstantiatedException("StatisticsManager is not started");
+        }
+        
+        return this.statisticsManager;
     }
     
     public void addEventHandler(AbstractEventHandler handler) {
