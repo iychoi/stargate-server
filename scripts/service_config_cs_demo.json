@@ -16,13 +16,6 @@
   },
   "data_source" : {
     "driver_setting" : [ {
-      "driver_class" : "stargate.drivers.datasource.localfs.LocalFSDataSourceDriver",
-      "driver_config" : {
-        "@class" : "stargate.drivers.datasource.localfs.LocalFSDataSourceDriverConfig",
-        "scheme" : "file",
-        "root_path" : "/"
-      }
-    }, {
       "driver_class" : "stargate.drivers.datasource.hdfs.HDFSDataSourceDriver",
       "driver_config" : {
         "@class" : "stargate.drivers.datasource.hdfs.HDFSDataSourceDriverConfig",
