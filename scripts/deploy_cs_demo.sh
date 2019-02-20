@@ -4,16 +4,15 @@ source ${CUR_DIR}/bootstrap.sh
 
 ROOT_DIR=~
 
-#INPUT=$@
-INPUT=service_config_cs_hadoop.json
-
 work() {
     local node=$1
-    scp ${INPUT} ${node}:${ROOT_DIR}/${RELEASE_NAME}/bin/
+    scp -r ${RELDIR}/${RELEASE_ARCHIVE_FILENAME} ${node}:${ROOT_DIR}/
+    ssh ${node} "rm -rf ${ROOT_DIR}/${RELEASE_NAME}" < /dev/null
+    ssh ${node} "tar zxvf ${ROOT_DIR}/${RELEASE_ARCHIVE_FILENAME}" < /dev/null
     echo "Done ${node}"
 }
 
 while read node; do
     echo "connecting to ${node}"
     work ${node} &
-done <cs_hadoop_cluster.txt
+done <cs_demo_cluster.txt

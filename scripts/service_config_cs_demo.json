@@ -8,9 +8,9 @@
       "driver_class" : "stargate.drivers.cluster.ignite.IgniteClusterDriver",
       "driver_config" : {
         "@class" : "stargate.drivers.cluster.ignite.IgniteClusterDriverConfig",
-        "cluster_name" : "UA_CS2",
+        "cluster_name" : "UA_CS_DEMO",
         "storage_root_path" : "/home/iychoi/stargate-release-1.0/storage",
-        "cluster_nodes" : ["node3.hadoop.cs.arizona.edu", "node4.hadoop.cs.arizona.edu"]
+        "cluster_nodes" : ["demo1.opencloud.cs.arizona.edu", "demo2.opencloud.cs.arizona.edu"]
       }
     } ]
   },
@@ -27,8 +27,8 @@
       "driver_config" : {
         "@class" : "stargate.drivers.datasource.hdfs.HDFSDataSourceDriverConfig",
         "scheme" : "hdfs",
-        "namenode_uri" : "hdfs://node0.hadoop.cs.arizona.edu:9000",
-        "root_path" : "/data/"
+        "namenode_uri" : "hdfs://demo1.opencloud.cs.arizona.edu:9000",
+        "root_path" : "/"
       }
     } ]
   },

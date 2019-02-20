@@ -5,7 +5,7 @@ source ${CUR_DIR}/bootstrap.sh
 ROOT_DIR=~
 
 #INPUT=$@
-INPUT=service_config_cs_hadoop.json
+INPUT=service_config_cs_demo.json
 
 work() {
     local node=$1
@@ -16,4 +16,4 @@ work() {
 while read node; do
     echo "connecting to ${node}"
     work ${node} &
-done <cs_hadoop_cluster.txt
+done <cs_demo_cluster.txt
