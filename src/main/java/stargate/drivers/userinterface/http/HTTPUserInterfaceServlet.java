@@ -139,9 +139,14 @@ public class HTTPUserInterfaceServlet extends AbstractUserInterfaceServer {
     public String getServiceConfig() throws IOException {
         LOG.info("getServiceConfig");
         
-        StargateService stargateService = getStargateService();
-        StargateServiceConfig config = stargateService.getConfig();
-        return config.toJson();
+        try {
+            StargateService stargateService = getStargateService();
+            StargateServiceConfig config = stargateService.getConfig();
+            return config.toJson();
+        } catch (Exception ex) {
+            LOG.error(ex);
+            throw new IOException(ex);
+        }
     }
     
     @GET
@@ -172,6 +177,9 @@ public class HTTPUserInterfaceServlet extends AbstractUserInterfaceServer {
             FSServiceInfo serviceInfo = new FSServiceInfo(chunkSize, hashAlgorithm);
             return serviceInfo;
         } catch (ManagerNotInstantiatedException ex) {
+            LOG.error(ex);
+            throw new IOException(ex);
+        } catch (Exception ex) {
             LOG.error(ex);
             throw new IOException(ex);
         }
@@ -219,6 +227,9 @@ public class HTTPUserInterfaceServlet extends AbstractUserInterfaceServer {
         } catch (DriverNotInitializedException ex) {
             LOG.error(ex);
             throw new IOException(ex);
+        } catch (Exception ex) {
+            LOG.error(ex);
+            throw new IOException(ex);
         }
     }
     
@@ -248,6 +259,9 @@ public class HTTPUserInterfaceServlet extends AbstractUserInterfaceServer {
             LOG.error(ex);
             throw new IOException(ex);
         } catch (DriverNotInitializedException ex) {
+            LOG.error(ex);
+            throw new IOException(ex);
+        } catch (Exception ex) {
             LOG.error(ex);
             throw new IOException(ex);
         }
@@ -283,6 +297,9 @@ public class HTTPUserInterfaceServlet extends AbstractUserInterfaceServer {
         } catch (DriverNotInitializedException ex) {
             LOG.error(ex);
             throw new IOException(ex);
+        } catch (Exception ex) {
+            LOG.error(ex);
+            throw new IOException(ex);
         }
     }
     
@@ -313,6 +330,9 @@ public class HTTPUserInterfaceServlet extends AbstractUserInterfaceServer {
             LOG.error(ex);
             throw new IOException(ex);
         } catch (DriverNotInitializedException ex) {
+            LOG.error(ex);
+            throw new IOException(ex);
+        } catch (Exception ex) {
             LOG.error(ex);
             throw new IOException(ex);
         }
@@ -346,6 +366,9 @@ public class HTTPUserInterfaceServlet extends AbstractUserInterfaceServer {
         } catch (DriverNotInitializedException ex) {
             LOG.error(ex);
             throw new IOException(ex);
+        } catch (Exception ex) {
+            LOG.error(ex);
+            throw new IOException(ex);
         }
     }
     
@@ -375,6 +398,9 @@ public class HTTPUserInterfaceServlet extends AbstractUserInterfaceServer {
             LOG.error(ex);
             throw new IOException(ex);
         } catch (DriverNotInitializedException ex) {
+            LOG.error(ex);
+            throw new IOException(ex);
+        } catch (Exception ex) {
             LOG.error(ex);
             throw new IOException(ex);
         }
@@ -417,6 +443,9 @@ public class HTTPUserInterfaceServlet extends AbstractUserInterfaceServer {
         } catch (DriverNotInitializedException ex) {
             LOG.error(ex);
             throw new IOException(ex);
+        } catch (Exception ex) {
+            LOG.error(ex);
+            throw new IOException(ex);
         }
     }
     
@@ -448,6 +477,9 @@ public class HTTPUserInterfaceServlet extends AbstractUserInterfaceServer {
         } catch (DriverNotInitializedException ex) {
             LOG.error(ex);
             throw new IOException(ex);
+        } catch (Exception ex) {
+            LOG.error(ex);
+            throw new IOException(ex);
         }
     }
     
@@ -477,6 +509,9 @@ public class HTTPUserInterfaceServlet extends AbstractUserInterfaceServer {
             LOG.error(ex);
             throw new IOException(ex);
         } catch (DriverNotInitializedException ex) {
+            LOG.error(ex);
+            throw new IOException(ex);
+        } catch (Exception ex) {
             LOG.error(ex);
             throw new IOException(ex);
         }
@@ -515,6 +550,9 @@ public class HTTPUserInterfaceServlet extends AbstractUserInterfaceServer {
         } catch (DriverNotInitializedException ex) {
             LOG.error(ex);
             throw new IOException(ex);
+        } catch (Exception ex) {
+            LOG.error(ex);
+            throw new IOException(ex);
         }
     }
     
@@ -549,6 +587,9 @@ public class HTTPUserInterfaceServlet extends AbstractUserInterfaceServer {
             LOG.error(ex);
             throw new IOException(ex);
         } catch (DriverNotInitializedException ex) {
+            LOG.error(ex);
+            throw new IOException(ex);
+        } catch (Exception ex) {
             LOG.error(ex);
             throw new IOException(ex);
         }
@@ -595,6 +636,9 @@ public class HTTPUserInterfaceServlet extends AbstractUserInterfaceServer {
         } catch (DriverNotInitializedException ex) {
             LOG.error(ex);
             throw new IOException(ex);
+        } catch (Exception ex) {
+            LOG.error(ex);
+            throw new IOException(ex);
         }
     }
     
@@ -635,6 +679,9 @@ public class HTTPUserInterfaceServlet extends AbstractUserInterfaceServer {
             LOG.error(ex);
             throw new IOException(ex);
         } catch (DriverNotInitializedException ex) {
+            LOG.error(ex);
+            throw new IOException(ex);
+        } catch (Exception ex) {
             LOG.error(ex);
             throw new IOException(ex);
         }
@@ -678,6 +725,9 @@ public class HTTPUserInterfaceServlet extends AbstractUserInterfaceServer {
         } catch (DriverNotInitializedException ex) {
             LOG.error(ex);
             throw new IOException(ex);
+        } catch (Exception ex) {
+            LOG.error(ex);
+            throw new IOException(ex);
         }
     }
     
@@ -704,6 +754,9 @@ public class HTTPUserInterfaceServlet extends AbstractUserInterfaceServer {
             RecipeManager recipeManager = service.getRecipeManager();
             return recipeManager.getRecipeKeys();
         } catch (ManagerNotInstantiatedException ex) {
+            LOG.error(ex);
+            throw new IOException(ex);
+        } catch (Exception ex) {
             LOG.error(ex);
             throw new IOException(ex);
         }
@@ -741,6 +794,9 @@ public class HTTPUserInterfaceServlet extends AbstractUserInterfaceServer {
         } catch (ManagerNotInstantiatedException ex) {
             LOG.error(ex);
             throw new IOException(ex);
+        } catch (Exception ex) {
+            LOG.error(ex);
+            throw new IOException(ex);
         }
     }
     
@@ -773,6 +829,9 @@ public class HTTPUserInterfaceServlet extends AbstractUserInterfaceServer {
             LOG.error(ex);
             throw new IOException(ex);
         } catch (DriverNotInitializedException ex) {
+            LOG.error(ex);
+            throw new IOException(ex);
+        } catch (Exception ex) {
             LOG.error(ex);
             throw new IOException(ex);
         }
@@ -828,6 +887,9 @@ public class HTTPUserInterfaceServlet extends AbstractUserInterfaceServer {
         } catch (DriverNotInitializedException ex) {
             LOG.error(ex);
             throw new IOException(ex);
+        } catch (Exception ex) {
+            LOG.error(ex);
+            throw new IOException(ex);
         }
     }
     
@@ -879,6 +941,9 @@ public class HTTPUserInterfaceServlet extends AbstractUserInterfaceServer {
         } catch (DriverNotInitializedException ex) {
             LOG.error(ex);
             throw new IOException(ex);
+        } catch (Exception ex) {
+            LOG.error(ex);
+            throw new IOException(ex);
         }
     }
     
@@ -920,6 +985,9 @@ public class HTTPUserInterfaceServlet extends AbstractUserInterfaceServer {
         } catch (DriverNotInitializedException ex) {
             LOG.error(ex);
             throw new IOException(ex);
+        } catch (Exception ex) {
+            LOG.error(ex);
+            throw new IOException(ex);
         }
     }
     
@@ -959,6 +1027,9 @@ public class HTTPUserInterfaceServlet extends AbstractUserInterfaceServer {
         } catch (ManagerNotInstantiatedException ex) {
             LOG.error(ex);
             throw new IOException(ex);
+        } catch (Exception ex) {
+            LOG.error(ex);
+            throw new IOException(ex);
         }
     }
     
@@ -995,6 +1066,9 @@ public class HTTPUserInterfaceServlet extends AbstractUserInterfaceServer {
         } catch (ManagerNotInstantiatedException ex) {
             LOG.error(ex);
             throw new IOException(ex);
+        } catch (Exception ex) {
+            LOG.error(ex);
+            throw new IOException(ex);
         }
     }
     
@@ -1021,6 +1095,9 @@ public class HTTPUserInterfaceServlet extends AbstractUserInterfaceServer {
             DataExportManager dataExportManager = service.getDataExportManager();
             return dataExportManager.getDataExportEntries();
         } catch (ManagerNotInstantiatedException ex) {
+            LOG.error(ex);
+            throw new IOException(ex);
+        } catch (Exception ex) {
             LOG.error(ex);
             throw new IOException(ex);
         }
@@ -1071,6 +1148,9 @@ public class HTTPUserInterfaceServlet extends AbstractUserInterfaceServer {
             LOG.error(ex);
             throw new IOException(ex);
         } catch (DriverNotInitializedException ex) {
+            LOG.error(ex);
+            throw new IOException(ex);
+        } catch (Exception ex) {
             LOG.error(ex);
             throw new IOException(ex);
         }
@@ -1130,6 +1210,9 @@ public class HTTPUserInterfaceServlet extends AbstractUserInterfaceServer {
         } catch (DriverNotInitializedException ex) {
             LOG.error(ex);
             throw new IOException(ex);
+        } catch (Exception ex) {
+            LOG.error(ex);
+            throw new IOException(ex);
         }
     }
     
@@ -1156,6 +1239,9 @@ public class HTTPUserInterfaceServlet extends AbstractUserInterfaceServer {
             DataSourceManager dataSourceManager = service.getDataSourceManager();
             return dataSourceManager.getRegisteredSchemes();
         } catch (ManagerNotInstantiatedException ex) {
+            LOG.error(ex);
+            throw new IOException(ex);
+        } catch (Exception ex) {
             LOG.error(ex);
             throw new IOException(ex);
         }
@@ -1192,6 +1278,9 @@ public class HTTPUserInterfaceServlet extends AbstractUserInterfaceServer {
         } catch (ManagerNotInstantiatedException ex) {
             LOG.error(ex);
             throw new IOException(ex);
+        } catch (Exception ex) {
+            LOG.error(ex);
+            throw new IOException(ex);
         }
     }
 
@@ -1226,6 +1315,9 @@ public class HTTPUserInterfaceServlet extends AbstractUserInterfaceServer {
         } catch (ManagerNotInstantiatedException ex) {
             LOG.error(ex);
             throw new IOException(ex);
+        } catch (Exception ex) {
+            LOG.error(ex);
+            throw new IOException(ex);
         }
     }
 
@@ -1252,6 +1344,9 @@ public class HTTPUserInterfaceServlet extends AbstractUserInterfaceServer {
             StatisticsManager statisticsManager = service.getStatisticsManager();
             statisticsManager.clearAllStatistics();
         } catch (ManagerNotInstantiatedException ex) {
+            LOG.error(ex);
+            throw new IOException(ex);
+        } catch (Exception ex) {
             LOG.error(ex);
             throw new IOException(ex);
         }

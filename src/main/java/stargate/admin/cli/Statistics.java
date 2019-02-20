@@ -128,6 +128,9 @@ public class Statistics {
     private static void process_statistics_show_node(URI serviceURI, String type) {
         try {
             StatisticsType sType = StatisticsType.fromStrVal(type);
+            if(sType == null) {
+                throw new IllegalArgumentException(String.format("cannot parse StatisticsType - %s", type));
+            }
             
             HTTPUserInterfaceClient client = HTTPUIClient.getClient(serviceURI);
             client.connect();
@@ -153,6 +156,9 @@ public class Statistics {
     private static void process_statistics_show_cluster(URI serviceURI, String type) {
         try {
             StatisticsType sType = StatisticsType.fromStrVal(type);
+            if(sType == null) {
+                throw new IllegalArgumentException(String.format("cannot parse StatisticsType - %s", type));
+            }
             
             HTTPUserInterfaceClient client = HTTPUIClient.getClient(serviceURI);
             client.connect();
@@ -192,6 +198,9 @@ public class Statistics {
     private static void process_statistics_clear_node(URI serviceURI, String type) {
         try {
             StatisticsType sType = StatisticsType.fromStrVal(type);
+            if(sType == null) {
+                throw new IllegalArgumentException(String.format("cannot parse StatisticsType - %s", type));
+            }
             
             HTTPUserInterfaceClient client = HTTPUIClient.getClient(serviceURI);
             client.connect();
@@ -209,6 +218,9 @@ public class Statistics {
     private static void process_statistics_clear_cluster(URI serviceURI, String type) {
         try {
             StatisticsType sType = StatisticsType.fromStrVal(type);
+            if(sType == null) {
+                throw new IllegalArgumentException(String.format("cannot parse StatisticsType - %s", type));
+            }
             
             HTTPUserInterfaceClient client = HTTPUIClient.getClient(serviceURI);
             client.connect();

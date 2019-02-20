@@ -128,6 +128,9 @@ public class HTTPTransportServlet extends AbstractTransportServer {
         } catch (ManagerNotInstantiatedException ex) {
             LOG.error(ex);
             throw new IOException(ex);
+        } catch (Exception ex) {
+            LOG.error(ex);
+            throw new IOException(ex);
         }
     }
     
@@ -157,6 +160,9 @@ public class HTTPTransportServlet extends AbstractTransportServer {
             LOG.error(ex);
             throw new IOException(ex);
         } catch (DriverNotInitializedException ex) {
+            LOG.error(ex);
+            throw new IOException(ex);
+        } catch (Exception ex) {
             LOG.error(ex);
             throw new IOException(ex);
         }
@@ -204,6 +210,9 @@ public class HTTPTransportServlet extends AbstractTransportServer {
         } catch (DriverNotInitializedException ex) {
             LOG.error(ex);
             throw new IOException(ex);
+        } catch (Exception ex) {
+            LOG.error(ex);
+            throw new IOException(ex);
         }
     }
     
@@ -245,6 +254,9 @@ public class HTTPTransportServlet extends AbstractTransportServer {
             LOG.error(ex);
             throw new IOException(ex);
         } catch (DriverNotInitializedException ex) {
+            LOG.error(ex);
+            throw new IOException(ex);
+        } catch (Exception ex) {
             LOG.error(ex);
             throw new IOException(ex);
         }
@@ -289,6 +301,9 @@ public class HTTPTransportServlet extends AbstractTransportServer {
         } catch (DriverNotInitializedException ex) {
             LOG.error(ex);
             throw new IOException(ex);
+        } catch (Exception ex) {
+            LOG.error(ex);
+            throw new IOException(ex);
         }
     }
     
@@ -329,6 +344,9 @@ public class HTTPTransportServlet extends AbstractTransportServer {
             LOG.error(ex);
             throw new IOException(ex);
         } catch (DriverNotInitializedException ex) {
+            LOG.error(ex);
+            throw new IOException(ex);
+        } catch (Exception ex) {
             LOG.error(ex);
             throw new IOException(ex);
         }
@@ -376,6 +394,9 @@ public class HTTPTransportServlet extends AbstractTransportServer {
             LOG.error(ex);
             throw new IOException(ex);
         } catch (DriverNotInitializedException ex) {
+            LOG.error(ex);
+            throw new IOException(ex);
+        } catch (Exception ex) {
             LOG.error(ex);
             throw new IOException(ex);
         }
