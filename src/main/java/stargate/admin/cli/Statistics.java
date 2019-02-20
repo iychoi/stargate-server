@@ -20,8 +20,11 @@ import java.net.URI;
 import java.util.Collection;
 import org.apache.commons.logging.Log;
 import org.apache.commons.logging.LogFactory;
+import stargate.commons.cluster.Cluster;
+import stargate.commons.cluster.Node;
 import stargate.commons.statistics.StatisticsEntry;
 import stargate.commons.statistics.StatisticsType;
+import stargate.commons.userinterface.UserInterfaceServiceInfo;
 import stargate.commons.utils.DateTimeUtils;
 import stargate.commons.utils.JsonSerializer;
 import stargate.drivers.userinterface.http.HTTPUserInterfaceClient;
@@ -34,9 +37,12 @@ public class Statistics {
     private static final Log LOG = LogFactory.getLog(Statistics.class);
 
     private enum COMMAND_LV1 {
-        CMD_LV1_SHOW("show"),
-        CMD_LV1_CLEAR("clear"),
-        CMD_LV1_CLEAR_ALL("clear_all"),
+        CMD_LV1_SHOW_NODE("show_node"),
+        CMD_LV1_SHOW_CLUSTER("show"),
+        CMD_LV1_CLEAR_NODE("clear_node"),
+        CMD_LV1_CLEAR_CLUSTER("clear"),
+        CMD_LV1_CLEAR_ALL_NODE("clear_all_node"),
+        CMD_LV1_CLEAR_ALL_CLUSTER("clear_all"),
         CMD_LV1_UNKNOWN("unknown");
         
         private String value;
@@ -70,18 +76,31 @@ public class Statistics {
                 COMMAND_LV1 cmd = COMMAND_LV1.fromString(cmd_lv1);
 
                 switch(cmd) {
-                    case CMD_LV1_SHOW:
+                    case CMD_LV1_SHOW_NODE:
                         if(positionalArgs.length >= 2) {
-                            process_statistics_show(parser.getServiceURI(), positionalArgs[1]);
+                            process_statistics_show_node(parser.getServiceURI(), positionalArgs[1]);
                         }
                         break;
-                    case CMD_LV1_CLEAR:
+                    case CMD_LV1_SHOW_CLUSTER:
                         if(positionalArgs.length >= 2) {
-                            process_statistics_clear(parser.getServiceURI(), positionalArgs[1]);
+                            process_statistics_show_cluster(parser.getServiceURI(), positionalArgs[1]);
                         }
                         break;
-                    case CMD_LV1_CLEAR_ALL:
-                        process_statistics_clear_all(parser.getServiceURI());
+                    case CMD_LV1_CLEAR_NODE:
+                        if(positionalArgs.length >= 2) {
+                            process_statistics_clear_node(parser.getServiceURI(), positionalArgs[1]);
+                        }
+                        break;
+                    case CMD_LV1_CLEAR_CLUSTER:
+                        if(positionalArgs.length >= 2) {
+                            process_statistics_clear_cluster(parser.getServiceURI(), positionalArgs[1]);
+                        }
+                        break;
+                    case CMD_LV1_CLEAR_ALL_NODE:
+                        process_statistics_clear_all_node(parser.getServiceURI());
+                        break;
+                    case CMD_LV1_CLEAR_ALL_CLUSTER:
+                        process_statistics_clear_all_cluster(parser.getServiceURI());
                         break;
                     case CMD_LV1_UNKNOWN:
                         throw new UnsupportedOperationException(String.format("Unknown command - %s", cmd_lv1));
@@ -106,7 +125,7 @@ public class Statistics {
         }
     }
     
-    private static void process_statistics_show(URI serviceURI, String type) {
+    private static void process_statistics_show_node(URI serviceURI, String type) {
         try {
             StatisticsType sType = StatisticsType.fromStrVal(type);
             
@@ -131,7 +150,46 @@ public class Statistics {
         }
     }
     
-    private static void process_statistics_clear(URI serviceURI, String type) {
+    private static void process_statistics_show_cluster(URI serviceURI, String type) {
+        try {
+            StatisticsType sType = StatisticsType.fromStrVal(type);
+            
+            HTTPUserInterfaceClient client = HTTPUIClient.getClient(serviceURI);
+            client.connect();
+            Cluster localCluster = client.getLocalCluster();
+            Collection<Node> localNodes = localCluster.getNodes();
+            
+            for(Node node : localNodes) {
+                UserInterfaceServiceInfo userInterfaceServiceInfo = node.getUserInterfaceServiceInfo();
+                
+                HTTPUserInterfaceClient node_client = HTTPUIClient.getClient(userInterfaceServiceInfo.getServiceURI());
+                node_client.connect();
+                Collection<StatisticsEntry> statistics = node_client.getStatistics(sType);
+                
+                System.out.println(String.format("Node : %s - ", node.toString()));
+                if(statistics == null || statistics.isEmpty()) {
+                    System.out.println("<EMPTY!>");
+                } else {
+                    for(StatisticsEntry stat : statistics) {
+                        String json = JsonSerializer.formatPretty(stat.toJson());
+                        System.out.println(json);
+                    }
+                }
+                
+                node_client.disconnect();
+            }
+            
+            String dateTimeString = DateTimeUtils.getDateTimeString(client.getLastActiveTime());
+            System.out.println(String.format("<Request processed %s>", dateTimeString));
+            client.disconnect();
+            System.exit(0);
+        } catch (IOException ex) {
+            ex.printStackTrace();
+            System.exit(1);
+        }
+    }
+    
+    private static void process_statistics_clear_node(URI serviceURI, String type) {
         try {
             StatisticsType sType = StatisticsType.fromStrVal(type);
             
@@ -148,11 +206,65 @@ public class Statistics {
         }
     }
     
-    private static void process_statistics_clear_all(URI serviceURI) {
+    private static void process_statistics_clear_cluster(URI serviceURI, String type) {
+        try {
+            StatisticsType sType = StatisticsType.fromStrVal(type);
+            
+            HTTPUserInterfaceClient client = HTTPUIClient.getClient(serviceURI);
+            client.connect();
+            Cluster localCluster = client.getLocalCluster();
+            Collection<Node> localNodes = localCluster.getNodes();
+            
+            for(Node node : localNodes) {
+                UserInterfaceServiceInfo userInterfaceServiceInfo = node.getUserInterfaceServiceInfo();
+                
+                HTTPUserInterfaceClient node_client = HTTPUIClient.getClient(userInterfaceServiceInfo.getServiceURI());
+                node_client.connect();
+                node_client.clearStatistics(sType);
+                node_client.disconnect();
+            }
+            
+            String dateTimeString = DateTimeUtils.getDateTimeString(client.getLastActiveTime());
+            System.out.println(String.format("<Request processed %s>", dateTimeString));
+            client.disconnect();
+            System.exit(0);
+        } catch (IOException ex) {
+            ex.printStackTrace();
+            System.exit(1);
+        }
+    }
+    
+    private static void process_statistics_clear_all_node(URI serviceURI) {
         try {
             HTTPUserInterfaceClient client = HTTPUIClient.getClient(serviceURI);
             client.connect();
             client.clearAllStatistics();
+            String dateTimeString = DateTimeUtils.getDateTimeString(client.getLastActiveTime());
+            System.out.println(String.format("<Request processed %s>", dateTimeString));
+            client.disconnect();
+            System.exit(0);
+        } catch (IOException ex) {
+            ex.printStackTrace();
+            System.exit(1);
+        }
+    }
+    
+    private static void process_statistics_clear_all_cluster(URI serviceURI) {
+        try {
+            HTTPUserInterfaceClient client = HTTPUIClient.getClient(serviceURI);
+            client.connect();
+            Cluster localCluster = client.getLocalCluster();
+            Collection<Node> localNodes = localCluster.getNodes();
+            
+            for(Node node : localNodes) {
+                UserInterfaceServiceInfo userInterfaceServiceInfo = node.getUserInterfaceServiceInfo();
+                
+                HTTPUserInterfaceClient node_client = HTTPUIClient.getClient(userInterfaceServiceInfo.getServiceURI());
+                node_client.connect();
+                node_client.clearAllStatistics();
+                node_client.disconnect();
+            }
+            
             String dateTimeString = DateTimeUtils.getDateTimeString(client.getLastActiveTime());
             System.out.println(String.format("<Request processed %s>", dateTimeString));
             client.disconnect();
