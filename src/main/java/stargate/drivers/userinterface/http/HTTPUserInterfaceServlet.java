@@ -144,7 +144,7 @@ public class HTTPUserInterfaceServlet extends AbstractUserInterfaceServer {
             StargateServiceConfig config = stargateService.getConfig();
             return config.toJson();
         } catch (Exception ex) {
-            LOG.error(ex);
+            LOG.error("Unknown exception", ex);
             throw new IOException(ex);
         }
     }
@@ -177,10 +177,10 @@ public class HTTPUserInterfaceServlet extends AbstractUserInterfaceServer {
             FSServiceInfo serviceInfo = new FSServiceInfo(chunkSize, hashAlgorithm);
             return serviceInfo;
         } catch (ManagerNotInstantiatedException ex) {
-            LOG.error(ex);
+            LOG.error("Manager is not instantiated", ex);
             throw new IOException(ex);
         } catch (Exception ex) {
-            LOG.error(ex);
+            LOG.error("Unknown exception", ex);
             throw new IOException(ex);
         }
     }
@@ -222,13 +222,13 @@ public class HTTPUserInterfaceServlet extends AbstractUserInterfaceServer {
                 return clusterManager.getRemoteCluster(name);
             }
         } catch (ManagerNotInstantiatedException ex) {
-            LOG.error(ex);
+            LOG.error("Manager is not instantiated", ex);
             throw new IOException(ex);
         } catch (DriverNotInitializedException ex) {
-            LOG.error(ex);
+            LOG.error("Driver is not initialized", ex);
             throw new IOException(ex);
         } catch (Exception ex) {
-            LOG.error(ex);
+            LOG.error("Unknown exception", ex);
             throw new IOException(ex);
         }
     }
@@ -256,13 +256,13 @@ public class HTTPUserInterfaceServlet extends AbstractUserInterfaceServer {
             ClusterManager clusterManager = service.getClusterManager();
             return clusterManager.getLocalCluster();
         } catch (ManagerNotInstantiatedException ex) {
-            LOG.error(ex);
+            LOG.error("Manager is not instantiated", ex);
             throw new IOException(ex);
         } catch (DriverNotInitializedException ex) {
-            LOG.error(ex);
+            LOG.error("Driver is not initialized", ex);
             throw new IOException(ex);
         } catch (Exception ex) {
-            LOG.error(ex);
+            LOG.error("Unknown exception", ex);
             throw new IOException(ex);
         }
     }
@@ -292,13 +292,13 @@ public class HTTPUserInterfaceServlet extends AbstractUserInterfaceServer {
             AbstractClusterDriver clusterDriver = clusterManager.getDriver();
             clusterDriver.activateCluster();
         } catch (ManagerNotInstantiatedException ex) {
-            LOG.error(ex);
+            LOG.error("Manager is not instantiated", ex);
             throw new IOException(ex);
         } catch (DriverNotInitializedException ex) {
-            LOG.error(ex);
+            LOG.error("Driver is not initialized", ex);
             throw new IOException(ex);
         } catch (Exception ex) {
-            LOG.error(ex);
+            LOG.error("Unknown exception", ex);
             throw new IOException(ex);
         }
     }
@@ -327,13 +327,13 @@ public class HTTPUserInterfaceServlet extends AbstractUserInterfaceServer {
             AbstractClusterDriver clusterDriver = clusterManager.getDriver();
             return clusterDriver.isClusterActive();
         } catch (ManagerNotInstantiatedException ex) {
-            LOG.error(ex);
+            LOG.error("Manager is not instantiated", ex);
             throw new IOException(ex);
         } catch (DriverNotInitializedException ex) {
-            LOG.error(ex);
+            LOG.error("Driver is not initialized", ex);
             throw new IOException(ex);
         } catch (Exception ex) {
-            LOG.error(ex);
+            LOG.error("Unknown exception", ex);
             throw new IOException(ex);
         }
     }
@@ -361,13 +361,13 @@ public class HTTPUserInterfaceServlet extends AbstractUserInterfaceServer {
             ClusterManager clusterManager = service.getClusterManager();
             return clusterManager.getLocalNode();
         } catch (ManagerNotInstantiatedException ex) {
-            LOG.error(ex);
+            LOG.error("Manager is not instantiated", ex);
             throw new IOException(ex);
         } catch (DriverNotInitializedException ex) {
-            LOG.error(ex);
+            LOG.error("Driver is not initialized", ex);
             throw new IOException(ex);
         } catch (Exception ex) {
-            LOG.error(ex);
+            LOG.error("Unknown exception", ex);
             throw new IOException(ex);
         }
     }
@@ -395,13 +395,13 @@ public class HTTPUserInterfaceServlet extends AbstractUserInterfaceServer {
             ClusterManager clusterManager = service.getClusterManager();
             return clusterManager.getLeaderNode();
         } catch (ManagerNotInstantiatedException ex) {
-            LOG.error(ex);
+            LOG.error("Manager is not instantiated", ex);
             throw new IOException(ex);
         } catch (DriverNotInitializedException ex) {
-            LOG.error(ex);
+            LOG.error("Driver is not initialized", ex);
             throw new IOException(ex);
         } catch (Exception ex) {
-            LOG.error(ex);
+            LOG.error("Unknown exception", ex);
             throw new IOException(ex);
         }
     }
@@ -438,13 +438,13 @@ public class HTTPUserInterfaceServlet extends AbstractUserInterfaceServer {
             ClusterManager clusterManager = service.getClusterManager();
             return clusterManager.getRemoteCluster(name);
         } catch (ManagerNotInstantiatedException ex) {
-            LOG.error(ex);
+            LOG.error("Manager is not instantiated", ex);
             throw new IOException(ex);
         } catch (DriverNotInitializedException ex) {
-            LOG.error(ex);
+            LOG.error("Driver is not initialized", ex);
             throw new IOException(ex);
         } catch (Exception ex) {
-            LOG.error(ex);
+            LOG.error("Unknown exception", ex);
             throw new IOException(ex);
         }
     }
@@ -472,13 +472,13 @@ public class HTTPUserInterfaceServlet extends AbstractUserInterfaceServer {
             ClusterManager clusterManager = service.getClusterManager();
             return clusterManager.getRemoteClusterNames();
         } catch (ManagerNotInstantiatedException ex) {
-            LOG.error(ex);
+            LOG.error("Manager is not instantiated", ex);
             throw new IOException(ex);
         } catch (DriverNotInitializedException ex) {
-            LOG.error(ex);
+            LOG.error("Driver is not initialized", ex);
             throw new IOException(ex);
         } catch (Exception ex) {
-            LOG.error(ex);
+            LOG.error("Unknown exception", ex);
             throw new IOException(ex);
         }
     }
@@ -506,13 +506,13 @@ public class HTTPUserInterfaceServlet extends AbstractUserInterfaceServer {
             ClusterManager clusterManager = service.getClusterManager();
             return clusterManager.getRemoteClusters();
         } catch (ManagerNotInstantiatedException ex) {
-            LOG.error(ex);
+            LOG.error("Manager is not instantiated", ex);
             throw new IOException(ex);
         } catch (DriverNotInitializedException ex) {
-            LOG.error(ex);
+            LOG.error("Driver is not initialized", ex);
             throw new IOException(ex);
         } catch (Exception ex) {
-            LOG.error(ex);
+            LOG.error("Unknown exception", ex);
             throw new IOException(ex);
         }
     }
@@ -542,16 +542,16 @@ public class HTTPUserInterfaceServlet extends AbstractUserInterfaceServer {
             ClusterManager clusterManager = service.getClusterManager();
             clusterManager.addRemoteCluster(cluster);
         } catch (ManagerNotInstantiatedException ex) {
-            LOG.error(ex);
+            LOG.error("Manager is not instantiated", ex);
             throw new IOException(ex);
         } catch (ClusterManagerException ex) {
-            LOG.error(ex);
+            LOG.error("ClusterManager exception", ex);
             throw new IOException(ex);
         } catch (DriverNotInitializedException ex) {
-            LOG.error(ex);
+            LOG.error("Driver is not initialized", ex);
             throw new IOException(ex);
         } catch (Exception ex) {
-            LOG.error(ex);
+            LOG.error("Unknown exception", ex);
             throw new IOException(ex);
         }
     }
@@ -584,13 +584,13 @@ public class HTTPUserInterfaceServlet extends AbstractUserInterfaceServer {
             ClusterManager clusterManager = service.getClusterManager();
             clusterManager.removeRemoteCluster(name);
         } catch (ManagerNotInstantiatedException ex) {
-            LOG.error(ex);
+            LOG.error("Manager is not instantiated", ex);
             throw new IOException(ex);
         } catch (DriverNotInitializedException ex) {
-            LOG.error(ex);
+            LOG.error("Driver is not initialized", ex);
             throw new IOException(ex);
         } catch (Exception ex) {
-            LOG.error(ex);
+            LOG.error("Unknown exception", ex);
             throw new IOException(ex);
         }
     }
@@ -631,13 +631,13 @@ public class HTTPUserInterfaceServlet extends AbstractUserInterfaceServer {
             VolumeManager volumeManager = service.getVolumeManager();
             return volumeManager.getDataObjectMetadata(uri);
         } catch (ManagerNotInstantiatedException ex) {
-            LOG.error(ex);
+            LOG.error("Manager is not instantiated", ex);
             throw new IOException(ex);
         } catch (DriverNotInitializedException ex) {
-            LOG.error(ex);
+            LOG.error("Driver is not initialized", ex);
             throw new IOException(ex);
         } catch (Exception ex) {
-            LOG.error(ex);
+            LOG.error("Unknown exception", ex);
             throw new IOException(ex);
         }
     }
@@ -676,13 +676,13 @@ public class HTTPUserInterfaceServlet extends AbstractUserInterfaceServer {
             Directory directory = volumeManager.getDirectory(uri);
             return directory.getEntries();
         } catch (ManagerNotInstantiatedException ex) {
-            LOG.error(ex);
+            LOG.error("Manager is not instantiated", ex);
             throw new IOException(ex);
         } catch (DriverNotInitializedException ex) {
-            LOG.error(ex);
+            LOG.error("Driver is not initialized", ex);
             throw new IOException(ex);
         } catch (Exception ex) {
-            LOG.error(ex);
+            LOG.error("Unknown exception", ex);
             throw new IOException(ex);
         }
     }
@@ -720,13 +720,13 @@ public class HTTPUserInterfaceServlet extends AbstractUserInterfaceServer {
             VolumeManager volumeManager = service.getVolumeManager();
             return volumeManager.getRecipe(uri);
         } catch (ManagerNotInstantiatedException ex) {
-            LOG.error(ex);
+            LOG.error("Manager is not instantiated", ex);
             throw new IOException(ex);
         } catch (DriverNotInitializedException ex) {
-            LOG.error(ex);
+            LOG.error("Driver is not initialized", ex);
             throw new IOException(ex);
         } catch (Exception ex) {
-            LOG.error(ex);
+            LOG.error("Unknown exception", ex);
             throw new IOException(ex);
         }
     }
@@ -754,10 +754,10 @@ public class HTTPUserInterfaceServlet extends AbstractUserInterfaceServer {
             RecipeManager recipeManager = service.getRecipeManager();
             return recipeManager.getRecipeKeys();
         } catch (ManagerNotInstantiatedException ex) {
-            LOG.error(ex);
+            LOG.error("Manager is not instantiated", ex);
             throw new IOException(ex);
         } catch (Exception ex) {
-            LOG.error(ex);
+            LOG.error("Unknown exception", ex);
             throw new IOException(ex);
         }
     }
@@ -792,10 +792,10 @@ public class HTTPUserInterfaceServlet extends AbstractUserInterfaceServer {
             RecipeManager recipeManager = service.getRecipeManager();
             recipeManager.removeRecipe(uri.getPath());
         } catch (ManagerNotInstantiatedException ex) {
-            LOG.error(ex);
+            LOG.error("Manager is not instantiated", ex);
             throw new IOException(ex);
         } catch (Exception ex) {
-            LOG.error(ex);
+            LOG.error("Unknown exception", ex);
             throw new IOException(ex);
         }
     }
@@ -823,16 +823,16 @@ public class HTTPUserInterfaceServlet extends AbstractUserInterfaceServer {
             RecipeManager recipeManager = service.getRecipeManager();
             recipeManager.syncRecipes();
         } catch (ManagerNotInstantiatedException ex) {
-            LOG.error(ex);
+            LOG.error("Manager is not instantiated", ex);
             throw new IOException(ex);
         } catch (RecipeManagerException ex) {
-            LOG.error(ex);
+            LOG.error("RecipeManager exception", ex);
             throw new IOException(ex);
         } catch (DriverNotInitializedException ex) {
-            LOG.error(ex);
+            LOG.error("Driver is not initialized", ex);
             throw new IOException(ex);
         } catch (Exception ex) {
-            LOG.error(ex);
+            LOG.error("Unknown exception", ex);
             throw new IOException(ex);
         }
     }
@@ -882,13 +882,13 @@ public class HTTPUserInterfaceServlet extends AbstractUserInterfaceServer {
             VolumeManager volumeManager = service.getVolumeManager();
             return volumeManager.getDataChunk(uri, hash);
         } catch (ManagerNotInstantiatedException ex) {
-            LOG.error(ex);
+            LOG.error("Manager is not instantiated", ex);
             throw new IOException(ex);
         } catch (DriverNotInitializedException ex) {
-            LOG.error(ex);
+            LOG.error("Driver is not initialized", ex);
             throw new IOException(ex);
         } catch (Exception ex) {
-            LOG.error(ex);
+            LOG.error("Unknown exception", ex);
             throw new IOException(ex);
         }
     }
@@ -936,13 +936,13 @@ public class HTTPUserInterfaceServlet extends AbstractUserInterfaceServer {
             TransferAssignment assignment = transportManager.schedulePrefetch(uri, hash);
             return assignment;
         } catch (ManagerNotInstantiatedException ex) {
-            LOG.error(ex);
+            LOG.error("Manager is not instantiated", ex);
             throw new IOException(ex);
         } catch (DriverNotInitializedException ex) {
-            LOG.error(ex);
+            LOG.error("Driver is not initialized", ex);
             throw new IOException(ex);
         } catch (Exception ex) {
-            LOG.error(ex);
+            LOG.error("Unknown exception", ex);
             throw new IOException(ex);
         }
     }
@@ -980,13 +980,13 @@ public class HTTPUserInterfaceServlet extends AbstractUserInterfaceServer {
             VolumeManager volumeManager = service.getVolumeManager();
             return volumeManager.getRemoteRecipeWithTransferSchedule(uri);
         } catch (ManagerNotInstantiatedException ex) {
-            LOG.error(ex);
+            LOG.error("Manager is not instantiated", ex);
             throw new IOException(ex);
         } catch (DriverNotInitializedException ex) {
-            LOG.error(ex);
+            LOG.error("Driver is not initialized", ex);
             throw new IOException(ex);
         } catch (Exception ex) {
-            LOG.error(ex);
+            LOG.error("Unknown exception", ex);
             throw new IOException(ex);
         }
     }
@@ -1025,10 +1025,10 @@ public class HTTPUserInterfaceServlet extends AbstractUserInterfaceServer {
             DataExportManager dataExportManager = service.getDataExportManager();
             return dataExportManager.getDataExportEntry(uri.getPath());
         } catch (ManagerNotInstantiatedException ex) {
-            LOG.error(ex);
+            LOG.error("Manager is not instantiated", ex);
             throw new IOException(ex);
         } catch (Exception ex) {
-            LOG.error(ex);
+            LOG.error("Unknown exception", ex);
             throw new IOException(ex);
         }
     }
@@ -1064,10 +1064,10 @@ public class HTTPUserInterfaceServlet extends AbstractUserInterfaceServer {
             
             return Collections.unmodifiableCollection(entries);
         } catch (ManagerNotInstantiatedException ex) {
-            LOG.error(ex);
+            LOG.error("Manager is not instantiated", ex);
             throw new IOException(ex);
         } catch (Exception ex) {
-            LOG.error(ex);
+            LOG.error("Unknown exception", ex);
             throw new IOException(ex);
         }
     }
@@ -1095,10 +1095,10 @@ public class HTTPUserInterfaceServlet extends AbstractUserInterfaceServer {
             DataExportManager dataExportManager = service.getDataExportManager();
             return dataExportManager.getDataExportEntries();
         } catch (ManagerNotInstantiatedException ex) {
-            LOG.error(ex);
+            LOG.error("Manager is not instantiated", ex);
             throw new IOException(ex);
         } catch (Exception ex) {
-            LOG.error(ex);
+            LOG.error("Unknown exception", ex);
             throw new IOException(ex);
         }
     }
@@ -1142,16 +1142,16 @@ public class HTTPUserInterfaceServlet extends AbstractUserInterfaceServer {
                 dataExportManager.addDataExportEntry(entry);
             }
         } catch (ManagerNotInstantiatedException ex) {
-            LOG.error(ex);
+            LOG.error("Manager is not instantiated", ex);
             throw new IOException(ex);
         } catch (DataExportManagerException ex) {
-            LOG.error(ex);
+            LOG.error("DataExportManager exception", ex);
             throw new IOException(ex);
         } catch (DriverNotInitializedException ex) {
-            LOG.error(ex);
+            LOG.error("Driver is not initialized", ex);
             throw new IOException(ex);
         } catch (Exception ex) {
-            LOG.error(ex);
+            LOG.error("Unknown exception", ex);
             throw new IOException(ex);
         }
     }
@@ -1205,13 +1205,13 @@ public class HTTPUserInterfaceServlet extends AbstractUserInterfaceServer {
             DataExportManager dataExportManager = service.getDataExportManager();
             dataExportManager.removeDataExportEntry(uri.getPath());
         } catch (ManagerNotInstantiatedException ex) {
-            LOG.error(ex);
+            LOG.error("Manager is not instantiated", ex);
             throw new IOException(ex);
         } catch (DriverNotInitializedException ex) {
-            LOG.error(ex);
+            LOG.error("Driver is not initialized", ex);
             throw new IOException(ex);
         } catch (Exception ex) {
-            LOG.error(ex);
+            LOG.error("Unknown exception", ex);
             throw new IOException(ex);
         }
     }
@@ -1239,10 +1239,10 @@ public class HTTPUserInterfaceServlet extends AbstractUserInterfaceServer {
             DataSourceManager dataSourceManager = service.getDataSourceManager();
             return dataSourceManager.getRegisteredSchemes();
         } catch (ManagerNotInstantiatedException ex) {
-            LOG.error(ex);
+            LOG.error("Manager is not instantiated", ex);
             throw new IOException(ex);
         } catch (Exception ex) {
-            LOG.error(ex);
+            LOG.error("Unknown exception", ex);
             throw new IOException(ex);
         }
     }
@@ -1276,10 +1276,10 @@ public class HTTPUserInterfaceServlet extends AbstractUserInterfaceServer {
             StatisticsManager statisticsManager = service.getStatisticsManager();
             return statisticsManager.getStatisticsEntries(type);
         } catch (ManagerNotInstantiatedException ex) {
-            LOG.error(ex);
+            LOG.error("Manager is not instantiated", ex);
             throw new IOException(ex);
         } catch (Exception ex) {
-            LOG.error(ex);
+            LOG.error("Unknown exception", ex);
             throw new IOException(ex);
         }
     }
@@ -1313,10 +1313,10 @@ public class HTTPUserInterfaceServlet extends AbstractUserInterfaceServer {
             StatisticsManager statisticsManager = service.getStatisticsManager();
             statisticsManager.clearStatistics(type);
         } catch (ManagerNotInstantiatedException ex) {
-            LOG.error(ex);
+            LOG.error("Manager is not instantiated", ex);
             throw new IOException(ex);
         } catch (Exception ex) {
-            LOG.error(ex);
+            LOG.error("Unknown exception", ex);
             throw new IOException(ex);
         }
     }
@@ -1344,10 +1344,10 @@ public class HTTPUserInterfaceServlet extends AbstractUserInterfaceServer {
             StatisticsManager statisticsManager = service.getStatisticsManager();
             statisticsManager.clearAllStatistics();
         } catch (ManagerNotInstantiatedException ex) {
-            LOG.error(ex);
+            LOG.error("Manager is not instantiated", ex);
             throw new IOException(ex);
         } catch (Exception ex) {
-            LOG.error(ex);
+            LOG.error("Unknown exception", ex);
             throw new IOException(ex);
         }
     }

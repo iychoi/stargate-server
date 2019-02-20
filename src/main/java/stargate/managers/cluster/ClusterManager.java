@@ -94,7 +94,7 @@ public class ClusterManager extends AbstractManager<AbstractClusterDriver> {
                     }
                     instance = new ClusterManager(service, clusterDrivers);
                 } catch (DriverFailedToLoadException ex) {
-                    LOG.error(ex);
+                    LOG.error("Could not load driver", ex);
                     throw new ManagerNotInstantiatedException(ex.toString());
                 }
             }
@@ -170,7 +170,7 @@ public class ClusterManager extends AbstractManager<AbstractClusterDriver> {
                     RemoteClusterEvent evt = RemoteClusterEvent.createInstance(jsonValue);
                     processRemoteClusterEvent(evt);
                 } catch (IOException ex) {
-                    LOG.error(ex);
+                    LOG.error("IOException", ex);
                 }
             }
         };
@@ -194,7 +194,7 @@ public class ClusterManager extends AbstractManager<AbstractClusterDriver> {
                 this.lastUpdateTime = currentTime;
             }
         } catch (DriverNotInitializedException ex) {
-            LOG.error(ex);
+            LOG.error("Driver is not initialized", ex);
             throw new IOException(ex);
         }
     }
@@ -208,10 +208,10 @@ public class ClusterManager extends AbstractManager<AbstractClusterDriver> {
 
                     this.remoteClusterStore = keyValueStoreManager.getDriver().getKeyValueStore(REMOTE_CLUSTER_STORE, Cluster.class, EnumDataStoreProperty.DATASTORE_PROP_PERSISTENT_REPLICATED);
                 } catch (ManagerNotInstantiatedException ex) {
-                    LOG.error(ex);
+                    LOG.error("Manager is not instantiated", ex);
                     throw new IOException(ex);
                 } catch (DriverNotInitializedException ex) {
-                    LOG.error(ex);
+                    LOG.error("Driver is not initialized", ex);
                     throw new IOException(ex);
                 }
             }
@@ -225,7 +225,7 @@ public class ClusterManager extends AbstractManager<AbstractClusterDriver> {
                 PolicyManager policyManager = stargateService.getPolicyManager();
                 this.policy = policyManager.getClusterPolicy();
             } catch (ManagerNotInstantiatedException ex) {
-                LOG.error(ex);
+                LOG.error("Manager is not initialized", ex);
                 throw new IOException(ex);
             }
         }
@@ -584,7 +584,7 @@ public class ClusterManager extends AbstractManager<AbstractClusterDriver> {
             StargateEvent event = new StargateEvent(StargateEventType.STARGATE_EVENT_TYPE_REMOTECLUSTER, nodeNames, localNode.getName(), remoteClusterEvent.toJson());
             eventManager.raiseEvent(event);
         } catch (ManagerNotInstantiatedException ex) {
-            LOG.error(ex);
+            LOG.error("Manager is not instantiated", ex);
         }
     }
     
@@ -602,7 +602,7 @@ public class ClusterManager extends AbstractManager<AbstractClusterDriver> {
             StargateEvent event = new StargateEvent(StargateEventType.STARGATE_EVENT_TYPE_REMOTECLUSTER, nodeNames, localNode.getName(), remoteClusterEvent.toJson());
             eventManager.raiseEvent(event);
         } catch (ManagerNotInstantiatedException ex) {
-            LOG.error(ex);
+            LOG.error("Manager is not instantiated", ex);
         }
     }
     
@@ -620,7 +620,7 @@ public class ClusterManager extends AbstractManager<AbstractClusterDriver> {
             StargateEvent event = new StargateEvent(StargateEventType.STARGATE_EVENT_TYPE_REMOTECLUSTER, nodeNames, localNode.getName(), remoteClusterEvent.toJson());
             eventManager.raiseEvent(event);
         } catch (ManagerNotInstantiatedException ex) {
-            LOG.error(ex);
+            LOG.error("Manager is not instantiated", ex);
         }
     }
     

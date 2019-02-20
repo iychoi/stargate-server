@@ -98,7 +98,7 @@ public class RecipeManager extends AbstractManager<AbstractRecipeDriver> {
                     }
                     instance = new RecipeManager(service, recipeDrivers);
                 } catch (DriverFailedToLoadException ex) {
-                    LOG.error(ex);
+                    LOG.error("Could not load driver", ex);
                     throw new ManagerNotInstantiatedException(ex.toString());
                 }
             }
@@ -160,10 +160,10 @@ public class RecipeManager extends AbstractManager<AbstractRecipeDriver> {
                     DataStoreManager keyValueStoreManager = stargateService.getDataStoreManager();
                     this.recipeStore = keyValueStoreManager.getDriver().getKeyValueStore(RECIPE_STORE, Recipe.class, EnumDataStoreProperty.DATASTORE_PROP_PERSISTENT_DISTRIBUTED);
                 } catch (ManagerNotInstantiatedException ex) {
-                    LOG.error(ex);
+                    LOG.error("Manager is not instantiated", ex);
                     throw new IOException(ex);
                 } catch (DriverNotInitializedException ex) {
-                    LOG.error(ex);
+                    LOG.error("Driver is not initialized", ex);
                     throw new IOException(ex);
                 }
             }
@@ -174,10 +174,10 @@ public class RecipeManager extends AbstractManager<AbstractRecipeDriver> {
                     DataStoreManager keyValueStoreManager = stargateService.getDataStoreManager();
                     this.hashStore = keyValueStoreManager.getDriver().getKeyValueStore(HASH_STORE, ReverseRecipeMapping.class, EnumDataStoreProperty.DATASTORE_PROP_PERSISTENT_DISTRIBUTED);
                 } catch (ManagerNotInstantiatedException ex) {
-                    LOG.error(ex);
+                    LOG.error("Manager is not instantiated", ex);
                     throw new IOException(ex);
                 } catch (DriverNotInitializedException ex) {
-                    LOG.error(ex);
+                    LOG.error("Driver is not initialied", ex);
                     throw new IOException(ex);
                 }
             }
@@ -656,7 +656,7 @@ public class RecipeManager extends AbstractManager<AbstractRecipeDriver> {
             is.close();
             return recipe;
         } catch (ManagerNotInstantiatedException ex) {
-            LOG.error(ex);
+            LOG.error("Manager is not instantiated", ex);
             throw new IOException(ex);
         }
     }
@@ -694,7 +694,7 @@ public class RecipeManager extends AbstractManager<AbstractRecipeDriver> {
             
             return recipeChunk;
         } catch (ManagerNotInstantiatedException ex) {
-            LOG.error(ex);
+            LOG.error("Manager is not instantiated", ex);
             throw new IOException(ex);
         }
     }
@@ -869,7 +869,7 @@ public class RecipeManager extends AbstractManager<AbstractRecipeDriver> {
 
                 return recipe;
             } catch (ManagerNotInstantiatedException ex) {
-                LOG.error(ex);
+                LOG.error("Manager is not instantiated", ex);
                 throw new IOException(ex);
             }
         }

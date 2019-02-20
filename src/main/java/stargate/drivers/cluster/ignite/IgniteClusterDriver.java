@@ -247,10 +247,10 @@ public class IgniteClusterDriver extends AbstractClusterDriver {
             LOG.debug(String.format("Local node - %s", stargateNode.toJson()));
             return stargateNode;
         } catch (ManagerNotInstantiatedException ex) {
-            LOG.error(ex);
+            LOG.error("Manager is not instantiated", ex);
             throw new IOException(ex);
         } catch (DriverNotInitializedException ex) {
-            LOG.error(ex);
+            LOG.error("Driver is not initialized", ex);
             throw new IOException(ex);
         }
     }

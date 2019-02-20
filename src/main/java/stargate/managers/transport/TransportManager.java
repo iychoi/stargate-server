@@ -119,7 +119,7 @@ public class TransportManager extends AbstractManager<AbstractTransportDriver> {
                     }
                     instance = new TransportManager(service, transportDrivers);
                 } catch (DriverFailedToLoadException ex) {
-                    LOG.error(ex);
+                    LOG.error("Could not load driver", ex);
                     throw new ManagerNotInstantiatedException(ex.toString());
                 }
             }
@@ -209,9 +209,9 @@ public class TransportManager extends AbstractManager<AbstractTransportDriver> {
                     TransferEvent evt = TransferEvent.createInstance(jsonValue);
                     processTransferEvent(evt);
                 } catch (IOException ex) {
-                    LOG.error(ex);
+                    LOG.error("IOException", ex);
                 } catch (DriverNotInitializedException ex) {
-                    LOG.error(ex);
+                    LOG.error("Driver is not initialized", ex);
                 }
             }
         };
@@ -234,10 +234,10 @@ public class TransportManager extends AbstractManager<AbstractTransportDriver> {
                     DataStoreManager keyValueStoreManager = stargateService.getDataStoreManager();
                     this.remoteDirectoryCacheStore = keyValueStoreManager.getDriver().getKeyValueStore(REMOTE_DIRECTORY_CACHE_STORE, Directory.class, EnumDataStoreProperty.DATASTORE_PROP_VOLATILE_REPLICATED, TimeUnit.MINUTES, 5, false);
                 } catch (ManagerNotInstantiatedException ex) {
-                    LOG.error(ex);
+                    LOG.error("Manager is not instantiated", ex);
                     throw new IOException(ex);
                 } catch (DriverNotInitializedException ex) {
-                    LOG.error(ex);
+                    LOG.error("Driver is not initialized", ex);
                     throw new IOException(ex);
                 }
             }
@@ -252,10 +252,10 @@ public class TransportManager extends AbstractManager<AbstractTransportDriver> {
                     DataStoreManager keyValueStoreManager = stargateService.getDataStoreManager();
                     this.remoteRecipeCacheStore = keyValueStoreManager.getDriver().getKeyValueStore(REMOTE_RECIPE_CACHE_STORE, Recipe.class, EnumDataStoreProperty.DATASTORE_PROP_VOLATILE_REPLICATED, TimeUnit.DAYS, 1, false);
                 } catch (ManagerNotInstantiatedException ex) {
-                    LOG.error(ex);
+                    LOG.error("Manager is not instantiated", ex);
                     throw new IOException(ex);
                 } catch (DriverNotInitializedException ex) {
-                    LOG.error(ex);
+                    LOG.error("Driver is not initialized", ex);
                     throw new IOException(ex);
                 }
             }
@@ -270,10 +270,10 @@ public class TransportManager extends AbstractManager<AbstractTransportDriver> {
                     DataStoreManager keyValueStoreManager = stargateService.getDataStoreManager();
                     this.dataChunkCacheStore = keyValueStoreManager.getDriver().getKeyValueStore(DATA_CHUNK_CACHE_STORE, byte[].class, EnumDataStoreProperty.DATASTORE_PROP_PERSISTENT_DISTRIBUTED, TimeUnit.DAYS, 0, false);
                 } catch (ManagerNotInstantiatedException ex) {
-                    LOG.error(ex);
+                    LOG.error("Manager is not instantiated", ex);
                     throw new IOException(ex);
                 } catch (DriverNotInitializedException ex) {
-                    LOG.error(ex);
+                    LOG.error("Driver is not initialized", ex);
                     throw new IOException(ex);
                 }
             }
@@ -316,7 +316,7 @@ public class TransportManager extends AbstractManager<AbstractTransportDriver> {
 
             return getRemoteCluster(remoteNode);
         } catch (ManagerNotInstantiatedException ex) {
-            LOG.error(ex);
+            LOG.error("Manager is not instantiated", ex);
             throw new IOException(ex);
         }
     }
@@ -495,7 +495,7 @@ public class TransportManager extends AbstractManager<AbstractTransportDriver> {
                 statisticsManager.addDataChunkTransferReceiveStatistics(uri.toUri().toASCIIString(), hash);
             }
         } catch (ManagerNotInstantiatedException ex) {
-            LOG.error(ex);
+            LOG.error("Manager is not instantiated", ex);
             throw new IOException(ex);
         }
     }
@@ -531,7 +531,7 @@ public class TransportManager extends AbstractManager<AbstractTransportDriver> {
             
             return getDataChunk(remoteNode, uri, hash);
         } catch (ManagerNotInstantiatedException ex) {
-            LOG.error(ex);
+            LOG.error("Manager is not instantiated", ex);
             throw new IOException(ex);
         }
     }
@@ -651,7 +651,7 @@ public class TransportManager extends AbstractManager<AbstractTransportDriver> {
                             LOG.debug(String.format("Waiting to finish data transfer for %s", hash));
                             reference.await(5, TimeUnit.MINUTES);
                         } catch (InterruptedException ex) {
-                            LOG.error(ex);
+                            LOG.error("InterruptedException", ex);
                             if(reference.getReferenceCount() <= 0) {
                                 this.waitObjects.remove(hash);
                             }
@@ -725,7 +725,7 @@ public class TransportManager extends AbstractManager<AbstractTransportDriver> {
                 return new ByteArrayInputStream(cacheDataBytes);
             }
         } catch (ManagerNotInstantiatedException ex) {
-            LOG.error(ex);
+            LOG.error("Manager is not instantiated", ex);
             throw new IOException(ex);
         }
     }
@@ -752,7 +752,7 @@ public class TransportManager extends AbstractManager<AbstractTransportDriver> {
                 }
             }
         } catch (ManagerNotInstantiatedException ex) {
-            LOG.error(ex);
+            LOG.error("Manager is not instantiated", ex);
             throw new IOException(ex);
         }
     }
@@ -779,7 +779,7 @@ public class TransportManager extends AbstractManager<AbstractTransportDriver> {
             Recipe recipe = getRecipe(uri);
             return schedulePrefetch(localCluster, recipe, hash);
         } catch (ManagerNotInstantiatedException ex) {
-            LOG.error(ex);
+            LOG.error("Manager is not instantiated", ex);
             throw new IOException(ex);
         }
     }
@@ -826,7 +826,7 @@ public class TransportManager extends AbstractManager<AbstractTransportDriver> {
             
             return schedulePrefetch(localCluster, recipe, hash);
         } catch (ManagerNotInstantiatedException ex) {
-            LOG.error(ex);
+            LOG.error("Manager is not instantiated", ex);
             throw new IOException(ex);
         }
     }
@@ -929,7 +929,7 @@ public class TransportManager extends AbstractManager<AbstractTransportDriver> {
 
             return assignment;
         } catch (ManagerNotInstantiatedException ex) {
-            LOG.error(ex);
+            LOG.error("Manager is not instantiated", ex);
             throw new IOException(ex);
         }
     }
@@ -962,7 +962,7 @@ public class TransportManager extends AbstractManager<AbstractTransportDriver> {
 
             return getDirectory(remoteNode, uri);
         } catch (ManagerNotInstantiatedException ex) {
-            LOG.error(ex);
+            LOG.error("Manager is not instantiated", ex);
             throw new IOException(ex);
         }
     }
@@ -1026,7 +1026,7 @@ public class TransportManager extends AbstractManager<AbstractTransportDriver> {
             
             return listDataObjectMetadata(remoteNode, uri);
         } catch (ManagerNotInstantiatedException ex) {
-            LOG.error(ex);
+            LOG.error("Manager is not instantiated", ex);
             throw new IOException(ex);
         }
     }
@@ -1077,7 +1077,7 @@ public class TransportManager extends AbstractManager<AbstractTransportDriver> {
 
             return getRecipe(remoteNode, uri);
         } catch (ManagerNotInstantiatedException ex) {
-            LOG.error(ex);
+            LOG.error("Manager is not instantiated", ex);
             throw new IOException(ex);
         }
     }
@@ -1126,7 +1126,7 @@ public class TransportManager extends AbstractManager<AbstractTransportDriver> {
             StargateEvent event = new StargateEvent(StargateEventType.STARGATE_EVENT_TYPE_TRANSPORT, nodeName, localNode.getName(), transferEvent.toJson());
             eventManager.raiseEvent(event);
         } catch (ManagerNotInstantiatedException ex) {
-            LOG.error(ex);
+            LOG.error("Manager is not instantiated", ex);
         }
     }
     
@@ -1144,7 +1144,7 @@ public class TransportManager extends AbstractManager<AbstractTransportDriver> {
             StargateEvent event = new StargateEvent(StargateEventType.STARGATE_EVENT_TYPE_TRANSPORT, nodeNames, localNode.getName(), transferEvent.toJson());
             eventManager.raiseEvent(event);
         } catch (ManagerNotInstantiatedException ex) {
-            LOG.error(ex);
+            LOG.error("Manager is not instantiated", ex);
         }
     }
     

@@ -118,7 +118,7 @@ public class DataExportManager extends AbstractManager<NullDriver> {
                     DataExportEvent evt = DataExportEvent.createInstance(jsonValue);
                     processDataExportEntryEvent(evt);
                 } catch (IOException ex) {
-                    LOG.error(ex);
+                    LOG.error("IOException", ex);
                 }
             }
         };
@@ -134,10 +134,10 @@ public class DataExportManager extends AbstractManager<NullDriver> {
                 DataStoreManager keyValueStoreManager = stargateService.getDataStoreManager();
                 this.dataExportEntryStore = keyValueStoreManager.getDriver().getKeyValueStore(DATA_EXPORT_STORE, DataExportEntry.class, EnumDataStoreProperty.DATASTORE_PROP_PERSISTENT_REPLICATED);
             } catch (ManagerNotInstantiatedException ex) {
-                LOG.error(ex);
+                LOG.error("Manager is not instantiated", ex);
                 throw new IOException(ex);
             } catch (DriverNotInitializedException ex) {
-                LOG.error(ex);
+                LOG.error("Driver is not initialized", ex);
                 throw new IOException(ex);
             }
         }
@@ -358,7 +358,7 @@ public class DataExportManager extends AbstractManager<NullDriver> {
             StargateEvent event = new StargateEvent(StargateEventType.STARGATE_EVENT_TYPE_DATAEXPORT, nodeNames, localNode.getName(), dataExportEvent.toJson());
             eventManager.raiseEvent(event);
         } catch (ManagerNotInstantiatedException ex) {
-            LOG.error(ex);
+            LOG.error("Manager is not instantiated", ex);
         }
     }
     
@@ -376,7 +376,7 @@ public class DataExportManager extends AbstractManager<NullDriver> {
             StargateEvent event = new StargateEvent(StargateEventType.STARGATE_EVENT_TYPE_DATAEXPORT, nodeNames, localNode.getName(), dataExportEvent.toJson());
             eventManager.raiseEvent(event);
         } catch (ManagerNotInstantiatedException ex) {
-            LOG.error(ex);
+            LOG.error("Manager is not instantiated", ex);
         }
     }
     
@@ -393,7 +393,7 @@ public class DataExportManager extends AbstractManager<NullDriver> {
             StargateEvent event = new StargateEvent(StargateEventType.STARGATE_EVENT_TYPE_DATAEXPORT, nodeNames, localNode.getName(), dataExportEvent.toJson());
             eventManager.raiseEvent(event);
         } catch (ManagerNotInstantiatedException ex) {
-            LOG.error(ex);
+            LOG.error("Manager is not instantiated", ex);
         }
     }
     

@@ -81,7 +81,7 @@ public class ServiceMain {
             // when pressing ctrl+c, execution line does not reach to here.
             // so use shutdown hook to release resources instead.
         } catch (Exception ex) {
-            LOG.error(ex);
+            LOG.error("Unknown Exception", ex);
             ex.printStackTrace();
         }
     }

@@ -73,7 +73,7 @@ public abstract class AbstractPolicy extends AbstractImmutableConfig {
                 Object val = this.manager.get(getKey(key));
                 this.store.put(key, val);
             } catch (IOException ex) {
-                LOG.error(ex);
+                LOG.error("IOException", ex);
             }
         }
         

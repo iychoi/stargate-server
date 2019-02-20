@@ -57,9 +57,9 @@ public class PrefetchTask implements Runnable {
             LOG.debug(String.format("Prefetching %s - %s", this.uri.toUri().toASCIIString(), this.hash));
             manager.cacheRemoteDataChunk(this.uri, this.hash);
         } catch (IOException ex) {
-            LOG.error(ex);
+            LOG.error("IOException", ex);
         } catch (DriverNotInitializedException ex) {
-            LOG.error(ex);
+            LOG.error("Driver is not initialized", ex);
         }
     }
 }

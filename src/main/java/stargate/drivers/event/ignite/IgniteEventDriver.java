@@ -138,7 +138,7 @@ public class IgniteEventDriver extends AbstractEventDriver {
                             try {
                                 processEvent(event);
                             } catch (IOException ex) {
-                                LOG.error(ex);
+                                LOG.error("IOException", ex);
                             }
                         }
                     };
@@ -148,7 +148,7 @@ public class IgniteEventDriver extends AbstractEventDriver {
                     // do not call synchronously
                     //processEvent(event);
                 } catch (IOException ex) {
-                    LOG.error(ex);
+                    LOG.error("IOException", ex);
                 }
                 
                 // continue listening

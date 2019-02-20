@@ -63,13 +63,13 @@ public class RecipeChunkGenerateTask extends DistributedTask {
                     LOG.debug(String.format("Generated chunk %s - %s", parameter.getDataExportEntry().getSourceURI().toASCIIString(), recipeChunk.getHash()));
                     generatedChunks.add(recipeChunk);
                 } catch (ServiceNotStartedException ex) {
-                    LOG.error(ex);
+                    LOG.error("Service is not started", ex);
                 } catch (ManagerNotInstantiatedException ex) {
-                    LOG.error(ex);
+                    LOG.error("Manager is not instantiated", ex);
                 } catch (IOException ex) {
-                    LOG.error(ex);
+                    LOG.error("IOException", ex);
                 } catch (DriverNotInitializedException ex) {
-                    LOG.error(ex);
+                    LOG.error("Driver is not initialized", ex);
                 }
             }
             return generatedChunks;

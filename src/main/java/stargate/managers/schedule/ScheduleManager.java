@@ -70,7 +70,7 @@ public class ScheduleManager extends AbstractManager<AbstractScheduleDriver> {
                     }
                     instance = new ScheduleManager(service, scheduleDrivers);
                 } catch (DriverFailedToLoadException ex) {
-                    LOG.error(ex);
+                    LOG.error("Could not load driver", ex);
                     throw new ManagerNotInstantiatedException(ex.toString());
                 }
             }

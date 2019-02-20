@@ -82,7 +82,7 @@ public class LocalFSQueue extends AbstractQueue {
         try {
             return this.driver.listKeys(this.name).size();
         } catch (IOException ex) {
-            LOG.error(ex);
+            LOG.error("IOException", ex);
             return 0;
         }
     }
@@ -92,7 +92,7 @@ public class LocalFSQueue extends AbstractQueue {
         try {
             return (this.driver.listKeys(this.name).size() == 0);
         } catch (IOException ex) {
-            LOG.error(ex);
+            LOG.error("IOException", ex);
             return true;
         }
     }

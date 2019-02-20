@@ -116,10 +116,10 @@ public class VolumeManager extends AbstractManager<NullDriver> {
                 DataStoreManager keyValueStoreManager = stargateService.getDataStoreManager();
                 this.localVolumeStore = keyValueStoreManager.getDriver().getKeyValueStore(VOLUME_STORE, Directory.class, EnumDataStoreProperty.DATASTORE_PROP_PERSISTENT_REPLICATED);
             } catch (ManagerNotInstantiatedException ex) {
-                LOG.error(ex);
+                LOG.error("Manager is not instantiated", ex);
                 throw new IOException(ex);
             } catch (DriverNotInitializedException ex) {
-                LOG.error(ex);
+                LOG.error("Driver is not initialized", ex);
                 throw new IOException(ex);
             }
         }
@@ -142,7 +142,7 @@ public class VolumeManager extends AbstractManager<NullDriver> {
                 }
                 return false;
             } catch (ManagerNotInstantiatedException ex) {
-                LOG.error(ex);
+                LOG.error("Manager is not instantiated", ex);
                 return false;
             }
         }
@@ -176,7 +176,7 @@ public class VolumeManager extends AbstractManager<NullDriver> {
                 Cluster localCluster = clusterManager.getLocalCluster();
                 return new DataObjectURI(localCluster.getName(), uri.getPath());
             } catch (ManagerNotInstantiatedException ex) {
-                LOG.error(ex);
+                LOG.error("Manager is not instantiated", ex);
                 throw new IOException(ex);
             }
         }
@@ -223,7 +223,7 @@ public class VolumeManager extends AbstractManager<NullDriver> {
             this.lastUpdateTime = DateTimeUtils.getTimestamp();
             return rootDirectory;
         } catch (ManagerNotInstantiatedException ex) {
-            LOG.error(ex);
+            LOG.error("Manager is not instantiated", ex);
             throw new IOException(ex);
         }
     }
@@ -288,7 +288,7 @@ public class VolumeManager extends AbstractManager<NullDriver> {
             
             this.lastUpdateTime = DateTimeUtils.getTimestamp();
         } catch (ManagerNotInstantiatedException ex) {
-            LOG.error(ex);
+            LOG.error("Manager is not instantiated", ex);
             throw new IOException(ex);
         }
     }
@@ -312,7 +312,7 @@ public class VolumeManager extends AbstractManager<NullDriver> {
             
             buildLocalDirectoryHierarchy(metadatas);
         } catch (ManagerNotInstantiatedException ex) {
-            LOG.error(ex);
+            LOG.error("Manager is not instantiated", ex);
             throw new IOException(ex);
         }
     }
@@ -336,7 +336,7 @@ public class VolumeManager extends AbstractManager<NullDriver> {
             }
             return directory;
         } catch (ManagerNotInstantiatedException ex) {
-            LOG.error(ex);
+            LOG.error("Manager is not instantiated", ex);
             throw new IOException(ex);
         }
     }
@@ -415,7 +415,7 @@ public class VolumeManager extends AbstractManager<NullDriver> {
             }
             return recipe;
         } catch (ManagerNotInstantiatedException ex) {
-            LOG.error(ex);
+            LOG.error("Manager is not instantiated", ex);
             throw new IOException(ex);
         }
     }
@@ -431,7 +431,7 @@ public class VolumeManager extends AbstractManager<NullDriver> {
 
             return recipe;
         } catch (ManagerNotInstantiatedException ex) {
-            LOG.error(ex);
+            LOG.error("Manager is not instantiated", ex);
             throw new IOException(ex);
         }
     }
@@ -494,7 +494,7 @@ public class VolumeManager extends AbstractManager<NullDriver> {
                 
                 return newRecipe;
             } catch (ManagerNotInstantiatedException ex) {
-                LOG.error(ex);
+                LOG.error("Manager is not instantiated", ex);
                 throw new IOException(ex);
             }
         }
@@ -519,7 +519,7 @@ public class VolumeManager extends AbstractManager<NullDriver> {
             
             return getLocalDataChunk(recipe, hash);
         } catch (ManagerNotInstantiatedException ex) {
-            LOG.error(ex);
+            LOG.error("Manager is not instantiated", ex);
             throw new IOException(ex);
         }
     }
@@ -547,7 +547,7 @@ public class VolumeManager extends AbstractManager<NullDriver> {
             
             return getLocalDataChunk(recipe, hash);
         } catch (ManagerNotInstantiatedException ex) {
-            LOG.error(ex);
+            LOG.error("Manager is not instantiated", ex);
             throw new IOException(ex);
         }
     }
@@ -596,7 +596,7 @@ public class VolumeManager extends AbstractManager<NullDriver> {
             // access the file
             return dataSourceDriver.openFile(sourceMetadata.getURI(), chunk.getOffset(), chunk.getLength());
         } catch (ManagerNotInstantiatedException ex) {
-            LOG.error(ex);
+            LOG.error("Manager is not instantiated", ex);
             throw new IOException(ex);
         }
     }
@@ -612,7 +612,7 @@ public class VolumeManager extends AbstractManager<NullDriver> {
             }
             return is;
         } catch (ManagerNotInstantiatedException ex) {
-            LOG.error(ex);
+            LOG.error("Manager is not instantiated", ex);
             throw new IOException(ex);
         }
     }

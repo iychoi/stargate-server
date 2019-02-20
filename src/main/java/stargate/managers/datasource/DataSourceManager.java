@@ -66,7 +66,7 @@ public class DataSourceManager extends AbstractManager<AbstractDataSourceDriver>
                     }
                     instance = new DataSourceManager(service, dataSourceDrivers);
                 } catch (DriverFailedToLoadException ex) {
-                    LOG.error(ex);
+                    LOG.error("Could not load driver", ex);
                     throw new ManagerNotInstantiatedException(ex.toString());
                 }
             }

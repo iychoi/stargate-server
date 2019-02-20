@@ -230,7 +230,7 @@ public class LocalFSDataSourceDriver extends AbstractDataSourceDriver {
                     URI entryDriverUri = getDriverURI(file);
                     entries.add(entryDriverUri);
                 } catch (URISyntaxException ex) {
-                    LOG.error(ex);
+                    LOG.error("URISyntaxException", ex);
                     throw new IOException(ex);
                 }
             }
@@ -267,7 +267,7 @@ public class LocalFSDataSourceDriver extends AbstractDataSourceDriver {
                     SourceFileMetadata metadata = new SourceFileMetadata(entryDriverUri, true, file.isDirectory(), file.length(), file.lastModified());
                     entries.add(metadata);
                 } catch (URISyntaxException ex) {
-                    LOG.error(ex);
+                    LOG.error("URISyntaxException", ex);
                     throw new IOException(ex);
                 }
             }

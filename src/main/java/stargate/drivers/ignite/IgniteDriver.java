@@ -175,7 +175,7 @@ public class IgniteDriver {
                 // block at this point until the cluster is activated
                 this.activationLatch.await();
             } catch (InterruptedException ex) {
-                LOG.error(ex);
+                LOG.error("InterruptedException", ex);
                 throw new IOException(ex);
             }
             
@@ -219,7 +219,7 @@ public class IgniteDriver {
                     
                     activationLatch.countDown();
                 } catch (Exception ex) {
-                    LOG.error(ex);
+                    LOG.error("Unknown Exception", ex);
                     activationLatch.countDown();
                 }
             }

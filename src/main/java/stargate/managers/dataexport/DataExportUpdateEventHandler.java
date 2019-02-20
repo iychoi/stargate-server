@@ -63,7 +63,7 @@ public class DataExportUpdateEventHandler extends AbstractDataExportEventHandler
                 this.volumeManager.buildLocalDirectoryHierarchy();
             }
         } catch (Exception ex) {
-            LOG.error(ex);
+            LOG.error("Unknown Exception", ex);
         }
     }
 
@@ -76,7 +76,7 @@ public class DataExportUpdateEventHandler extends AbstractDataExportEventHandler
                 this.volumeManager.buildLocalDirectoryHierarchy();
             }
         } catch (Exception ex) {
-            LOG.error(ex);
+            LOG.error("Unknown Exception", ex);
         }
     }
 
@@ -90,7 +90,7 @@ public class DataExportUpdateEventHandler extends AbstractDataExportEventHandler
                 this.volumeManager.buildLocalDirectoryHierarchy();
             }
         } catch (Exception ex) {
-            LOG.error(ex);
+            LOG.error("Unknown Exception", ex);
         }
     }
 }

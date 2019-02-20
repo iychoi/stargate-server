@@ -146,7 +146,7 @@ public class LocalFSKeyValueStore extends AbstractKeyValueStore {
             cleanUp();
             return this.driver.listKeys(this.name).size();
         } catch (IOException ex) {
-            LOG.error(ex);
+            LOG.error("IOException", ex);
             return 0;
         }
     }
@@ -157,7 +157,7 @@ public class LocalFSKeyValueStore extends AbstractKeyValueStore {
             cleanUp();
             return (this.driver.listKeys(this.name).isEmpty());
         } catch (IOException ex) {
-            LOG.error(ex);
+            LOG.error("IOException", ex);
             return true;
         }
     }
@@ -172,7 +172,7 @@ public class LocalFSKeyValueStore extends AbstractKeyValueStore {
             cleanUp();
             return this.driver.existKey(this.name, key);
         } catch (IOException ex) {
-            LOG.error(ex);
+            LOG.error("IOException", ex);
             return false;
         }
     }

@@ -126,10 +126,10 @@ public class HTTPTransportServlet extends AbstractTransportServer {
             FSServiceInfo serviceInfo = new FSServiceInfo(chunkSize, hashAlgorithm);
             return serviceInfo;
         } catch (ManagerNotInstantiatedException ex) {
-            LOG.error(ex);
+            LOG.error("Manager is not instantiated", ex);
             throw new IOException(ex);
         } catch (Exception ex) {
-            LOG.error(ex);
+            LOG.error("Unknown exception", ex);
             throw new IOException(ex);
         }
     }
@@ -157,13 +157,13 @@ public class HTTPTransportServlet extends AbstractTransportServer {
             ClusterManager clusterManager = service.getClusterManager();
             return clusterManager.getLocalCluster();
         } catch (ManagerNotInstantiatedException ex) {
-            LOG.error(ex);
+            LOG.error("Manager is not instantiated", ex);
             throw new IOException(ex);
         } catch (DriverNotInitializedException ex) {
-            LOG.error(ex);
+            LOG.error("Driver is not initialized", ex);
             throw new IOException(ex);
         } catch (Exception ex) {
-            LOG.error(ex);
+            LOG.error("Unknown exception", ex);
             throw new IOException(ex);
         }
     }
@@ -205,13 +205,13 @@ public class HTTPTransportServlet extends AbstractTransportServer {
             VolumeManager volumeManager = service.getVolumeManager();
             return volumeManager.getDataObjectMetadata(uri);
         } catch (ManagerNotInstantiatedException ex) {
-            LOG.error(ex);
+            LOG.error("Manager is not instantiated", ex);
             throw new IOException(ex);
         } catch (DriverNotInitializedException ex) {
-            LOG.error(ex);
+            LOG.error("Driver is not initialized", ex);
             throw new IOException(ex);
         } catch (Exception ex) {
-            LOG.error(ex);
+            LOG.error("Unknown exception", ex);
             throw new IOException(ex);
         }
     }
@@ -251,13 +251,13 @@ public class HTTPTransportServlet extends AbstractTransportServer {
             Directory directory = volumeManager.getDirectory(uri);
             return directory.getEntries();
         } catch (ManagerNotInstantiatedException ex) {
-            LOG.error(ex);
+            LOG.error("Manager is not instantiated", ex);
             throw new IOException(ex);
         } catch (DriverNotInitializedException ex) {
-            LOG.error(ex);
+            LOG.error("Driver is not initialized", ex);
             throw new IOException(ex);
         } catch (Exception ex) {
-            LOG.error(ex);
+            LOG.error("Unknown exception", ex);
             throw new IOException(ex);
         }
     }
@@ -296,13 +296,13 @@ public class HTTPTransportServlet extends AbstractTransportServer {
             VolumeManager volumeManager = service.getVolumeManager();
             return volumeManager.getRecipe(uri);
         } catch (ManagerNotInstantiatedException ex) {
-            LOG.error(ex);
+            LOG.error("Manager is not instantiated", ex);
             throw new IOException(ex);
         } catch (DriverNotInitializedException ex) {
-            LOG.error(ex);
+            LOG.error("Driver is not initialized", ex);
             throw new IOException(ex);
         } catch (Exception ex) {
-            LOG.error(ex);
+            LOG.error("Unknown exception", ex);
             throw new IOException(ex);
         }
     }
@@ -341,13 +341,13 @@ public class HTTPTransportServlet extends AbstractTransportServer {
             VolumeManager volumeManager = service.getVolumeManager();
             return volumeManager.getDirectory(uri);
         } catch (ManagerNotInstantiatedException ex) {
-            LOG.error(ex);
+            LOG.error("Manager is not instantiated", ex);
             throw new IOException(ex);
         } catch (DriverNotInitializedException ex) {
-            LOG.error(ex);
+            LOG.error("Driver is not initialized", ex);
             throw new IOException(ex);
         } catch (Exception ex) {
-            LOG.error(ex);
+            LOG.error("Unknown exception", ex);
             throw new IOException(ex);
         }
     }
@@ -391,13 +391,13 @@ public class HTTPTransportServlet extends AbstractTransportServer {
             statisticsManager.addDataChunkTransferSendStatistics(hash);
             return is;
         } catch (ManagerNotInstantiatedException ex) {
-            LOG.error(ex);
+            LOG.error("Manager is not instantiated", ex);
             throw new IOException(ex);
         } catch (DriverNotInitializedException ex) {
-            LOG.error(ex);
+            LOG.error("Driver is not initialized", ex);
             throw new IOException(ex);
         } catch (Exception ex) {
-            LOG.error(ex);
+            LOG.error("Unknown exception", ex);
             throw new IOException(ex);
         }
     }

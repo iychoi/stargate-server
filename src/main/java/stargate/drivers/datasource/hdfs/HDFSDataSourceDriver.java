@@ -264,7 +264,7 @@ public class HDFSDataSourceDriver extends AbstractDataSourceDriver {
                     URI entryDriverUri = getDriverURI(stat.getPath());
                     entries.add(entryDriverUri);
                 } catch (URISyntaxException ex) {
-                    LOG.error(ex);
+                    LOG.error("URISyntaxException", ex);
                     throw new IOException(ex);
                 }
             }
@@ -303,7 +303,7 @@ public class HDFSDataSourceDriver extends AbstractDataSourceDriver {
                     entries.add(metadata);
                     
                 } catch (URISyntaxException ex) {
-                    LOG.error(ex);
+                    LOG.error("URISyntaxException", ex);
                     throw new IOException(ex);
                 }
             }

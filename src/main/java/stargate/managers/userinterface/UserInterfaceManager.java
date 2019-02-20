@@ -67,7 +67,7 @@ public class UserInterfaceManager extends AbstractManager<AbstractUserInterfaceD
                     }
                     instance = new UserInterfaceManager(service, userInterfaceDrivers);
                 } catch (DriverFailedToLoadException ex) {
-                    LOG.error(ex);
+                    LOG.error("Could not load driver", ex);
                     throw new ManagerNotInstantiatedException(ex.toString());
                 }
             }

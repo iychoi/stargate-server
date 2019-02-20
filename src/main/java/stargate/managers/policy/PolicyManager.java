@@ -101,10 +101,10 @@ public class PolicyManager extends AbstractManager<NullDriver> {
                     DataStoreManager keyValueStoreManager = stargateService.getDataStoreManager();
                     this.policyStore = keyValueStoreManager.getDriver().getKeyValueStore(POLICY_STORE, DataExportEntry.class, EnumDataStoreProperty.DATASTORE_PROP_PERSISTENT_REPLICATED);
                 } catch (ManagerNotInstantiatedException ex) {
-                    LOG.error(ex);
+                    LOG.error("Manager is not instantiated", ex);
                     throw new IOException(ex);
                 } catch (DriverNotInitializedException ex) {
-                    LOG.error(ex);
+                    LOG.error("Driver is not initialized", ex);
                     throw new IOException(ex);
                 }
             }
