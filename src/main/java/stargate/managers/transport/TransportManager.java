@@ -572,6 +572,7 @@ public class TransportManager extends AbstractManager<AbstractTransportDriver> {
             
             this.waitObjects.putIfAbsent(hash, new TransferReference());
             TransferReference reference = this.waitObjects.get(hash);
+            reference.increaseReference();
             synchronized(reference) {
                 Recipe localRecipe = recipeManager.getRecipeByHash(hash);
                 if(localRecipe != null) {
@@ -652,10 +653,10 @@ public class TransportManager extends AbstractManager<AbstractTransportDriver> {
                             reference.await(5, TimeUnit.MINUTES);
                         } catch (InterruptedException ex) {
                             LOG.error("InterruptedException", ex);
+                            reference.decreaseReference();
                             if(reference.getReferenceCount() <= 0) {
                                 this.waitObjects.remove(hash);
                             }
-                            reference.decreaseReference();
                             throw new IOException(ex);
                         }
 
