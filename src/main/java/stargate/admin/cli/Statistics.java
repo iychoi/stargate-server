@@ -125,6 +125,13 @@ public class Statistics {
         }
     }
     
+    private static String get_statistics_string(StatisticsEntry stat) {
+        long timestamp = stat.getTimestamp();
+        String dateTimeString = DateTimeUtils.getDateTimeString(timestamp);
+        
+        return String.format("[%s] %s", dateTimeString, stat.getValue());
+    }
+    
     private static void process_statistics_show_node(URI serviceURI, String type) {
         try {
             StatisticsType sType = StatisticsType.fromStrVal(type);
@@ -139,8 +146,8 @@ public class Statistics {
                 System.out.println("<EMPTY!>");
             } else {
                 for(StatisticsEntry stat : statistics) {
-                    String json = JsonSerializer.formatPretty(stat.toJson());
-                    System.out.println(json);
+                    String statString = get_statistics_string(stat);
+                    System.out.println(statString);
                 }
             }
             String dateTimeString = DateTimeUtils.getDateTimeString(client.getLastActiveTime());
@@ -177,8 +184,8 @@ public class Statistics {
                     System.out.println("<EMPTY!>");
                 } else {
                     for(StatisticsEntry stat : statistics) {
-                        String json = JsonSerializer.formatPretty(stat.toJson());
-                        System.out.println(json);
+                        String statString = get_statistics_string(stat);
+                        System.out.println(statString);
                     }
                 }
                 
