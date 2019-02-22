@@ -53,6 +53,7 @@ public class IgniteEventDriver extends AbstractEventDriver {
     private Map<StargateEventType, Set<AbstractEventHandler>> eventHandlers = new HashMap<StargateEventType, Set<AbstractEventHandler>>();
     private final Object eventHandlersSyncObj = new Object();
     private ExecutorService eventHandlerThreadPool = Executors.newFixedThreadPool(1);
+    private ExecutorService eventSenderThreadPool = Executors.newFixedThreadPool(1);
     
     private final String STARGATE_TOPIC = "STARGATE_TOPIC";
     
@@ -105,6 +106,7 @@ public class IgniteEventDriver extends AbstractEventDriver {
         this.listenEvent = false;
         this.eventHandlers.clear();
         this.eventHandlerThreadPool.shutdownNow();
+        this.eventSenderThreadPool.shutdownNow();
         
         if(this.igniteDriver != null && this.igniteDriver.isStarted()) {
             this.igniteDriver.uninit();
@@ -235,7 +237,20 @@ public class IgniteEventDriver extends AbstractEventDriver {
             throw new DriverNotInitializedException("driver is not initialized");
         }
         
-        LOG.debug(String.format("Raise an event : %s", event.getEventType().toString()));
-        this.msg.send(STARGATE_TOPIC, event.toJson());
+        Runnable r = new Runnable() {
+            @Override
+            public void run() {
+                try {
+                    LOG.debug(String.format("Raise an event : %s", event.getEventType().toString()));
+                    synchronized(msg) {
+                        msg.send(STARGATE_TOPIC, event.toJson());
+                    }
+                } catch (IOException ex) {
+                    LOG.error("IOException", ex);
+                }
+            }
+        };
+        
+        this.eventSenderThreadPool.execute(r);
     }
 }
