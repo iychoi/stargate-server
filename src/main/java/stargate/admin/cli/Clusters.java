@@ -38,6 +38,7 @@ public class Clusters {
     private static final Log LOG = LogFactory.getLog(Clusters.class);
 
     private enum COMMAND_LV1 {
+        CMD_LV1_CLUSTER_SUMMARY("summary"),
         CMD_LV1_LOCAL_CLUSTER("local"),
         CMD_LV1_REMOTE_CLUSTERS("remote"),
         CMD_LV1_UNKNOWN("unknown");
@@ -128,6 +129,9 @@ public class Clusters {
                 COMMAND_LV1 cmd = COMMAND_LV1.fromString(cmd_lv1);
 
                 switch(cmd) {
+                    case CMD_LV1_CLUSTER_SUMMARY:
+                        process_cluster_summary(parser.getServiceURI());
+                        break;
                     case CMD_LV1_LOCAL_CLUSTER:
                         local_cluster(parser);
                         break;
@@ -238,6 +242,53 @@ public class Clusters {
                 }
             }
             System.out.println(String.format("Available commands - %s", sb.toString()));
+        }
+    }
+    
+    private static String get_node_string(Node node) {
+        Collection<String> hostnames = node.getHostnames();
+        StringBuilder sb = new StringBuilder();
+        sb.append("[");
+        boolean first = true;
+        for(String hostname : hostnames) {
+            if(first) {
+                sb.append(hostname);
+                first = false;
+            } else {
+                sb.append(", ");
+                sb.append(hostname);
+            }
+        }
+        sb.append("]");
+        return String.format("%s %s %s", node.getName(), node.getUserInterfaceServiceInfo().getServiceURI().toASCIIString(), sb.toString());
+    }
+    
+    private static void process_cluster_summary(URI serviceURI) {
+        try {
+            HTTPUserInterfaceClient client = HTTPUIClient.getClient(serviceURI);
+            client.connect();
+            Cluster localCluster = client.getLocalCluster();
+            Collection<Cluster> remoteClusters = client.getRemoteClusters();
+            
+            Collection<Node> localNodes = localCluster.getNodes();
+            System.out.println(String.format("Local Cluster - %s (%d nodes)", localCluster.getName(), localCluster.getNodeNum()));
+            for(Node node : localNodes) {
+                System.out.println(get_node_string(node));
+            }
+            System.out.println("");
+            
+            System.out.println("Remote Clusters");
+            for(Cluster remoteCluster : remoteClusters) {
+                System.out.println(String.format("%s (%d nodes)", remoteCluster.getName(), remoteCluster.getNodeNum()));
+            }
+            
+            String dateTimeString = DateTimeUtils.getDateTimeString(client.getLastActiveTime());
+            System.out.println(String.format("<Request processed %s>", dateTimeString));
+            client.disconnect();
+            System.exit(0);
+        } catch (IOException ex) {
+            ex.printStackTrace();
+            System.exit(1);
         }
     }
     
