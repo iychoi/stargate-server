@@ -405,7 +405,7 @@ public class TransportManager extends AbstractManager<AbstractTransportDriver> {
                             //notify
                             raiseEventForTransferCompletion(uri, hash);
                             
-                            LOG.debug(String.format("Found a local chunk for - %s, %s at %s", uri.toUri().toASCIIString(), hash, localNode.getName()));
+                            LOG.debug(String.format("Found a local chunk for - %s, %s", uri.toUri().toASCIIString(), hash));
                             return;
                         //} else {
                         //    // data is found in the local cluster but remote node
@@ -446,7 +446,7 @@ public class TransportManager extends AbstractManager<AbstractTransportDriver> {
                             this.waitObjects.remove(hash);
                         }
                         
-                        LOG.debug(String.format("Found a chunk cache for - %s, %s at %s", uri.toUri().toASCIIString(), hash, localNode.getName()));
+                        LOG.debug(String.format("Found a chunk cache for - %s, %s", uri.toUri().toASCIIString(), hash));
                         return;
                     }
 
@@ -457,7 +457,7 @@ public class TransportManager extends AbstractManager<AbstractTransportDriver> {
                         if(reference.getReferenceCount() <= 0) {
                             this.waitObjects.remove(hash);
                         }
-                        LOG.debug(String.format("Transfer schedule is found but pending (not the task of this node) for %s, %s at %s", uri.toUri().toASCIIString(), hash, localNode.getName()));
+                        LOG.debug(String.format("Transfer schedule is found but pending (not the task of this node) for %s, %s", uri.toUri().toASCIIString(), hash));
                         return;
                     }
                 }
@@ -628,7 +628,7 @@ public class TransportManager extends AbstractManager<AbstractTransportDriver> {
                             
                             ByteArrayInputStream bais = new ByteArrayInputStream(cacheDataBytes);
                             
-                            LOG.debug(String.format("Found a local chunk for - %s, %s at %s", uri.toUri().toASCIIString(), hash, localNode.getName()));
+                            LOG.debug(String.format("Found a local chunk for - %s, %s", uri.toUri().toASCIIString(), hash));
                             
                             return bais;
                         //} else {
@@ -651,7 +651,7 @@ public class TransportManager extends AbstractManager<AbstractTransportDriver> {
                             this.waitObjects.remove(hash);
                         }
                         
-                        LOG.debug(String.format("Found a chunk cache for - %s, %s at %s", uri.toUri().toASCIIString(), hash, localNode.getName()));
+                        LOG.debug(String.format("Found a chunk cache for - %s, %s", uri.toUri().toASCIIString(), hash));
                         return bais;
                     } else {
                         // wait until the data transfer is complete
@@ -698,7 +698,7 @@ public class TransportManager extends AbstractManager<AbstractTransportDriver> {
                                 this.waitObjects.remove(hash);
                             }
                             
-                            LOG.debug(String.format("Found a chunk cache for - %s, %s at %s", uri.toUri().toASCIIString(), hash, localNode.getName()));
+                            LOG.debug(String.format("Found a chunk cache for - %s, %s", uri.toUri().toASCIIString(), hash));
                             return bais;
                         } else {
                             // something caused the waiting thread to wake up
@@ -749,7 +749,7 @@ public class TransportManager extends AbstractManager<AbstractTransportDriver> {
                 StatisticsManager statisticsManager = stargateService.getStatisticsManager();
                 statisticsManager.addDataChunkTransferReceiveStatistics(uri.toUri().toASCIIString(), hash);
                 
-                LOG.debug(String.format("Get a chunk for - %s, %s at %s", uri.toUri().toASCIIString(), hash, localNode.getName()));
+                LOG.debug(String.format("Get a chunk for - %s, %s", uri.toUri().toASCIIString(), hash));
                 
                 return new ByteArrayInputStream(cacheDataBytes);
             }
@@ -786,7 +786,7 @@ public class TransportManager extends AbstractManager<AbstractTransportDriver> {
         }
     }
     
-    public TransferAssignment schedulePrefetch(DataObjectURI uri, String hash) throws IOException, DriverNotInitializedException {
+    public TransferAssignment prefetchDataChunk(DataObjectURI uri, String hash) throws IOException, DriverNotInitializedException {
         if(uri == null) {
             throw new IllegalArgumentException("uri is null");
         }
@@ -806,14 +806,14 @@ public class TransportManager extends AbstractManager<AbstractTransportDriver> {
             Cluster localCluster = clusterManager.getLocalCluster();
             
             Recipe recipe = getRecipe(uri);
-            return schedulePrefetch(localCluster, recipe, hash);
+            return prefetchDataChunk(localCluster, recipe, hash);
         } catch (ManagerNotInstantiatedException ex) {
             LOG.error("Manager is not instantiated", ex);
             throw new IOException(ex);
         }
     }
     
-    public TransferAssignment schedulePrefetch(Cluster localCluster, DataObjectURI uri, String hash) throws IOException, DriverNotInitializedException {
+    public TransferAssignment prefetchDataChunk(Cluster localCluster, DataObjectURI uri, String hash) throws IOException, DriverNotInitializedException {
         if(localCluster == null) {
             throw new IllegalArgumentException("localCluster is null or empty");
         }
@@ -831,10 +831,10 @@ public class TransportManager extends AbstractManager<AbstractTransportDriver> {
         }
         
         Recipe recipe = getRecipe(uri);
-        return schedulePrefetch(localCluster, recipe, hash);
+        return prefetchDataChunk(localCluster, recipe, hash);
     }
     
-    public TransferAssignment schedulePrefetch(Recipe recipe, String hash) throws IOException, DriverNotInitializedException {
+    public TransferAssignment prefetchDataChunk(Recipe recipe, String hash) throws IOException, DriverNotInitializedException {
         if(recipe == null) {
             throw new IllegalArgumentException("recipe is null");
         }
@@ -853,14 +853,14 @@ public class TransportManager extends AbstractManager<AbstractTransportDriver> {
 
             Cluster localCluster = clusterManager.getLocalCluster();
             
-            return schedulePrefetch(localCluster, recipe, hash);
+            return prefetchDataChunk(localCluster, recipe, hash);
         } catch (ManagerNotInstantiatedException ex) {
             LOG.error("Manager is not instantiated", ex);
             throw new IOException(ex);
         }
     }
     
-    public TransferAssignment schedulePrefetch(Cluster localCluster, Recipe recipe, String hash) throws IOException, DriverNotInitializedException {
+    public TransferAssignment prefetchDataChunk(Cluster localCluster, Recipe recipe, String hash) throws IOException, DriverNotInitializedException {
         if(localCluster == null) {
             throw new IllegalArgumentException("localCluster is null");
         }
@@ -882,7 +882,7 @@ public class TransportManager extends AbstractManager<AbstractTransportDriver> {
         DataObjectMetadata metadata = recipe.getMetadata();
         RecipeChunk chunk = recipe.getChunk(hash);
         
-        LOG.debug(String.format("Scheduling a prefetch - %s, %s", metadata.getURI().toUri().toASCIIString(), hash));
+        LOG.debug(String.format("Scheduling a prefetching - %s, %s", metadata.getURI().toUri().toASCIIString(), hash));
         
         if(chunk == null) {
             throw new IllegalArgumentException(String.format("cannot find recipe chunk for hash %s", hash));
@@ -960,7 +960,7 @@ public class TransportManager extends AbstractManager<AbstractTransportDriver> {
             raiseEventForPrefetchTransfer(metadata.getURI(), hash, determinedLocalNode.getName());
 
             TransferAssignment assignment = new TransferAssignment(recipe.getMetadata().getURI(), hash, determinedLocalNode.getName());
-            LOG.debug(String.format("Scheduled a prefetch for - %s, %s at %s", metadata.getURI().toUri().toASCIIString(), hash, determinedLocalNode.getName()));
+            LOG.debug(String.format("Scheduled a prefetching for - %s, %s at %s", metadata.getURI().toUri().toASCIIString(), hash, determinedLocalNode.getName()));
             return assignment;
         } catch (ManagerNotInstantiatedException ex) {
             LOG.error("Manager is not instantiated", ex);
@@ -1183,7 +1183,6 @@ public class TransportManager extends AbstractManager<AbstractTransportDriver> {
     }
     
     private void processPrefetchEvent(DataObjectURI uri, String hash) {
-        LOG.debug(String.format("Scheduling prefetching for %s - %s", uri.toUri().toASCIIString(), hash));
         PrefetchTask task = new PrefetchTask(this, uri, hash);
         this.prefetchThreadPool.execute(task);
     }
@@ -1191,14 +1190,14 @@ public class TransportManager extends AbstractManager<AbstractTransportDriver> {
     private void processTransferEvent(TransferEvent event) throws IOException, DriverNotInitializedException {
         switch(event.getEventType()) {
             case TRANSFER_EVENT_TYPE_ONDEMAND:
-                LOG.debug(String.format("on-demand transfser is requested : %s - %s", event.getURI().toUri().toASCIIString(), event.getHash()));
+                LOG.debug(String.format("On-demand transfser is requested : %s - %s", event.getURI().toUri().toASCIIString(), event.getHash()));
                 break;
             case TRANSFER_EVENT_TYPE_PREFETCH:
-                LOG.debug(String.format("prefetch is requested : %s - %s", event.getURI().toUri().toASCIIString(), event.getHash()));
+                LOG.debug(String.format("A prefetching is requested : %s - %s", event.getURI().toUri().toASCIIString(), event.getHash()));
                 processPrefetchEvent(event.getURI(), event.getHash());
                 break;
             case TRANSFER_EVENT_TYPE_COMPLETE:
-                LOG.debug(String.format("transfser is finished : %s - %s", event.getURI().toUri().toASCIIString(), event.getHash()));
+                LOG.debug(String.format("Transfser is finished : %s - %s", event.getURI().toUri().toASCIIString(), event.getHash()));
                 TransferReference reference = this.waitObjects.get(event.getHash());
                 if(reference != null) {
                     reference.finishTransfer();

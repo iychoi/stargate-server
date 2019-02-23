@@ -482,7 +482,7 @@ public class VolumeManager extends AbstractManager<NullDriver> {
                 
                 Collection<RecipeChunk> recipeChunks = remoteRecipe.getChunks();
                 for(RecipeChunk chunk : recipeChunks) {
-                    TransferAssignment assignment = transportManager.schedulePrefetch(localCluster, remoteRecipe, chunk.getHash());
+                    TransferAssignment assignment = transportManager.prefetchDataChunk(localCluster, remoteRecipe, chunk.getHash());
                     String assignedNodeName = assignment.getTransferNode();
                     int assignedNodeID = newRecipe.getNodeID(assignedNodeName);
                     

@@ -933,7 +933,7 @@ public class HTTPUserInterfaceServlet extends AbstractUserInterfaceServer {
         try {
             StargateService service = getStargateService();
             TransportManager transportManager = service.getTransportManager();
-            TransferAssignment assignment = transportManager.schedulePrefetch(uri, hash);
+            TransferAssignment assignment = transportManager.prefetchDataChunk(uri, hash);
             return assignment;
         } catch (ManagerNotInstantiatedException ex) {
             LOG.error("Manager is not instantiated", ex);
