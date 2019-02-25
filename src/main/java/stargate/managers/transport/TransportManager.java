@@ -363,10 +363,12 @@ public class TransportManager extends AbstractManager<AbstractTransportDriver> {
             DataSourceManager dataSourceManager = stargateService.getDataSourceManager();
             
             // put to the cache
+            boolean putPendingChunkCache = false;
             DataChunkCache pendingDataChunkCache = new DataChunkCache(DataChunkCacheType.DATA_CHUNK_CACHE_PENDING, hash, 1, localNode.getName(), null);
             boolean insert = this.dataChunkCacheStore.putIfAbsent(hash, pendingDataChunkCache.toBytes());
             if(insert) {
                 this.lastUpdateTime = DateTimeUtils.getTimestamp();
+                putPendingChunkCache = true;
             }
 
             this.waitObjects.putIfAbsent(hash, new TransferReference());
@@ -435,30 +437,32 @@ public class TransportManager extends AbstractManager<AbstractTransportDriver> {
                 }
             
                 // double-check cache
-                byte[] existingData = (byte[]) this.dataChunkCacheStore.get(hash);
-                if(existingData != null) {
-                    DataChunkCache existingCache = DataChunkCache.fromBytes(existingData);
-                    if(existingCache.getType() == DataChunkCacheType.DATA_CHUNK_CACHE_PRESENT) {
-                        // existing
-                        reference.finishTransfer();
-                        reference.decreaseReference();
-                        if(reference.getReferenceCount() <= 0) {
-                            this.waitObjects.remove(hash);
-                        }
-                        
-                        LOG.debug(String.format("Found a chunk cache for - %s, %s", uri.toUri().toASCIIString(), hash));
-                        return;
-                    }
+                if(!putPendingChunkCache) {
+                    byte[] existingData = (byte[]) this.dataChunkCacheStore.get(hash);
+                    if(existingData != null) {
+                        DataChunkCache existingCache = DataChunkCache.fromBytes(existingData);
+                        if(existingCache.getType() == DataChunkCacheType.DATA_CHUNK_CACHE_PRESENT) {
+                            // existing
+                            reference.finishTransfer();
+                            reference.decreaseReference();
+                            if(reference.getReferenceCount() <= 0) {
+                                this.waitObjects.remove(hash);
+                            }
 
-                    String transferNode = existingCache.getTransferNode();
-                    if(!localNode.getName().equals(transferNode)) {
-                        // it's not my task
-                        reference.decreaseReference();
-                        if(reference.getReferenceCount() <= 0) {
-                            this.waitObjects.remove(hash);
+                            LOG.debug(String.format("Found a chunk cache for - %s, %s", uri.toUri().toASCIIString(), hash));
+                            return;
                         }
-                        LOG.debug(String.format("Transfer schedule is found but pending (not the task of this node) for %s, %s", uri.toUri().toASCIIString(), hash));
-                        return;
+
+                        String transferNode = existingCache.getTransferNode();
+                        if(!localNode.getName().equals(transferNode)) {
+                            // it's not my task
+                            reference.decreaseReference();
+                            if(reference.getReferenceCount() <= 0) {
+                                this.waitObjects.remove(hash);
+                            }
+                            LOG.debug(String.format("Transfer schedule is found but pending (not the task of this node) for %s, %s", uri.toUri().toASCIIString(), hash));
+                            return;
+                        }
                     }
                 }
 
@@ -580,10 +584,12 @@ public class TransportManager extends AbstractManager<AbstractTransportDriver> {
             RecipeManager recipeManager = stargateService.getRecipeManager();
             
             // put to the cache
+            boolean putPendingChunkCache = false;
             DataChunkCache pendingDataChunkCache = new DataChunkCache(DataChunkCacheType.DATA_CHUNK_CACHE_PENDING, hash, 1, localNode.getName(), null);
             boolean insert = this.dataChunkCacheStore.putIfAbsent(hash, pendingDataChunkCache.toBytes());
             if(insert) {
                 this.lastUpdateTime = DateTimeUtils.getTimestamp();
+                putPendingChunkCache = true;
             }
             
             this.waitObjects.putIfAbsent(hash, new TransferReference());
@@ -637,76 +643,78 @@ public class TransportManager extends AbstractManager<AbstractTransportDriver> {
                 }
 
                 // double-check cache
-                byte[] existingData = (byte[]) this.dataChunkCacheStore.get(hash);
-                if(existingData != null) {
-                    DataChunkCache existingCache = DataChunkCache.fromBytes(existingData);
-                    if(existingCache.getType() == DataChunkCacheType.DATA_CHUNK_CACHE_PRESENT) {
-                        // existing
-                        byte[] data = existingCache.getData();
-                        ByteArrayInputStream bais = new ByteArrayInputStream(data);
-                        
-                        reference.finishTransfer();
-                        reference.decreaseReference();
-                        if(reference.getReferenceCount() <= 0) {
-                            this.waitObjects.remove(hash);
-                        }
-                        
-                        LOG.debug(String.format("Found a chunk cache for - %s, %s", uri.toUri().toASCIIString(), hash));
-                        return bais;
-                    } else {
-                        // wait until the data transfer is complete
-                        while(true) {
-                            byte[] bytes = (byte[]) this.dataChunkCacheStore.get(hash);
-                            DataChunkCache dataChunkCache = DataChunkCache.fromBytes(bytes);
-
-                            DataChunkCache newDataChunkCache = new DataChunkCache(DataChunkCacheType.DATA_CHUNK_CACHE_PENDING, hash, dataChunkCache.getVersion() + 1, dataChunkCache.getTransferNode(), null);
-                            newDataChunkCache.addWaitingNodes(dataChunkCache.getWaitingNodes());
-                            newDataChunkCache.addWaitingNode(localNode.getName());
-                            
-                            boolean replaced = this.dataChunkCacheStore.replace(hash, bytes, newDataChunkCache.toBytes());
-                            if(replaced) {
-                                this.lastUpdateTime = DateTimeUtils.getTimestamp();
-                                break;
-                            } else {
-                                LOG.warn("Could not replaced chunk cache entry - try it again");
-                            }
-                        }
-                        
-                        try {
-                            LOG.debug(String.format("Waiting to finish data transfer for %s", hash));
-                            reference.await(5, TimeUnit.MINUTES);
-                        } catch (InterruptedException ex) {
-                            LOG.error("InterruptedException", ex);
-                            reference.decreaseReference();
-                            if(reference.getReferenceCount() <= 0) {
-                                this.waitObjects.remove(hash);
-                            }
-                            throw new IOException(ex);
-                        }
-
-                        // re-check
-                        existingData = (byte[]) this.dataChunkCacheStore.get(hash);
-                        existingCache = DataChunkCache.fromBytes(existingData);
-                        
+                if(!putPendingChunkCache) {
+                    byte[] existingData = (byte[]) this.dataChunkCacheStore.get(hash);
+                    if(existingData != null) {
+                        DataChunkCache existingCache = DataChunkCache.fromBytes(existingData);
                         if(existingCache.getType() == DataChunkCacheType.DATA_CHUNK_CACHE_PRESENT) {
+                            // existing
                             byte[] data = existingCache.getData();
                             ByteArrayInputStream bais = new ByteArrayInputStream(data);
-                            
+
                             reference.finishTransfer();
                             reference.decreaseReference();
                             if(reference.getReferenceCount() <= 0) {
                                 this.waitObjects.remove(hash);
                             }
-                            
+
                             LOG.debug(String.format("Found a chunk cache for - %s, %s", uri.toUri().toASCIIString(), hash));
                             return bais;
                         } else {
-                            // something caused the waiting thread to wake up
-                            reference.decreaseReference();
-                            if(reference.getReferenceCount() <= 0) {
-                                this.waitObjects.remove(hash);
+                            // wait until the data transfer is complete
+                            while(true) {
+                                byte[] bytes = (byte[]) this.dataChunkCacheStore.get(hash);
+                                DataChunkCache dataChunkCache = DataChunkCache.fromBytes(bytes);
+
+                                DataChunkCache newDataChunkCache = new DataChunkCache(DataChunkCacheType.DATA_CHUNK_CACHE_PENDING, hash, dataChunkCache.getVersion() + 1, dataChunkCache.getTransferNode(), null);
+                                newDataChunkCache.addWaitingNodes(dataChunkCache.getWaitingNodes());
+                                newDataChunkCache.addWaitingNode(localNode.getName());
+
+                                boolean replaced = this.dataChunkCacheStore.replace(hash, bytes, newDataChunkCache.toBytes());
+                                if(replaced) {
+                                    this.lastUpdateTime = DateTimeUtils.getTimestamp();
+                                    break;
+                                } else {
+                                    LOG.warn("Could not replaced chunk cache entry - try it again");
+                                }
                             }
-                            throw new IOException(String.format("Something caused the thread waiting for the data %s to wake up", hash));
+
+                            try {
+                                LOG.debug(String.format("Waiting to finish data transfer for %s", hash));
+                                reference.await(5, TimeUnit.MINUTES);
+                            } catch (InterruptedException ex) {
+                                LOG.error("InterruptedException", ex);
+                                reference.decreaseReference();
+                                if(reference.getReferenceCount() <= 0) {
+                                    this.waitObjects.remove(hash);
+                                }
+                                throw new IOException(ex);
+                            }
+
+                            // re-check
+                            existingData = (byte[]) this.dataChunkCacheStore.get(hash);
+                            existingCache = DataChunkCache.fromBytes(existingData);
+
+                            if(existingCache.getType() == DataChunkCacheType.DATA_CHUNK_CACHE_PRESENT) {
+                                byte[] data = existingCache.getData();
+                                ByteArrayInputStream bais = new ByteArrayInputStream(data);
+
+                                reference.finishTransfer();
+                                reference.decreaseReference();
+                                if(reference.getReferenceCount() <= 0) {
+                                    this.waitObjects.remove(hash);
+                                }
+
+                                LOG.debug(String.format("Found a chunk cache for - %s, %s", uri.toUri().toASCIIString(), hash));
+                                return bais;
+                            } else {
+                                // something caused the waiting thread to wake up
+                                reference.decreaseReference();
+                                if(reference.getReferenceCount() <= 0) {
+                                    this.waitObjects.remove(hash);
+                                }
+                                throw new IOException(String.format("Something caused the thread waiting for the data %s to wake up", hash));
+                            }
                         }
                     }
                 }
