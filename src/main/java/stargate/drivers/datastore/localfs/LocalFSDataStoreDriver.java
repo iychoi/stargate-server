@@ -334,7 +334,7 @@ public class LocalFSDataStoreDriver extends AbstractDataStoreDriver {
     }
     
     @Override
-    public synchronized AbstractKeyValueStore getKeyValueStore(String name, Class valueClass, EnumDataStoreProperty property, TimeUnit timeunit, long timeval, boolean allowKeyLock) throws IOException, DriverNotInitializedException {
+    public synchronized AbstractKeyValueStore getExpiringKeyValueStore(String name, Class valueClass, EnumDataStoreProperty property, TimeUnit timeunit, long timeval) throws IOException, DriverNotInitializedException {
         if(name == null || name.isEmpty()) {
             throw new IllegalArgumentException("name is null or empty");
         }
@@ -365,7 +365,7 @@ public class LocalFSDataStoreDriver extends AbstractDataStoreDriver {
                 throw new IOException("Cannot create a kv store (" + name + ")");
             }
             
-            s = new LocalFSKeyValueStore(this, name, valueClass, property, timeunit, timeval, allowKeyLock);
+            s = new LocalFSKeyValueStore(this, name, valueClass, property, timeunit, timeval);
             this.kvStores.put(name, s);
         }
         return s;

@@ -23,7 +23,6 @@ import java.util.List;
 import java.util.ArrayList;
 import java.util.Map;
 import java.util.concurrent.TimeUnit;
-import java.util.concurrent.locks.Lock;
 import javax.cache.Cache;
 import javax.cache.expiry.CreatedExpiryPolicy;
 import javax.cache.expiry.Duration;
@@ -60,7 +59,6 @@ public class IgniteKeyValueStore extends AbstractKeyValueStore {
     private EnumDataStoreProperty property;
     private TimeUnit expiryTimeUnit;
     private long expiryTimeValue;
-    private boolean allowKeyLock;
     private List<AbstractDataStoreLayoutEventHandler> layoutEventHandlers = new ArrayList<AbstractDataStoreLayoutEventHandler>();
     private final Object layoutEventHandlersSyncObj = new Object();
     
@@ -95,7 +93,6 @@ public class IgniteKeyValueStore extends AbstractKeyValueStore {
         this.property = property;
         this.expiryTimeUnit = TimeUnit.SECONDS;
         this.expiryTimeValue = 0;
-        this.allowKeyLock = false;
         
         CacheConfiguration<String, ByteArray> cc = new CacheConfiguration<String, ByteArray>();
         if(EnumDataStoreProperty.isDistributed(property)) {
@@ -122,7 +119,7 @@ public class IgniteKeyValueStore extends AbstractKeyValueStore {
         this.affinity = this.ignite.affinity(name);
     }
     
-    public IgniteKeyValueStore(IgniteDataStoreDriver driver, Ignite ignite, String name, Class valueClass, EnumDataStoreProperty property, TimeUnit timeunit, long timeval, boolean allowKeyLock) {
+    public IgniteKeyValueStore(IgniteDataStoreDriver driver, Ignite ignite, String name, Class valueClass, EnumDataStoreProperty property, TimeUnit timeunit, long timeval) {
         if(driver == null) {
             throw new IllegalArgumentException("driver is null");
         }
@@ -158,7 +155,6 @@ public class IgniteKeyValueStore extends AbstractKeyValueStore {
         this.property = property;
         this.expiryTimeUnit = timeunit;
         this.expiryTimeValue = timeval;
-        this.allowKeyLock = allowKeyLock;
         
         CacheConfiguration<String, ByteArray> cc = new CacheConfiguration<String, ByteArray>();
         if(EnumDataStoreProperty.isDistributed(property)) {
@@ -174,11 +170,7 @@ public class IgniteKeyValueStore extends AbstractKeyValueStore {
         }
         
         cc.setWriteSynchronizationMode(CacheWriteSynchronizationMode.FULL_SYNC);
-        if(allowKeyLock) {
-            cc.setAtomicityMode(CacheAtomicityMode.TRANSACTIONAL);
-        } else {
-            cc.setAtomicityMode(CacheAtomicityMode.ATOMIC);
-        }
+        cc.setAtomicityMode(CacheAtomicityMode.ATOMIC);
         cc.setEvictionPolicy(null);
         cc.setCopyOnRead(false);
         cc.setOnheapCacheEnabled(true);
@@ -213,10 +205,6 @@ public class IgniteKeyValueStore extends AbstractKeyValueStore {
     
     public long getExpiryTime() {
         return this.expiryTimeValue;
-    }
-    
-    public boolean getAllowKeyLock() {
-        return this.allowKeyLock;
     }
     
     @Override
@@ -375,19 +363,6 @@ public class IgniteKeyValueStore extends AbstractKeyValueStore {
         return keys;
     }
     
-    @Override
-    public Lock getKeyLock(String key) {
-        if(!this.allowKeyLock) {
-            throw new IllegalStateException("key lock is not supported");
-        }
-        
-        if(key == null || key.isEmpty()) {
-            throw new IllegalArgumentException("key is null or empty");
-        }
-        
-        return this.store.lock(key);
-    }
-
     @Override
     public void addLayoutEventHandler(AbstractDataStoreLayoutEventHandler eventHandler) {
         if(eventHandler == null) {

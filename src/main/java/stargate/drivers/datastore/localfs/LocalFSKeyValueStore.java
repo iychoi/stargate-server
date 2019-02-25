@@ -22,7 +22,6 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.concurrent.TimeUnit;
-import java.util.concurrent.locks.Lock;
 import org.apache.commons.logging.Log;
 import org.apache.commons.logging.LogFactory;
 import stargate.commons.datastore.AbstractDataStoreLayoutEventHandler;
@@ -45,7 +44,6 @@ public class LocalFSKeyValueStore extends AbstractKeyValueStore {
     private EnumDataStoreProperty property;
     private TimeUnit expiryTimeUnit;
     private long expiryTimeVal;
-    private boolean allowKeyLock;
     private List<AbstractDataStoreLayoutEventHandler> layoutEventHandlers = new ArrayList<AbstractDataStoreLayoutEventHandler>();
     private final Object layoutEventHandlersSyncObj = new Object();
     
@@ -72,10 +70,9 @@ public class LocalFSKeyValueStore extends AbstractKeyValueStore {
         this.property = property;
         this.expiryTimeUnit = TimeUnit.SECONDS;
         this.expiryTimeVal = 0;
-        this.allowKeyLock = false;
     }
 
-    public LocalFSKeyValueStore(LocalFSDataStoreDriver driver, String name, Class valueClass, EnumDataStoreProperty property, TimeUnit timeunit, long timeval, boolean allowKeyLock) {
+    public LocalFSKeyValueStore(LocalFSDataStoreDriver driver, String name, Class valueClass, EnumDataStoreProperty property, TimeUnit timeunit, long timeval) {
         if(driver == null) {
             throw new IllegalArgumentException("driver is null");
         }
@@ -98,7 +95,6 @@ public class LocalFSKeyValueStore extends AbstractKeyValueStore {
         this.property = property;
         this.expiryTimeUnit = timeunit;
         this.expiryTimeVal = timeval;
-        this.allowKeyLock = allowKeyLock;
     }
     
     @Override
@@ -336,12 +332,6 @@ public class LocalFSKeyValueStore extends AbstractKeyValueStore {
             map.put(key, value);
         }
         return map;
-    }
-    
-    @Override
-    public Lock getKeyLock(String key) {
-        //TODO: Implement this
-        throw new UnsupportedOperationException("Not supported yet."); //To change body of generated methods, choose Tools | Templates.
     }
     
     @Override

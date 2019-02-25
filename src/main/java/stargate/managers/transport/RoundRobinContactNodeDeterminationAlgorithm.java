@@ -97,7 +97,7 @@ public class RoundRobinContactNodeDeterminationAlgorithm extends AbstractContact
                 try {
                     StargateService stargateService = getStargateService();
                     DataStoreManager keyValueStoreManager = stargateService.getDataStoreManager();
-                    this.responsibleNodeMappingStore = keyValueStoreManager.getDriver().getKeyValueStore(RESPONSIBLE_NODE_MAPPING_STORE, ResponsibleNodeMapping.class, EnumDataStoreProperty.DATASTORE_PROP_VOLATILE_REPLICATED, TimeUnit.MINUTES, 5, false);
+                    this.responsibleNodeMappingStore = keyValueStoreManager.getDriver().getExpiringKeyValueStore(RESPONSIBLE_NODE_MAPPING_STORE, ResponsibleNodeMapping.class, EnumDataStoreProperty.DATASTORE_PROP_VOLATILE_REPLICATED, TimeUnit.MINUTES, 5);
                 } catch (ManagerNotInstantiatedException ex) {
                     LOG.error("Manager is not instantiated", ex);
                     throw new IOException(ex);
