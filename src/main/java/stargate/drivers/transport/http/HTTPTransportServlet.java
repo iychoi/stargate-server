@@ -83,13 +83,23 @@ public class HTTPTransportServlet extends AbstractTransportServer {
     @Path(HTTPTransportRestfulConstants.API_PATH + "/" + HTTPTransportRestfulConstants.API_CHECK_LIVE_PATH)
     @Produces(MediaType.APPLICATION_JSON)
     public Response isLiveRestful() throws IOException {
+        LOG.info("REQ - isLiveRestful");
+        
         try {
             boolean live = isLive();
             RestfulResponse rres = new RestfulResponse(live);
-            return Response.status(Response.Status.OK).entity(rres).build();
+            Response res = Response.status(Response.Status.OK).entity(rres).build();
+            
+            LOG.info("RES - isLiveRestful");
+            
+            return res;
         } catch(Exception ex) {
             RestfulResponse rres = new RestfulResponse(ex);
-            return Response.status(Response.Status.INTERNAL_SERVER_ERROR).entity(rres).build();
+            Response res = Response.status(Response.Status.INTERNAL_SERVER_ERROR).entity(rres).build();
+            
+            LOG.info("RES (ERR) - isLiveRestful");
+            
+            return res;
         }
     }
     
@@ -102,20 +112,28 @@ public class HTTPTransportServlet extends AbstractTransportServer {
     @Path(HTTPTransportRestfulConstants.API_PATH + "/" + HTTPTransportRestfulConstants.API_GET_FS_SERVICE_INFO_PATH)
     @Produces(MediaType.APPLICATION_JSON)
     public Response getFSServiceInfoRestful() throws IOException {
+        LOG.info("REQ - getFSServiceInfoRestful");
+        
         try {
             FSServiceInfo info = getFSServiceInfo();
             RestfulResponse rres = new RestfulResponse(info);
-            return Response.status(Response.Status.OK).entity(rres).build();
+            Response res = Response.status(Response.Status.OK).entity(rres).build();
+            
+            LOG.info("RES - getFSServiceInfoRestful");
+            
+            return res;
         } catch(Exception ex) {
             RestfulResponse rres = new RestfulResponse(ex);
-            return Response.status(Response.Status.INTERNAL_SERVER_ERROR).entity(rres).build();
+            Response res = Response.status(Response.Status.INTERNAL_SERVER_ERROR).entity(rres).build();
+            
+            LOG.info("RES (ERR) - getFSServiceInfoRestful");
+            
+            return res;
         }
     }
     
     @Override
     public FSServiceInfo getFSServiceInfo() throws IOException {
-        LOG.info("getFSServiceInfo");
-        
         try {
             StargateService stargateService = getStargateService();
             RecipeManager recipeManager = stargateService.getRecipeManager();
@@ -138,20 +156,28 @@ public class HTTPTransportServlet extends AbstractTransportServer {
     @Path(HTTPTransportRestfulConstants.API_PATH + "/" + HTTPTransportRestfulConstants.API_GET_LOCAL_CLUSTER_PATH)
     @Produces(MediaType.APPLICATION_JSON)
     public Response getLocalClusterRestful() throws IOException {
+        LOG.info("REQ - getLocalClusterRestful");
+        
         try {
-            Cluster cluster = getLocalCluster();
-            RestfulResponse rres = new RestfulResponse(cluster);
-            return Response.status(Response.Status.OK).entity(rres).build();
+            Cluster localCluster = getLocalCluster();
+            RestfulResponse rres = new RestfulResponse(localCluster);
+            Response res = Response.status(Response.Status.OK).entity(rres).build();
+            
+            LOG.info("RES - getLocalClusterRestful");
+            
+            return res;
         } catch(Exception ex) {
             RestfulResponse rres = new RestfulResponse(ex);
-            return Response.status(Response.Status.INTERNAL_SERVER_ERROR).entity(rres).build();
+            Response res = Response.status(Response.Status.INTERNAL_SERVER_ERROR).entity(rres).build();
+            
+            LOG.info("RES (ERR) - getLocalClusterRestful");
+            
+            return res;
         }
     }
     
     @Override
     public Cluster getLocalCluster() throws IOException {
-        LOG.info("getLocalCluster");
-        
         try {
             StargateService service = getStargateService();
             ClusterManager clusterManager = service.getClusterManager();
@@ -177,18 +203,33 @@ public class HTTPTransportServlet extends AbstractTransportServer {
         //    throw new IllegalArgumentException("path is null or empty");
         //}
         
+        LOG.info(String.format("REQ - getDataObjectMetadataRestful - %s", path));
+        
+        
         try {
             Cluster cluster = getLocalCluster();
             DataObjectURI objectUri = new DataObjectURI(cluster.getName(), PathUtils.makeAbsolutePath(path));
             DataObjectMetadata objectMetadata = getDataObjectMetadata(objectUri);
             RestfulResponse rres = new RestfulResponse(objectMetadata);
-            return Response.status(Response.Status.OK).entity(rres).build();
+            Response res = Response.status(Response.Status.OK).entity(rres).build();
+        
+            LOG.info(String.format("RES - getDataObjectMetadataRestful - %s", path));
+            
+            return res;
         } catch(FileNotFoundException ex) {
             RestfulResponse rres = new RestfulResponse(ex);
-            return Response.status(Response.Status.NOT_FOUND).entity(rres).build();
+            Response res = Response.status(Response.Status.NOT_FOUND).entity(rres).build();
+            
+            LOG.info(String.format("RES (ERR) - getDataObjectMetadataRestful - %s", path));
+            
+            return res;
         } catch(Exception ex) {
             RestfulResponse rres = new RestfulResponse(ex);
-            return Response.status(Response.Status.INTERNAL_SERVER_ERROR).entity(rres).build();
+            Response res = Response.status(Response.Status.INTERNAL_SERVER_ERROR).entity(rres).build();
+            
+            LOG.info(String.format("RES (ERR) - getDataObjectMetadataRestful - %s", path));
+            
+            return res;
         }
     }
     
@@ -197,8 +238,6 @@ public class HTTPTransportServlet extends AbstractTransportServer {
         if(uri == null) {
             throw new IllegalArgumentException("uri is null");
         }
-        
-        LOG.info(String.format("getDataObjectMetadata - %s", uri.toUri().toASCIIString()));
         
         try {
             StargateService service = getStargateService();
@@ -225,15 +264,25 @@ public class HTTPTransportServlet extends AbstractTransportServer {
         //    throw new IllegalArgumentException("path is null or empty");
         //}
         
+        LOG.info(String.format("REQ - listDataObjectMetadataRestful - %s", path));
+        
         try {
             Cluster cluster = getLocalCluster();
             DataObjectURI objectUri = new DataObjectURI(cluster.getName(), PathUtils.makeAbsolutePath(path));
             Collection<DataObjectMetadata> objectMetadataList = listDataObjectMetadata(objectUri);
             RestfulResponse rres = new RestfulResponse(objectMetadataList.toArray(new DataObjectMetadata[0]));
-            return Response.status(Response.Status.OK).entity(rres).build();
+            Response res = Response.status(Response.Status.OK).entity(rres).build();
+            
+            LOG.info(String.format("RES - listDataObjectMetadataRestful - %s", path));
+            
+            return res;
         } catch(Exception ex) {
             RestfulResponse rres = new RestfulResponse(ex);
-            return Response.status(Response.Status.INTERNAL_SERVER_ERROR).entity(rres).build();
+            Response res = Response.status(Response.Status.INTERNAL_SERVER_ERROR).entity(rres).build();
+            
+            LOG.info(String.format("RES (ERR) - listDataObjectMetadataRestful - %s", path));
+            
+            return res;
         }
     }
     
@@ -242,8 +291,6 @@ public class HTTPTransportServlet extends AbstractTransportServer {
         if(uri == null) {
             throw new IllegalArgumentException("uri is null");
         }
-        
-        LOG.info(String.format("listDataObjectMetadata - %s", uri.toUri().toASCIIString()));
         
         try {
             StargateService service = getStargateService();
@@ -271,15 +318,25 @@ public class HTTPTransportServlet extends AbstractTransportServer {
             throw new IllegalArgumentException("path is null or empty");
         }
         
+        LOG.info(String.format("REQ - getRecipeRestful - %s", path));
+        
         try {
             Cluster cluster = getLocalCluster();
             DataObjectURI objectUri = new DataObjectURI(cluster.getName(), PathUtils.makeAbsolutePath(path));
             Recipe recipe = getRecipe(objectUri);
             RestfulResponse rres = new RestfulResponse(recipe);
-            return Response.status(Response.Status.OK).entity(rres).build();
+            Response res = Response.status(Response.Status.OK).entity(rres).build();
+            
+            LOG.info(String.format("RES - getRecipeRestful - %s", path));
+            
+            return res;
         } catch(Exception ex) {
             RestfulResponse rres = new RestfulResponse(ex);
-            return Response.status(Response.Status.INTERNAL_SERVER_ERROR).entity(rres).build();
+            Response res = Response.status(Response.Status.INTERNAL_SERVER_ERROR).entity(rres).build();
+            
+            LOG.info(String.format("RES (ERR) - getRecipeRestful - %s", path));
+            
+            return res;
         }
     }
     
@@ -288,8 +345,6 @@ public class HTTPTransportServlet extends AbstractTransportServer {
         if(uri == null) {
             throw new IllegalArgumentException("uri is null");
         }
-        
-        LOG.info(String.format("getRecipe - %s", uri.toUri().toASCIIString()));
         
         try {
             StargateService service = getStargateService();
@@ -316,15 +371,25 @@ public class HTTPTransportServlet extends AbstractTransportServer {
         //    throw new IllegalArgumentException("path is null or empty");
         //}
         
+        LOG.info(String.format("REQ - getDirectoryRestful - %s", path));
+        
         try {
             Cluster cluster = getLocalCluster();
             DataObjectURI objectUri = new DataObjectURI(cluster.getName(), PathUtils.makeAbsolutePath(path));
             Directory directory = getDirectory(objectUri);
             RestfulResponse rres = new RestfulResponse(directory);
-            return Response.status(Response.Status.OK).entity(rres).build();
+            Response res = Response.status(Response.Status.OK).entity(rres).build();
+            
+            LOG.info(String.format("RES - getDirectoryRestful - %s", path));
+            
+            return res;
         } catch(Exception ex) {
             RestfulResponse rres = new RestfulResponse(ex);
-            return Response.status(Response.Status.INTERNAL_SERVER_ERROR).entity(rres).build();
+            Response res = Response.status(Response.Status.INTERNAL_SERVER_ERROR).entity(rres).build();
+            
+            LOG.info(String.format("RES (ERR) - getDirectoryRestful - %s", path));
+            
+            return res;
         }
     }
     
@@ -333,8 +398,6 @@ public class HTTPTransportServlet extends AbstractTransportServer {
         if(uri == null) {
             throw new IllegalArgumentException("uri is null");
         }
-        
-        LOG.info(String.format("getDirectory - %s", uri.toUri().toASCIIString()));
         
         try {
             StargateService service = getStargateService();
@@ -361,16 +424,28 @@ public class HTTPTransportServlet extends AbstractTransportServer {
             throw new IllegalArgumentException("hash is null or empty");
         }
         
+        LOG.info(String.format("REQ - getDataChunkRestful - %s", hash));
+        
         try {
             final InputStream is = getDataChunk(hash);
             if(is == null) {
+                LOG.info(String.format("RES (ERR) - getDataChunkRestful - %s", hash));
                 return Response.status(Response.Status.NOT_FOUND).build();
             }
             
             StreamingOutputData stream = new StreamingOutputData(is);
-            return Response.ok(stream).header("content-disposition", "attachment; filename = " + hash).build();
+            Response res = Response.ok(stream).header("content-disposition", "attachment; filename = " + hash).build();
+            
+            LOG.info(String.format("RES - getDataChunkRestful - %s", hash));
+            
+            return res;
         } catch (Exception ex) {
-            return Response.status(Response.Status.INTERNAL_SERVER_ERROR).build();
+            RestfulResponse rres = new RestfulResponse(ex);
+            Response res = Response.status(Response.Status.INTERNAL_SERVER_ERROR).entity(rres).build();
+            
+            LOG.info(String.format("RES (ERR) - getDataChunkRestful - %s", hash));
+            
+            return res;
         }
     }
 
@@ -379,8 +454,6 @@ public class HTTPTransportServlet extends AbstractTransportServer {
         if(hash == null || hash.isEmpty()) {
             throw new IllegalArgumentException("hash is null or empty");
         }
-        
-        LOG.info(String.format("getDataChunk - %s", hash));
         
         try {
             StargateService service = getStargateService();

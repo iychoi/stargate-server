@@ -106,13 +106,23 @@ public class HTTPUserInterfaceServlet extends AbstractUserInterfaceServer {
     @Path(HTTPUserInterfaceRestfulConstants.API_PATH + "/" + HTTPUserInterfaceRestfulConstants.API_CHECK_LIVE_PATH)
     @Produces(MediaType.APPLICATION_JSON)
     public Response isLiveRestful() throws IOException {
+        LOG.info("REQ - isLiveRestful");
+        
         try {
             boolean live = isLive();
             RestfulResponse rres = new RestfulResponse(live);
-            return Response.status(Response.Status.OK).entity(rres).build();
+            Response res = Response.status(Response.Status.OK).entity(rres).build();
+            
+            LOG.info("RES - isLiveRestful");
+            
+            return res;
         } catch(Exception ex) {
             RestfulResponse rres = new RestfulResponse(ex);
-            return Response.status(Response.Status.INTERNAL_SERVER_ERROR).entity(rres).build();
+            Response res = Response.status(Response.Status.INTERNAL_SERVER_ERROR).entity(rres).build();
+            
+            LOG.info("RES (ERR) - isLiveRestful");
+            
+            return res;
         }
     }
     
@@ -125,20 +135,28 @@ public class HTTPUserInterfaceServlet extends AbstractUserInterfaceServer {
     @Path(HTTPUserInterfaceRestfulConstants.API_PATH + "/" + HTTPUserInterfaceRestfulConstants.API_GET_SERVICE_CONFIG_PATH)
     @Produces(MediaType.APPLICATION_JSON)
     public Response getServiceConfigRestful() throws IOException {
+        LOG.info("REQ - getServiceConfigRestful");
+        
         try {
             String config = getServiceConfig();
             RestfulResponse rres = new RestfulResponse(config);
-            return Response.status(Response.Status.OK).entity(rres).build();
+            Response res = Response.status(Response.Status.OK).entity(rres).build();
+            
+            LOG.info("RES - getServiceConfigRestful");
+            
+            return res;
         } catch(Exception ex) {
             RestfulResponse rres = new RestfulResponse(ex);
-            return Response.status(Response.Status.INTERNAL_SERVER_ERROR).entity(rres).build();
+            Response res = Response.status(Response.Status.INTERNAL_SERVER_ERROR).entity(rres).build();
+            
+            LOG.info("RES (ERR) - getServiceConfigRestful");
+            
+            return res;
         }
     }
     
     @Override
     public String getServiceConfig() throws IOException {
-        LOG.info("getServiceConfig");
-        
         try {
             StargateService stargateService = getStargateService();
             StargateServiceConfig config = stargateService.getConfig();
@@ -153,20 +171,28 @@ public class HTTPUserInterfaceServlet extends AbstractUserInterfaceServer {
     @Path(HTTPUserInterfaceRestfulConstants.API_PATH + "/" + HTTPUserInterfaceRestfulConstants.API_GET_FS_SERVICE_INFO_PATH)
     @Produces(MediaType.APPLICATION_JSON)
     public Response getFSServiceInfoRestful() throws IOException {
+        LOG.info("REQ - getFSServiceInfoRestful");
+        
         try {
             FSServiceInfo info = getFSServiceInfo();
             RestfulResponse rres = new RestfulResponse(info);
-            return Response.status(Response.Status.OK).entity(rres).build();
+            Response res = Response.status(Response.Status.OK).entity(rres).build();
+            
+            LOG.info("RES - getFSServiceInfoRestful");
+            
+            return res;
         } catch(Exception ex) {
             RestfulResponse rres = new RestfulResponse(ex);
-            return Response.status(Response.Status.INTERNAL_SERVER_ERROR).entity(rres).build();
+            Response res = Response.status(Response.Status.INTERNAL_SERVER_ERROR).entity(rres).build();
+            
+            LOG.info("RES (ERR) - getFSServiceInfoRestful");
+            
+            return res;
         }
     }
     
     @Override
     public FSServiceInfo getFSServiceInfo() throws IOException {
-        LOG.info("getFSServiceInfo");
-        
         try {
             StargateService stargateService = getStargateService();
             RecipeManager recipeManager = stargateService.getRecipeManager();
@@ -194,13 +220,23 @@ public class HTTPUserInterfaceServlet extends AbstractUserInterfaceServer {
             throw new IllegalArgumentException("name is null or empty");
         }
         
+        LOG.info("REQ - getClusterRestful");
+        
         try {
             Cluster cluster = getCluster(name);
             RestfulResponse rres = new RestfulResponse(cluster);
-            return Response.status(Response.Status.OK).entity(rres).build();
+            Response res = Response.status(Response.Status.OK).entity(rres).build();
+            
+            LOG.info("RES - getClusterRestful");
+            
+            return res;
         } catch(Exception ex) {
             RestfulResponse rres = new RestfulResponse(ex);
-            return Response.status(Response.Status.INTERNAL_SERVER_ERROR).entity(rres).build();
+            Response res = Response.status(Response.Status.INTERNAL_SERVER_ERROR).entity(rres).build();
+            
+            LOG.info("RES (ERR) - getClusterRestful");
+            
+            return res;
         }
     }
     
@@ -209,8 +245,6 @@ public class HTTPUserInterfaceServlet extends AbstractUserInterfaceServer {
         if(name == null || name.isEmpty()) {
             throw new IllegalArgumentException("name is null or empty");
         }
-        
-        LOG.info(String.format("getCluster - %s", name));
         
         try {
             StargateService service = getStargateService();
@@ -237,20 +271,28 @@ public class HTTPUserInterfaceServlet extends AbstractUserInterfaceServer {
     @Path(HTTPUserInterfaceRestfulConstants.API_PATH + "/" + HTTPUserInterfaceRestfulConstants.API_GET_LOCAL_CLUSTER_PATH)
     @Produces(MediaType.APPLICATION_JSON)
     public Response getLocalClusterRestful() throws IOException {
+        LOG.info("REQ - getLocalClusterRestful");
+        
         try {
             Cluster localCluster = getLocalCluster();
             RestfulResponse rres = new RestfulResponse(localCluster);
-            return Response.status(Response.Status.OK).entity(rres).build();
+            Response res = Response.status(Response.Status.OK).entity(rres).build();
+            
+            LOG.info("RES - getLocalClusterRestful");
+            
+            return res;
         } catch(Exception ex) {
             RestfulResponse rres = new RestfulResponse(ex);
-            return Response.status(Response.Status.INTERNAL_SERVER_ERROR).entity(rres).build();
+            Response res = Response.status(Response.Status.INTERNAL_SERVER_ERROR).entity(rres).build();
+            
+            LOG.info("RES (ERR) - getLocalClusterRestful");
+            
+            return res;
         }
     }
     
     @Override
     public Cluster getLocalCluster() throws IOException {
-        LOG.info("getLocalCluster");
-        
         try {
             StargateService service = getStargateService();
             ClusterManager clusterManager = service.getClusterManager();
@@ -271,21 +313,29 @@ public class HTTPUserInterfaceServlet extends AbstractUserInterfaceServer {
     @Path(HTTPUserInterfaceRestfulConstants.API_PATH + "/" + HTTPUserInterfaceRestfulConstants.API_ACTIVATE_CLUSTER_PATH)
     @Produces(MediaType.APPLICATION_JSON)
     public Response activateClusterRestful() throws IOException {
+        LOG.info("REQ - activateClusterRestful");
+        
         try {
             activateCluster();
             
             RestfulResponse rres = new RestfulResponse(true);
-            return Response.status(Response.Status.OK).entity(rres).build();
+            Response res = Response.status(Response.Status.OK).entity(rres).build();
+            
+            LOG.info("RES - activateClusterRestful");
+            
+            return res;
         } catch(Exception ex) {
             RestfulResponse rres = new RestfulResponse(ex);
-            return Response.status(Response.Status.INTERNAL_SERVER_ERROR).entity(rres).build();
+            Response res = Response.status(Response.Status.INTERNAL_SERVER_ERROR).entity(rres).build();
+            
+            LOG.info("RES (ERR) - activateClusterRestful");
+            
+            return res;
         }
     }
     
     @Override
     public void activateCluster() throws IOException {
-        LOG.info("activateCluster");
-        
         try {
             StargateService service = getStargateService();
             ClusterManager clusterManager = service.getClusterManager();
@@ -307,20 +357,28 @@ public class HTTPUserInterfaceServlet extends AbstractUserInterfaceServer {
     @Path(HTTPUserInterfaceRestfulConstants.API_PATH + "/" + HTTPUserInterfaceRestfulConstants.API_CHECK_ACTIVE_CLUSTER_PATH)
     @Produces(MediaType.APPLICATION_JSON)
     public Response isClusterActiveRestful() throws IOException {
+        LOG.info("REQ - isClusterActiveRestful");
+        
         try {
             boolean active = isClusterActive();
             RestfulResponse rres = new RestfulResponse(active);
-            return Response.status(Response.Status.OK).entity(rres).build();
+            Response res = Response.status(Response.Status.OK).entity(rres).build();
+            
+            LOG.info("RES - isClusterActiveRestful");
+            
+            return res;
         } catch(Exception ex) {
             RestfulResponse rres = new RestfulResponse(ex);
-            return Response.status(Response.Status.INTERNAL_SERVER_ERROR).entity(rres).build();
+            Response res = Response.status(Response.Status.INTERNAL_SERVER_ERROR).entity(rres).build();
+            
+            LOG.info("RES (ERR) - isClusterActiveRestful");
+            
+            return res;
         }
     }
     
     @Override
     public boolean isClusterActive() throws IOException {
-        LOG.info("isClusterActive");
-        
         try {
             StargateService service = getStargateService();
             ClusterManager clusterManager = service.getClusterManager();
@@ -342,20 +400,28 @@ public class HTTPUserInterfaceServlet extends AbstractUserInterfaceServer {
     @Path(HTTPUserInterfaceRestfulConstants.API_PATH + "/" + HTTPUserInterfaceRestfulConstants.API_GET_LOCAL_NODE_PATH)
     @Produces(MediaType.APPLICATION_JSON)
     public Response getLocalNodeRestful() throws IOException {
+        LOG.info("REQ - getLocalNodeRestful");
+        
         try {
             Node localNode = getLocalNode();
             RestfulResponse rres = new RestfulResponse(localNode);
-            return Response.status(Response.Status.OK).entity(rres).build();
+            Response res = Response.status(Response.Status.OK).entity(rres).build();
+            
+            LOG.info("RES - getLocalNodeRestful");
+            
+            return res;
         } catch(Exception ex) {
             RestfulResponse rres = new RestfulResponse(ex);
-            return Response.status(Response.Status.INTERNAL_SERVER_ERROR).entity(rres).build();
+            Response res = Response.status(Response.Status.INTERNAL_SERVER_ERROR).entity(rres).build();
+            
+            LOG.info("RES (ERR) - getLocalNodeRestful");
+            
+            return res;
         }
     }
     
     @Override
     public Node getLocalNode() throws IOException {
-        LOG.info("getLocalNode");
-        
         try {
             StargateService service = getStargateService();
             ClusterManager clusterManager = service.getClusterManager();
@@ -376,20 +442,28 @@ public class HTTPUserInterfaceServlet extends AbstractUserInterfaceServer {
     @Path(HTTPUserInterfaceRestfulConstants.API_PATH + "/" + HTTPUserInterfaceRestfulConstants.API_GET_LEADER_NODE_PATH)
     @Produces(MediaType.APPLICATION_JSON)
     public Response getLeaderNodeRestful() throws IOException {
+        LOG.info("REQ - getLeaderNodeRestful");
+        
         try {
             Node leaderNode = getLeaderNode();
             RestfulResponse rres = new RestfulResponse(leaderNode);
-            return Response.status(Response.Status.OK).entity(rres).build();
+            Response res = Response.status(Response.Status.OK).entity(rres).build();
+            
+            LOG.info("RES - getLeaderNodeRestful");
+            
+            return res;
         } catch(Exception ex) {
             RestfulResponse rres = new RestfulResponse(ex);
-            return Response.status(Response.Status.INTERNAL_SERVER_ERROR).entity(rres).build();
+            Response res = Response.status(Response.Status.INTERNAL_SERVER_ERROR).entity(rres).build();
+            
+            LOG.info("RES (ERR) - getLeaderNodeRestful");
+            
+            return res;
         }
     }
     
     @Override
     public Node getLeaderNode() throws IOException {
-        LOG.info("getLeaderNode");
-        
         try {
             StargateService service = getStargateService();
             ClusterManager clusterManager = service.getClusterManager();
@@ -415,13 +489,23 @@ public class HTTPUserInterfaceServlet extends AbstractUserInterfaceServer {
             throw new IllegalArgumentException("name is null or empty");
         }
         
+        LOG.info(String.format("REQ - getRemoteClusterRestful - %s", name));
+        
         try {
             Cluster cluster = getRemoteCluster(name);
             RestfulResponse rres = new RestfulResponse(cluster);
-            return Response.status(Response.Status.OK).entity(rres).build();
+            Response res = Response.status(Response.Status.OK).entity(rres).build();
+            
+            LOG.info(String.format("RES - getRemoteClusterRestful - %s", name));
+            
+            return res;
         } catch(Exception ex) {
             RestfulResponse rres = new RestfulResponse(ex);
-            return Response.status(Response.Status.INTERNAL_SERVER_ERROR).entity(rres).build();
+            Response res = Response.status(Response.Status.INTERNAL_SERVER_ERROR).entity(rres).build();
+            
+            LOG.info(String.format("RES (ERR) - getRemoteClusterRestful - %s", name));
+            
+            return res;
         }
     }
     
@@ -430,8 +514,6 @@ public class HTTPUserInterfaceServlet extends AbstractUserInterfaceServer {
         if(name == null || name.isEmpty()) {
             throw new IllegalArgumentException("name is null or empty");
         }
-        
-        LOG.info(String.format("getRemoteCluster - %s", name));
         
         try {
             StargateService service = getStargateService();
@@ -453,20 +535,28 @@ public class HTTPUserInterfaceServlet extends AbstractUserInterfaceServer {
     @Path(HTTPUserInterfaceRestfulConstants.API_PATH + "/" + HTTPUserInterfaceRestfulConstants.API_LIST_REMOTE_CLUSTERS_PATH)
     @Produces(MediaType.APPLICATION_JSON)
     public Response listRemoteClustersRestful() throws IOException {
+        LOG.info("REQ - listRemoteClustersRestful");
+        
         try {
             Collection<String> remoteClusters = listRemoteClusters();
             RestfulResponse rres = new RestfulResponse(remoteClusters.toArray(new String[0]));
-            return Response.status(Response.Status.OK).entity(rres).build();
+            Response res = Response.status(Response.Status.OK).entity(rres).build();
+            
+            LOG.info("RES - listRemoteClustersRestful");
+            
+            return res;
         } catch(Exception ex) {
             RestfulResponse rres = new RestfulResponse(ex);
-            return Response.status(Response.Status.INTERNAL_SERVER_ERROR).entity(rres).build();
+            Response res = Response.status(Response.Status.INTERNAL_SERVER_ERROR).entity(rres).build();
+            
+            LOG.info("RES (ERR) - listRemoteClustersRestful");
+            
+            return res;
         }
     }
     
     @Override
     public Collection<String> listRemoteClusters() throws IOException {
-        LOG.info("listRemoteClusters");
-        
         try {
             StargateService service = getStargateService();
             ClusterManager clusterManager = service.getClusterManager();
@@ -487,20 +577,28 @@ public class HTTPUserInterfaceServlet extends AbstractUserInterfaceServer {
     @Path(HTTPUserInterfaceRestfulConstants.API_PATH + "/" + HTTPUserInterfaceRestfulConstants.API_GET_REMOTE_CLUSTERS_PATH)
     @Produces(MediaType.APPLICATION_JSON)
     public Response getRemoteClustersRestful() throws IOException {
+        LOG.info("REQ - getRemoteClustersRestful");
+        
         try {
             Collection<Cluster> remoteClusters = getRemoteClusters();
             RestfulResponse rres = new RestfulResponse(remoteClusters.toArray(new Cluster[0]));
-            return Response.status(Response.Status.OK).entity(rres).build();
+            Response res = Response.status(Response.Status.OK).entity(rres).build();
+            
+            LOG.info("RES - getRemoteClustersRestful");
+            
+            return res;
         } catch(Exception ex) {
             RestfulResponse rres = new RestfulResponse(ex);
-            return Response.status(Response.Status.INTERNAL_SERVER_ERROR).entity(rres).build();
+            Response res = Response.status(Response.Status.INTERNAL_SERVER_ERROR).entity(rres).build();
+            
+            LOG.info("RES (ERR) - getRemoteClustersRestful");
+            
+            return res;
         }
     }
 
     @Override
     public Collection<Cluster> getRemoteClusters() throws IOException {
-        LOG.info("getRemoteClusters");
-        
         try {
             StargateService service = getStargateService();
             ClusterManager clusterManager = service.getClusterManager();
@@ -522,21 +620,29 @@ public class HTTPUserInterfaceServlet extends AbstractUserInterfaceServer {
     @Produces(MediaType.APPLICATION_JSON)
     @Consumes(MediaType.APPLICATION_JSON)
     public Response addRemoteClusterRestful(Cluster cluster) throws IOException {
+        LOG.info(String.format("REQ - addRemoteClusterRestful - %s", cluster.getName()));
+        
         try {
             addRemoteCluster(cluster);
             
             RestfulResponse rres = new RestfulResponse(true);
-            return Response.status(Response.Status.OK).entity(rres).build();
+            Response res = Response.status(Response.Status.OK).entity(rres).build();
+            
+            LOG.info(String.format("RES - addRemoteClusterRestful - %s", cluster.getName()));
+            
+            return res;
         } catch(Exception ex) {
             RestfulResponse rres = new RestfulResponse(ex);
-            return Response.status(Response.Status.INTERNAL_SERVER_ERROR).entity(rres).build();
+            Response res = Response.status(Response.Status.INTERNAL_SERVER_ERROR).entity(rres).build();
+            
+            LOG.info(String.format("RES (ERR) - addRemoteClusterRestful - %s", cluster.getName()));
+            
+            return res;
         }
     }
     
     @Override
     public void addRemoteCluster(Cluster cluster) throws IOException {
-        LOG.info(String.format("getRemoteClusters - %s", cluster.getName()));
-        
         try {
             StargateService service = getStargateService();
             ClusterManager clusterManager = service.getClusterManager();
@@ -565,20 +671,28 @@ public class HTTPUserInterfaceServlet extends AbstractUserInterfaceServer {
             throw new IllegalArgumentException("cluster is null or empty");
         }
         
+        LOG.info(String.format("REQ - removeRemoteClusterRestful - %s", cluster));
+        
         try {
             removeRemoteCluster(cluster);
             RestfulResponse rres = new RestfulResponse(true);
-            return Response.status(Response.Status.OK).entity(rres).build();
+            Response res = Response.status(Response.Status.OK).entity(rres).build();
+            
+            LOG.info(String.format("RES - removeRemoteClusterRestful - %s", cluster));
+        
+            return res;
         } catch(Exception ex) {
             RestfulResponse rres = new RestfulResponse(ex);
-            return Response.status(Response.Status.INTERNAL_SERVER_ERROR).entity(rres).build();
+            Response res = Response.status(Response.Status.INTERNAL_SERVER_ERROR).entity(rres).build();
+            
+            LOG.info(String.format("RES (ERR) - removeRemoteClusterRestful - %s", cluster));
+        
+            return res;
         }
     }
     
     @Override
     public void removeRemoteCluster(String name) throws IOException {
-        LOG.info(String.format("removeRemoteCluster - %s", name));
-        
         try {
             StargateService service = getStargateService();
             ClusterManager clusterManager = service.getClusterManager();
@@ -604,17 +718,31 @@ public class HTTPUserInterfaceServlet extends AbstractUserInterfaceServer {
         //    throw new IllegalArgumentException("path is null or empty");
         //}
         
+        LOG.info(String.format("REQ - getDataObjectMetadataRestful - %s", path));
+        
         try {
             DataObjectURI objectUri = new DataObjectURI(PathUtils.makeAbsolutePath(path));
             DataObjectMetadata objectMetadata = getDataObjectMetadata(objectUri);
             RestfulResponse rres = new RestfulResponse(objectMetadata);
-            return Response.status(Response.Status.OK).entity(rres).build();
+            Response res = Response.status(Response.Status.OK).entity(rres).build();
+            
+            LOG.info(String.format("RES - getDataObjectMetadataRestful - %s", path));
+            
+            return res;
         } catch(FileNotFoundException ex) {
             RestfulResponse rres = new RestfulResponse(ex);
-            return Response.status(Response.Status.NOT_FOUND).entity(rres).build();
+            Response res = Response.status(Response.Status.NOT_FOUND).entity(rres).build();
+            
+            LOG.info(String.format("RES (ERR) - getDataObjectMetadataRestful - %s", path));
+            
+            return res;
         } catch(Exception ex) {
             RestfulResponse rres = new RestfulResponse(ex);
-            return Response.status(Response.Status.INTERNAL_SERVER_ERROR).entity(rres).build();
+            Response res = Response.status(Response.Status.INTERNAL_SERVER_ERROR).entity(rres).build();
+            
+            LOG.info(String.format("RES (ERR) - getDataObjectMetadataRestful - %s", path));
+            
+            return res;
         }
     }
     
@@ -623,8 +751,6 @@ public class HTTPUserInterfaceServlet extends AbstractUserInterfaceServer {
         if(uri == null) {
             throw new IllegalArgumentException("uri is null");
         }
-        
-        LOG.info(String.format("getDataObjectMetadata - %s", uri.toUri().toASCIIString()));
         
         try {
             StargateService service = getStargateService();
@@ -651,14 +777,24 @@ public class HTTPUserInterfaceServlet extends AbstractUserInterfaceServer {
         //    throw new IllegalArgumentException("path is null or empty");
         //}
         
+        LOG.info(String.format("REQ - listDataObjectMetadataRestful - %s", path));
+        
         try {
             DataObjectURI objectUri = new DataObjectURI(PathUtils.makeAbsolutePath(path));
             Collection<DataObjectMetadata> objectMetadataList = listDataObjectMetadata(objectUri);        
             RestfulResponse rres = new RestfulResponse(objectMetadataList.toArray(new DataObjectMetadata[0]));
-            return Response.status(Response.Status.OK).entity(rres).build();
+            Response res = Response.status(Response.Status.OK).entity(rres).build();
+            
+            LOG.info(String.format("RES - listDataObjectMetadataRestful - %s", path));
+            
+            return res;
         } catch(Exception ex) {
             RestfulResponse rres = new RestfulResponse(ex);
-            return Response.status(Response.Status.INTERNAL_SERVER_ERROR).entity(rres).build();
+            Response res = Response.status(Response.Status.INTERNAL_SERVER_ERROR).entity(rres).build();
+            
+            LOG.info(String.format("RES (ERR) - listDataObjectMetadataRestful - %s", path));
+            
+            return res;
         }
     }
 
@@ -667,8 +803,6 @@ public class HTTPUserInterfaceServlet extends AbstractUserInterfaceServer {
         if(uri == null) {
             throw new IllegalArgumentException("uri is null");
         }
-        
-        LOG.info(String.format("listDataObjectMetadata - %s", uri.toUri().toASCIIString()));
         
         try {
             StargateService service = getStargateService();
@@ -696,14 +830,24 @@ public class HTTPUserInterfaceServlet extends AbstractUserInterfaceServer {
             throw new IllegalArgumentException("path is null or empty");
         }
         
+        LOG.info(String.format("REQ - getRecipeRestful - %s", path));
+        
         try {
             DataObjectURI objectUri = new DataObjectURI(PathUtils.makeAbsolutePath(path));
             Recipe recipe = getRecipe(objectUri);
             RestfulResponse rres = new RestfulResponse(recipe);
-            return Response.status(Response.Status.OK).entity(rres).build();
+            Response res = Response.status(Response.Status.OK).entity(rres).build();
+            
+            LOG.info(String.format("RES - getRecipeRestful - %s", path));
+            
+            return res;
         } catch(Exception ex) {
             RestfulResponse rres = new RestfulResponse(ex);
-            return Response.status(Response.Status.INTERNAL_SERVER_ERROR).entity(rres).build();
+            Response res = Response.status(Response.Status.INTERNAL_SERVER_ERROR).entity(rres).build();
+            
+            LOG.info(String.format("RES (ERR) - getRecipeRestful - %s", path));
+            
+            return res;
         }
     }
     
@@ -712,8 +856,6 @@ public class HTTPUserInterfaceServlet extends AbstractUserInterfaceServer {
         if(uri == null) {
             throw new IllegalArgumentException("uri is null");
         }
-        
-        LOG.info(String.format("getRecipe - %s", uri.toUri().toASCIIString()));
         
         try {
             StargateService service = getStargateService();
@@ -735,20 +877,28 @@ public class HTTPUserInterfaceServlet extends AbstractUserInterfaceServer {
     @Path(HTTPUserInterfaceRestfulConstants.API_PATH + "/" + HTTPUserInterfaceRestfulConstants.API_LIST_RECIPES_PATH)
     @Produces(MediaType.APPLICATION_JSON)
     public Response listRecipesRestful() throws IOException {
+        LOG.info("REQ - listRecipesRestful");
+        
         try {
             Collection<String> recipes = listRecipes();
             RestfulResponse rres = new RestfulResponse(recipes.toArray(new String[0]));
-            return Response.status(Response.Status.OK).entity(rres).build();
+            Response res = Response.status(Response.Status.OK).entity(rres).build();
+            
+            LOG.info("RES - listRecipesRestful");
+            
+            return res;
         } catch(Exception ex) {
             RestfulResponse rres = new RestfulResponse(ex);
-            return Response.status(Response.Status.INTERNAL_SERVER_ERROR).entity(rres).build();
+            Response res = Response.status(Response.Status.INTERNAL_SERVER_ERROR).entity(rres).build();
+            
+            LOG.info("RES (ERR) - listRecipesRestful");
+            
+            return res;
         }
     }
     
     @Override
     public Collection<String> listRecipes() throws IOException {
-        LOG.info("listRecipes");
-        
         try {
             StargateService service = getStargateService();
             RecipeManager recipeManager = service.getRecipeManager();
@@ -771,22 +921,30 @@ public class HTTPUserInterfaceServlet extends AbstractUserInterfaceServer {
             throw new IllegalArgumentException("path is null or empty");
         }
         
+        LOG.info(String.format("REQ - removeRecipeRestful - %s", path));
+        
         try {
             // local
             DataObjectURI objectUri = new DataObjectURI("", PathUtils.makeAbsolutePath(path));
             removeRecipe(objectUri);
             RestfulResponse rres = new RestfulResponse(true);
-            return Response.status(Response.Status.OK).entity(rres).build();
+            Response res = Response.status(Response.Status.OK).entity(rres).build();
+            
+            LOG.info(String.format("RES - removeRecipeRestful - %s", path));
+            
+            return res;
         } catch(Exception ex) {
             RestfulResponse rres = new RestfulResponse(ex);
-            return Response.status(Response.Status.INTERNAL_SERVER_ERROR).entity(rres).build();
+            Response res = Response.status(Response.Status.INTERNAL_SERVER_ERROR).entity(rres).build();
+            
+            LOG.info(String.format("RES (ERR) - removeRecipeRestful - %s", path));
+            
+            return res;
         }
     }
     
     @Override
     public void removeRecipe(DataObjectURI uri) throws IOException {
-        LOG.info(String.format("removeRecipe - %s", uri.toUri().toASCIIString()));
-        
         try {
             StargateService service = getStargateService();
             RecipeManager recipeManager = service.getRecipeManager();
@@ -804,20 +962,28 @@ public class HTTPUserInterfaceServlet extends AbstractUserInterfaceServer {
     @Path(HTTPUserInterfaceRestfulConstants.API_PATH + "/" + HTTPUserInterfaceRestfulConstants.API_SYNC_RECIPES_PATH)
     @Produces(MediaType.APPLICATION_JSON)
     public Response syncRecipesRestful() throws IOException {
+        LOG.info("REQ - syncRecipesRestful");
+        
         try {
             syncRecipes();
             RestfulResponse rres = new RestfulResponse(true);
-            return Response.status(Response.Status.OK).entity(rres).build();
+            Response res = Response.status(Response.Status.OK).entity(rres).build();
+            
+            LOG.info("RES - syncRecipesRestful");
+            
+            return res;
         } catch(Exception ex) {
             RestfulResponse rres = new RestfulResponse(ex);
-            return Response.status(Response.Status.INTERNAL_SERVER_ERROR).entity(rres).build();
+            Response res = Response.status(Response.Status.INTERNAL_SERVER_ERROR).entity(rres).build();
+            
+            LOG.info("RES (ERR) - syncRecipesRestful");
+            
+            return res;
         }
     }
     
     @Override
     public void syncRecipes() throws IOException {
-        LOG.info("syncRecipes");
-        
         try {
             StargateService service = getStargateService();
             RecipeManager recipeManager = service.getRecipeManager();
@@ -851,17 +1017,29 @@ public class HTTPUserInterfaceServlet extends AbstractUserInterfaceServer {
             throw new IllegalArgumentException("hash is null or empty");
         }
         
+        LOG.info(String.format("REQ - getDataChunkRestful - %s (%s)", path, hash));
+        
         try {
             DataObjectURI objectUri = new DataObjectURI(PathUtils.makeAbsolutePath(path));
             final InputStream is = getDataChunk(objectUri, hash);
             if(is == null) {
+                LOG.info(String.format("RES (ERR) - getDataChunkRestful - %s (%s)", path, hash));
                 return Response.status(Response.Status.NOT_FOUND).build();
             }
             
             StreamingOutputData stream = new StreamingOutputData(is);
-            return Response.ok(stream).header("content-disposition", "attachment; filename = " + hash).build();
+            Response res = Response.ok(stream).header("content-disposition", "attachment; filename = " + hash).build();
+            
+            LOG.info(String.format("RES - getDataChunkRestful - %s (%s)", path, hash));
+            
+            return res;
         } catch (Exception ex) {
-            return Response.status(Response.Status.INTERNAL_SERVER_ERROR).build();
+            RestfulResponse rres = new RestfulResponse(ex);
+            Response res = Response.status(Response.Status.INTERNAL_SERVER_ERROR).entity(rres).build();
+            
+            LOG.info(String.format("RES (ERR) - getDataChunkRestful - %s (%s)", path, hash));
+            
+            return res;
         }
     }
     
@@ -874,8 +1052,6 @@ public class HTTPUserInterfaceServlet extends AbstractUserInterfaceServer {
         if(hash == null || hash.isEmpty()) {
             throw new IllegalArgumentException("hash is null or empty");
         }
-        
-        LOG.info(String.format("getDataChunk - %s, %s", uri.toUri().toASCIIString(), hash));
         
         try {
             StargateService service = getStargateService();
@@ -907,14 +1083,24 @@ public class HTTPUserInterfaceServlet extends AbstractUserInterfaceServer {
             throw new IllegalArgumentException("hash is null or empty");
         }
         
+        LOG.info(String.format("REQ - schedulePrefetchRestful - %s (%s)", path, hash));
+                
         try {
             DataObjectURI objectUri = new DataObjectURI(PathUtils.makeAbsolutePath(path));
             TransferAssignment assignment = schedulePrefetch(objectUri, hash);
             RestfulResponse rres = new RestfulResponse(assignment);
-            return Response.status(Response.Status.OK).entity(rres).build();
+            Response res = Response.status(Response.Status.OK).entity(rres).build();
+            
+            LOG.info(String.format("RES - schedulePrefetchRestful - %s (%s)", path, hash));
+            
+            return res;
         } catch(Exception ex) {
             RestfulResponse rres = new RestfulResponse(ex);
-            return Response.status(Response.Status.INTERNAL_SERVER_ERROR).entity(rres).build();
+            Response res = Response.status(Response.Status.INTERNAL_SERVER_ERROR).entity(rres).build();
+            
+            LOG.info(String.format("RES (ERR) - schedulePrefetchRestful - %s (%s)", path, hash));
+            
+            return res;
         }
     }
     
@@ -927,8 +1113,6 @@ public class HTTPUserInterfaceServlet extends AbstractUserInterfaceServer {
         if(hash == null || hash.isEmpty()) {
             throw new IllegalArgumentException("hash is null or empty");
         }
-        
-        LOG.info(String.format("schedulePrefetch - %s, %s", uri.toUri().toASCIIString(), hash));
         
         try {
             StargateService service = getStargateService();
@@ -956,14 +1140,24 @@ public class HTTPUserInterfaceServlet extends AbstractUserInterfaceServer {
             throw new IllegalArgumentException("path is null or empty");
         }
         
+        LOG.info(String.format("REQ - getRemoteRecipeWithTransferScheduleRestful - %s", path));
+        
         try {
             DataObjectURI objectUri = new DataObjectURI(PathUtils.makeAbsolutePath(path));
             Recipe recipe = getRemoteRecipeWithTransferSchedule(objectUri);
             RestfulResponse rres = new RestfulResponse(recipe);
-            return Response.status(Response.Status.OK).entity(rres).build();
+            Response res = Response.status(Response.Status.OK).entity(rres).build();
+            
+            LOG.info(String.format("RES - getRemoteRecipeWithTransferScheduleRestful - %s", path));
+            
+            return res;
         } catch(Exception ex) {
             RestfulResponse rres = new RestfulResponse(ex);
-            return Response.status(Response.Status.INTERNAL_SERVER_ERROR).entity(rres).build();
+            Response res = Response.status(Response.Status.INTERNAL_SERVER_ERROR).entity(rres).build();
+            
+            LOG.info(String.format("RES (ERR) - getRemoteRecipeWithTransferScheduleRestful - %s", path));
+            
+            return res;
         }
     }
     
@@ -972,8 +1166,6 @@ public class HTTPUserInterfaceServlet extends AbstractUserInterfaceServer {
         if(uri == null) {
             throw new IllegalArgumentException("uri is null");
         }
-        
-        LOG.info(String.format("getRemoteRecipeWithTransferSchedule - %s", uri.toUri().toASCIIString()));
         
         try {
             StargateService service = getStargateService();
@@ -1000,15 +1192,25 @@ public class HTTPUserInterfaceServlet extends AbstractUserInterfaceServer {
             throw new IllegalArgumentException("path is null or empty");
         }
         
+        LOG.info(String.format("REQ - getDataExportEntryRestful - %s", path));
+        
         try {
             // local
             DataObjectURI objectUri = new DataObjectURI("", PathUtils.makeAbsolutePath(path));
             DataExportEntry mapping = getDataExportEntry(objectUri);    
             RestfulResponse rres = new RestfulResponse(mapping);
-            return Response.status(Response.Status.OK).entity(rres).build();
+            Response res = Response.status(Response.Status.OK).entity(rres).build();
+            
+            LOG.info(String.format("RES - getDataExportEntryRestful - %s", path));
+            
+            return res;
         } catch(Exception ex) {
             RestfulResponse rres = new RestfulResponse(ex);
-            return Response.status(Response.Status.INTERNAL_SERVER_ERROR).entity(rres).build();
+            Response res = Response.status(Response.Status.INTERNAL_SERVER_ERROR).entity(rres).build();
+            
+            LOG.info(String.format("RES (ERR) - getDataExportEntryRestful - %s", path));
+            
+            return res;
         }
     }
     
@@ -1017,8 +1219,6 @@ public class HTTPUserInterfaceServlet extends AbstractUserInterfaceServer {
         if(uri == null) {
             throw new IllegalArgumentException("uri is null");
         }
-        
-        LOG.info(String.format("getDataExportEntry - %s", uri.toUri().toASCIIString()));
         
         try {
             StargateService service = getStargateService();
@@ -1037,20 +1237,28 @@ public class HTTPUserInterfaceServlet extends AbstractUserInterfaceServer {
     @Path(HTTPUserInterfaceRestfulConstants.API_PATH + "/" + HTTPUserInterfaceRestfulConstants.API_LIST_DATA_EXPORT_ENTRIES_PATH)
     @Produces(MediaType.APPLICATION_JSON)
     public Response listDataExportEntriesRestful() throws IOException {
+        LOG.info("REQ - listDataExportEntriesRestful");
+        
         try {
             Collection<String> dataExportEntries = listDataExportEntries();    
             RestfulResponse rres = new RestfulResponse(dataExportEntries.toArray(new String[0]));
-            return Response.status(Response.Status.OK).entity(rres).build();
+            Response res = Response.status(Response.Status.OK).entity(rres).build();
+            
+            LOG.info("RES - listDataExportEntriesRestful");
+            
+            return res;
         } catch(Exception ex) {
             RestfulResponse rres = new RestfulResponse(ex);
-            return Response.status(Response.Status.INTERNAL_SERVER_ERROR).entity(rres).build();
+            Response res = Response.status(Response.Status.INTERNAL_SERVER_ERROR).entity(rres).build();
+            
+            LOG.info("RES (ERR) - listDataExportEntriesRestful");
+            
+            return res;
         }
     }
     
     @Override
     public Collection<String> listDataExportEntries() throws IOException {
-        LOG.info("listDataExportEntries");
-        
         try {
             StargateService service = getStargateService();
             DataExportManager dataExportManager = service.getDataExportManager();
@@ -1076,20 +1284,28 @@ public class HTTPUserInterfaceServlet extends AbstractUserInterfaceServer {
     @Path(HTTPUserInterfaceRestfulConstants.API_PATH + "/" + HTTPUserInterfaceRestfulConstants.API_GET_DATA_EXPORT_ENTRIES_PATH)
     @Produces(MediaType.APPLICATION_JSON)
     public Response getDataExportEntriesRestful() throws IOException {
+        LOG.info("REQ - getDataExportEntriesRestful");
+        
         try {
             Collection<DataExportEntry> dataExportEntries = getDataExportEntries();    
             RestfulResponse rres = new RestfulResponse(dataExportEntries.toArray(new DataExportEntry[0]));
-            return Response.status(Response.Status.OK).entity(rres).build();
+            Response res = Response.status(Response.Status.OK).entity(rres).build();
+            
+            LOG.info("RES - getDataExportEntriesRestful");
+            
+            return res;
         } catch(Exception ex) {
             RestfulResponse rres = new RestfulResponse(ex);
-            return Response.status(Response.Status.INTERNAL_SERVER_ERROR).entity(rres).build();
+            Response res = Response.status(Response.Status.INTERNAL_SERVER_ERROR).entity(rres).build();
+            
+            LOG.info("RES (ERR) - getDataExportEntriesRestful");
+            
+            return res;
         }
     }
 
     @Override
     public Collection<DataExportEntry> getDataExportEntries() throws IOException {
-        LOG.info("getDataExportEntries");
-        
         try {
             StargateService service = getStargateService();
             DataExportManager dataExportManager = service.getDataExportManager();
@@ -1108,21 +1324,29 @@ public class HTTPUserInterfaceServlet extends AbstractUserInterfaceServer {
     @Produces(MediaType.APPLICATION_JSON)
     @Consumes(MediaType.APPLICATION_JSON)
     public Response addDataExportEntryRestful(DataExportEntry entry) throws IOException {
+        LOG.info(String.format("REQ - addDataExportEntryRestful - %s", entry.getStargatePath()));
+        
         try {
             addDataExportEntry(entry);
             
             RestfulResponse rres = new RestfulResponse(true);
-            return Response.status(Response.Status.OK).entity(rres).build();
+            Response res = Response.status(Response.Status.OK).entity(rres).build();
+            
+            LOG.info(String.format("RES - addDataExportEntryRestful - %s", entry.getStargatePath()));
+            
+            return res;
         } catch(Exception ex) {
             RestfulResponse rres = new RestfulResponse(ex);
-            return Response.status(Response.Status.INTERNAL_SERVER_ERROR).entity(rres).build();
+            Response res = Response.status(Response.Status.INTERNAL_SERVER_ERROR).entity(rres).build();
+            
+            LOG.info(String.format("RES (ERR) - addDataExportEntryRestful - %s", entry.getStargatePath()));
+            
+            return res;
         }
     }
     
     @Override
     public void addDataExportEntry(DataExportEntry entry) throws IOException {
-        LOG.info(String.format("addDataExportEntry - %s", entry.getStargatePath()));
-        
         try {
             StargateService service = getStargateService();
             DataSourceManager dataSourceManager = service.getDataSourceManager();
@@ -1157,8 +1381,6 @@ public class HTTPUserInterfaceServlet extends AbstractUserInterfaceServer {
     }
     
     private void addDataExportEntryRecursively(DataExportManager dataExportManager, String stargatePath, AbstractDataSourceDriver dataSourceDriver, SourceFileMetadata sourceDirectoryMetadata) throws IOException, FileNotFoundException, DataExportManagerException, DriverNotInitializedException {
-        LOG.info(String.format("addDataExportEntryRecursively - %s", stargatePath));
-        
         Collection<SourceFileMetadata> listDirectoryWithMetadata = dataSourceDriver.listDirectoryWithMetadata(sourceDirectoryMetadata.getURI());
         for(SourceFileMetadata fileMetadata : listDirectoryWithMetadata) {
             String stargateFileName = PathUtils.getFileName(fileMetadata.getURI());
@@ -1184,22 +1406,30 @@ public class HTTPUserInterfaceServlet extends AbstractUserInterfaceServer {
             throw new IllegalArgumentException("path is null or empty");
         }
         
+        LOG.info(String.format("REQ - removeDataExportEntryRestful - %s", path));
+        
         try {
             // local
             DataObjectURI objectUri = new DataObjectURI("", PathUtils.makeAbsolutePath(path));
             removeDataExportEntry(objectUri);
             RestfulResponse rres = new RestfulResponse(true);
-            return Response.status(Response.Status.OK).entity(rres).build();
+            Response res = Response.status(Response.Status.OK).entity(rres).build();
+            
+            LOG.info(String.format("RES - removeDataExportEntryRestful - %s", path));
+            
+            return res;
         } catch(Exception ex) {
             RestfulResponse rres = new RestfulResponse(ex);
-            return Response.status(Response.Status.INTERNAL_SERVER_ERROR).entity(rres).build();
+            Response res = Response.status(Response.Status.INTERNAL_SERVER_ERROR).entity(rres).build();
+            
+            LOG.info(String.format("RES (ERR) - removeDataExportEntryRestful - %s", path));
+            
+            return res;
         }
     }
 
     @Override
     public void removeDataExportEntry(DataObjectURI uri) throws IOException {
-        LOG.info(String.format("removeDataExportEntry - %s", uri.toUri().toASCIIString()));
-        
         try {
             StargateService service = getStargateService();
             DataExportManager dataExportManager = service.getDataExportManager();
@@ -1220,20 +1450,28 @@ public class HTTPUserInterfaceServlet extends AbstractUserInterfaceServer {
     @Path(HTTPUserInterfaceRestfulConstants.API_PATH + "/" + HTTPUserInterfaceRestfulConstants.API_LIST_DATA_SOURCES_PATH)
     @Produces(MediaType.APPLICATION_JSON)
     public Response listDataSourcesRestful() throws IOException {
+        LOG.info("REQ - listDataSourcesRestful");
+        
         try {
             Collection<String> dataSources = listDataSources();    
             RestfulResponse rres = new RestfulResponse(dataSources.toArray(new String[0]));
-            return Response.status(Response.Status.OK).entity(rres).build();
+            Response res = Response.status(Response.Status.OK).entity(rres).build();
+            
+            LOG.info("RES - listDataSourcesRestful");
+            
+            return res;
         } catch(Exception ex) {
             RestfulResponse rres = new RestfulResponse(ex);
-            return Response.status(Response.Status.INTERNAL_SERVER_ERROR).entity(rres).build();
+            Response res = Response.status(Response.Status.INTERNAL_SERVER_ERROR).entity(rres).build();
+            
+            LOG.info("RES (ERR) - listDataSourcesRestful");
+            
+            return res;
         }
     }
     
     @Override
     public Collection<String> listDataSources() throws IOException {
-        LOG.info("listDataSources");
-        
         try {
             StargateService service = getStargateService();
             DataSourceManager dataSourceManager = service.getDataSourceManager();
@@ -1256,21 +1494,29 @@ public class HTTPUserInterfaceServlet extends AbstractUserInterfaceServer {
             throw new IllegalArgumentException("type is null or empty");
         }
         
+        LOG.info(String.format("REQ - getStatisticsRestful - %s", type));
+        
         try {
             StatisticsType sType = StatisticsType.valueOf(type);
             Collection<StatisticsEntry> statistics = getStatistics(sType);    
             RestfulResponse rres = new RestfulResponse(statistics.toArray(new StatisticsEntry[0]));
-            return Response.status(Response.Status.OK).entity(rres).build();
+            Response res = Response.status(Response.Status.OK).entity(rres).build();
+            
+            LOG.info(String.format("RES - getStatisticsRestful - %s", type));
+            
+            return res;
         } catch(Exception ex) {
             RestfulResponse rres = new RestfulResponse(ex);
-            return Response.status(Response.Status.INTERNAL_SERVER_ERROR).entity(rres).build();
+            Response res = Response.status(Response.Status.INTERNAL_SERVER_ERROR).entity(rres).build();
+            
+            LOG.info(String.format("RES (ERR) - getStatisticsRestful - %s", type));
+            
+            return res;
         }
     }
 
     @Override
     public Collection<StatisticsEntry> getStatistics(StatisticsType type) throws IOException {
-        LOG.info("getStatistics");
-        
         try {
             StargateService service = getStargateService();
             StatisticsManager statisticsManager = service.getStatisticsManager();
@@ -1293,21 +1539,29 @@ public class HTTPUserInterfaceServlet extends AbstractUserInterfaceServer {
             throw new IllegalArgumentException("type is null or empty");
         }
         
+        LOG.info(String.format("REQ - clearStatisticsRestful - %s", type));
+        
         try {
             StatisticsType sType = StatisticsType.valueOf(type);
             clearStatistics(sType);    
             RestfulResponse rres = new RestfulResponse(true);
-            return Response.status(Response.Status.OK).entity(rres).build();
+            Response res = Response.status(Response.Status.OK).entity(rres).build();
+            
+            LOG.info(String.format("RES - clearStatisticsRestful - %s", type));
+            
+            return res;
         } catch(Exception ex) {
             RestfulResponse rres = new RestfulResponse(ex);
-            return Response.status(Response.Status.INTERNAL_SERVER_ERROR).entity(rres).build();
+            Response res = Response.status(Response.Status.INTERNAL_SERVER_ERROR).entity(rres).build();
+            
+            LOG.info(String.format("RES (ERR) - clearStatisticsRestful - %s", type));
+            
+            return res;
         }
     }
     
     @Override
     public void clearStatistics(StatisticsType type) throws IOException {
-        LOG.info("clearStatistics");
-        
         try {
             StargateService service = getStargateService();
             StatisticsManager statisticsManager = service.getStatisticsManager();
@@ -1325,20 +1579,28 @@ public class HTTPUserInterfaceServlet extends AbstractUserInterfaceServer {
     @Path(HTTPUserInterfaceRestfulConstants.API_PATH + "/" + HTTPUserInterfaceRestfulConstants.API_CLEAR_ALL_STATISTICS_PATH)
     @Produces(MediaType.APPLICATION_JSON)
     public Response clearAllStatisticsRestful() throws IOException {
+        LOG.info("REQ - clearAllStatisticsRestful");
+        
         try {
             clearAllStatistics();    
             RestfulResponse rres = new RestfulResponse(true);
-            return Response.status(Response.Status.OK).entity(rres).build();
+            Response res = Response.status(Response.Status.OK).entity(rres).build();
+            
+            LOG.info("RES - clearAllStatisticsRestful");
+            
+            return res;
         } catch(Exception ex) {
             RestfulResponse rres = new RestfulResponse(ex);
-            return Response.status(Response.Status.INTERNAL_SERVER_ERROR).entity(rres).build();
+            Response res = Response.status(Response.Status.INTERNAL_SERVER_ERROR).entity(rres).build();
+            
+            LOG.info("RES (ERR) - clearAllStatisticsRestful");
+            
+            return res;
         }
     }
     
     @Override
     public void clearAllStatistics() throws IOException {
-        LOG.info("clearAllStatistics");
-        
         try {
             StargateService service = getStargateService();
             StatisticsManager statisticsManager = service.getStatisticsManager();
