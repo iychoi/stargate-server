@@ -6,10 +6,11 @@ ROOT_DIR=~
 
 work() {
     local node=$1
-    scp ${RELLIBDIR}/stargate* ${node}:${ROOT_DIR}/${RELEASE_NAME}/libs
     ssh ${node} "rm -rf ${ROOT_DIR}/${RELEASE_NAME}/work/*" < /dev/null
     ssh ${node} "rm -rf ${ROOT_DIR}/${RELEASE_NAME}/storage/*" < /dev/null
-    ssh ${node} "rm -rf ${ROOT_DIR}/${RELEASE_NAME}/bin/stargate.log*" < /dev/null
+    ssh ${node} "rm -rf ~/stargate.log*" < /dev/null
+    ssh ${node} "wget -N -P ${ROOT_DIR}/${RELEASE_NAME}/libs/ ${RELEASE_REPO_URL}/libs/stargate-commons-1.0.jar" < /dev/null
+    ssh ${node} "wget -N -P ${ROOT_DIR}/${RELEASE_NAME}/libs/ ${RELEASE_REPO_URL}/libs/stargate-server-1.0.jar" < /dev/null
     echo "Done ${node}"
 }
 

@@ -6,10 +6,7 @@ ROOT_DIR=~
 
 work() {
     local node=$1
-    ssh ${node} "rm -rf ${ROOT_DIR}/${RELEASE_NAME}" < /dev/null
-    ssh ${node} "rm -rf ~/stargate.log*" < /dev/null
-    ssh ${node} "wget -N ${RELEASE_REPO_URL}/${RELEASE_ARCHIVE_FILENAME}" < /dev/null
-    ssh ${node} "tar zxvf ${ROOT_DIR}/${RELEASE_ARCHIVE_FILENAME}" < /dev/null
+    ssh ${node} "tmux kill-session -t '${TMUX_SESSION_NAME}'" < /dev/null
     echo "Done ${node}"
 }
 

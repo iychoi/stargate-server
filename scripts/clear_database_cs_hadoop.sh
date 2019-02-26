@@ -9,12 +9,10 @@ work() {
     ssh ${node} "rm -rf ${ROOT_DIR}/${RELEASE_NAME}/work/*" < /dev/null
     ssh ${node} "rm -rf ${ROOT_DIR}/${RELEASE_NAME}/storage/*" < /dev/null
     ssh ${node} "rm -rf ~/stargate.log*" < /dev/null
-    ssh ${node} "wget -N -P ${ROOT_DIR}/${RELEASE_NAME}/libs/ ${RELEASE_REPO_URL}/libs/stargate-commons-1.0.jar" < /dev/null
-    ssh ${node} "wget -N -P ${ROOT_DIR}/${RELEASE_NAME}/libs/ ${RELEASE_REPO_URL}/libs/stargate-server-1.0.jar" < /dev/null
     echo "Done ${node}"
 }
 
 while read node; do
     echo "connecting to ${node}"
     work ${node} &
-done <cs_demo_cluster.txt
+done <cs_hadoop_cluster.txt
