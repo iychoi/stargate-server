@@ -336,7 +336,7 @@ public class HDFSDataSourceDriver extends AbstractDataSourceDriver {
     }
 
     @Override
-    public InputStream openFile(URI uri, long offset, int size) throws IOException, FileNotFoundException, DriverNotInitializedException {
+    public InputStream openFile(URI uri, long offset, long size) throws IOException, FileNotFoundException, DriverNotInitializedException {
         if(uri == null) {
             throw new IllegalArgumentException("uri is null");
         }

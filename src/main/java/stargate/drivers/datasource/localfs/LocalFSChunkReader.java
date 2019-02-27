@@ -28,10 +28,10 @@ public class LocalFSChunkReader extends InputStream {
 
     private InputStream is;
     private long offset;
-    private int size;
+    private long size;
     private long currentOffset;
     
-    public LocalFSChunkReader(File resourcePath, long offset, int size) throws IOException {
+    public LocalFSChunkReader(File resourcePath, long offset, long size) throws IOException {
         if(resourcePath == null) {
             throw new IllegalArgumentException("resourcePath is null");
         }
@@ -49,7 +49,7 @@ public class LocalFSChunkReader extends InputStream {
         initialize(is, offset, size);
     }
     
-    public LocalFSChunkReader(FileInputStream is, long offset, int size) throws IOException {
+    public LocalFSChunkReader(FileInputStream is, long offset, long size) throws IOException {
         if(is == null) {
             throw new IllegalArgumentException("is is null");
         }
@@ -65,7 +65,7 @@ public class LocalFSChunkReader extends InputStream {
         initialize(is, offset, size);
     }
     
-    private void initialize(FileInputStream is, long offset, int size) throws IOException {
+    private void initialize(FileInputStream is, long offset, long size) throws IOException {
         this.is = is;
         this.offset = offset;
         this.size = size;
@@ -79,7 +79,7 @@ public class LocalFSChunkReader extends InputStream {
         this.currentOffset = offset;
     }
     
-    private int availableBytes(int toRead) {
+    private long availableBytes(long toRead) {
         long offsetMove = (this.currentOffset - this.offset) + toRead;
         if(offsetMove > this.size) {
             return (int) (this.size - (this.currentOffset - this.offset));
@@ -106,12 +106,12 @@ public class LocalFSChunkReader extends InputStream {
             throw new IllegalArgumentException("buf is null");
         }
         
-        int availableBytes = availableBytes(buf.length);
+        long availableBytes = availableBytes(buf.length);
         if(availableBytes <= 0) {
             return -1;
         }
         
-        int read = this.is.read(buf, 0, availableBytes);
+        int read = this.is.read(buf, 0, (int) availableBytes);
         if(read >= 0) {
             this.currentOffset += read;
         }
@@ -132,12 +132,12 @@ public class LocalFSChunkReader extends InputStream {
             throw new IllegalArgumentException("len is negative");
         }
         
-        int availableBytes = availableBytes(len);
+        long availableBytes = availableBytes(len);
         if(availableBytes <= 0) {
             return -1;
         }
         
-        int read = this.is.read(buf, offset, availableBytes);
+        int read = this.is.read(buf, offset, (int) availableBytes);
         if(read >= 0) {
             this.currentOffset += read;
         }
@@ -150,7 +150,7 @@ public class LocalFSChunkReader extends InputStream {
             throw new IllegalArgumentException("len is negative");
         }
         
-        int availableBytes = availableBytes((int) len);
+        long availableBytes = availableBytes(len);
         if(availableBytes <= 0) {
             return -1;
         }
@@ -164,12 +164,12 @@ public class LocalFSChunkReader extends InputStream {
 
     @Override
     public int available() throws IOException {
-        int availableBytes = availableBytes((int) this.is.available());
+        long availableBytes = availableBytes(this.is.available());
         if(availableBytes <= 0) {
             return -1;
         }
         
-        return availableBytes;
+        return (int) availableBytes;
     }
 
     @Override

@@ -33,10 +33,10 @@ public class HDFSChunkReader extends InputStream {
     
     private InputStream is;
     private long offset;
-    private int size;
+    private long size;
     private long currentOffset;
     
-    public HDFSChunkReader(URI resourceUri, long offset, int size) throws IOException {
+    public HDFSChunkReader(URI resourceUri, long offset, long size) throws IOException {
         if(resourceUri == null) {
             throw new IllegalArgumentException("resourceUri is null");
         }
@@ -56,7 +56,7 @@ public class HDFSChunkReader extends InputStream {
         initialize(is, offset, size);
     }
     
-    public HDFSChunkReader(FileSystem fs, Path resourcePath, long offset, int size) throws IOException {
+    public HDFSChunkReader(FileSystem fs, Path resourcePath, long offset, long size) throws IOException {
         if(fs == null) {
             throw new IllegalArgumentException("fs is null");
         }
@@ -78,7 +78,7 @@ public class HDFSChunkReader extends InputStream {
         initialize(is, offset, size);
     }
     
-    public HDFSChunkReader(Configuration conf, Path resourcePath, long offset, int size) throws IOException {
+    public HDFSChunkReader(Configuration conf, Path resourcePath, long offset, long size) throws IOException {
         if(conf == null) {
             throw new IllegalArgumentException("conf is null");
         }
@@ -101,7 +101,7 @@ public class HDFSChunkReader extends InputStream {
         initialize(is, offset, size);
     }
     
-    public HDFSChunkReader(Path resourcePath, long offset, int size) throws IOException {
+    public HDFSChunkReader(Path resourcePath, long offset, long size) throws IOException {
         if(resourcePath == null) {
             throw new IllegalArgumentException("resourcePath is null");
         }
@@ -120,7 +120,7 @@ public class HDFSChunkReader extends InputStream {
         initialize(is, offset, size);
     }
     
-    public HDFSChunkReader(FSDataInputStream is, long offset, int size) throws IOException {
+    public HDFSChunkReader(FSDataInputStream is, long offset, long size) throws IOException {
         if(is == null) {
             throw new IllegalArgumentException("is is null");
         }
@@ -136,7 +136,7 @@ public class HDFSChunkReader extends InputStream {
         initialize(is, offset, size);
     }
     
-    private void initialize(FSDataInputStream is, long offset, int size) throws IOException {
+    private void initialize(FSDataInputStream is, long offset, long size) throws IOException {
         this.is = is;
         this.offset = offset;
         this.size = size;
@@ -150,10 +150,10 @@ public class HDFSChunkReader extends InputStream {
         this.currentOffset = offset;
     }
     
-    private int availableBytes(int toRead) {
+    private long availableBytes(long toRead) {
         long offsetMove = (this.currentOffset - this.offset) + toRead;
         if(offsetMove > this.size) {
-            return (int) (this.size - (this.currentOffset - this.offset));
+            return this.size - (this.currentOffset - this.offset);
         } else {
             return toRead;
         }
@@ -177,12 +177,12 @@ public class HDFSChunkReader extends InputStream {
             throw new IllegalArgumentException("buf is null");
         }
         
-        int availableBytes = availableBytes(buf.length);
+        long availableBytes = availableBytes(buf.length);
         if(availableBytes <= 0) {
             return -1;
         }
         
-        int read = this.is.read(buf, 0, availableBytes);
+        int read = this.is.read(buf, 0, (int) availableBytes);
         if(read >= 0) {
             this.currentOffset += read;
         }
@@ -203,12 +203,12 @@ public class HDFSChunkReader extends InputStream {
             throw new IllegalArgumentException("len is negative");
         }
         
-        int availableBytes = availableBytes(len);
+        long availableBytes = availableBytes(len);
         if(availableBytes <= 0) {
             return -1;
         }
         
-        int read = this.is.read(buf, offset, availableBytes);
+        int read = this.is.read(buf, offset, (int) availableBytes);
         if(read >= 0) {
             this.currentOffset += read;
         }
@@ -221,7 +221,7 @@ public class HDFSChunkReader extends InputStream {
             throw new IllegalArgumentException("len is negative");
         }
         
-        int availableBytes = availableBytes((int) len);
+        long availableBytes = availableBytes(len);
         if(availableBytes <= 0) {
             return -1;
         }
@@ -235,12 +235,12 @@ public class HDFSChunkReader extends InputStream {
 
     @Override
     public int available() throws IOException {
-        int availableBytes = availableBytes((int) this.is.available());
+        long availableBytes = availableBytes(this.is.available());
         if(availableBytes <= 0) {
             return -1;
         }
         
-        return availableBytes;
+        return (int) availableBytes;
     }
 
     @Override

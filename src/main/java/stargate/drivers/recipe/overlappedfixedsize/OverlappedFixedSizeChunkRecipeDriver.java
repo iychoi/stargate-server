@@ -13,7 +13,7 @@
    See the License for the specific language governing permissions and
    limitations under the License.
 */
-package stargate.drivers.recipe.fixedsize;
+package stargate.drivers.recipe.overlappedfixedsize;
 
 import java.io.IOException;
 import java.io.InputStream;
@@ -21,6 +21,7 @@ import java.security.DigestInputStream;
 import java.security.MessageDigest;
 import java.security.NoSuchAlgorithmException;
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.Collection;
 import java.util.Collections;
 import java.util.List;
@@ -34,54 +35,58 @@ import stargate.commons.recipe.RecipeChunk;
  *
  * @author iychoi
  */
-public class FixedSizeChunkRecipeDriver extends AbstractRecipeDriver {
+public class OverlappedFixedSizeChunkRecipeDriver extends AbstractRecipeDriver {
 
-    private FixedSizeChunkRecipeDriverConfig config;
+    private OverlappedFixedSizeChunkRecipeDriverConfig config;
     private int chunkSize;
+    private int overlapSize;
     private String hashAlgorithm;
     private static final int BUFFER_SIZE = 64*1024; // 64KB
     private int bufferSize = BUFFER_SIZE;
     private byte[] buffer;
     
-    public FixedSizeChunkRecipeDriver(AbstractDriverConfig config) {
+    public OverlappedFixedSizeChunkRecipeDriver(AbstractDriverConfig config) {
         if(config == null) {
             throw new IllegalArgumentException("config is null");
         }
         
-        if(!(config instanceof FixedSizeChunkRecipeDriverConfig)) {
+        if(!(config instanceof OverlappedFixedSizeChunkRecipeDriverConfig)) {
             throw new IllegalArgumentException("config is not an instance of FixedSizeChunkRecipeDriver");
         }
         
-        this.config = (FixedSizeChunkRecipeDriverConfig) config;
+        this.config = (OverlappedFixedSizeChunkRecipeDriverConfig) config;
         this.chunkSize = this.config.getChunkSize();
+        this.overlapSize = this.config.getOverlapSize();
         this.hashAlgorithm = this.config.getHashAlgorithm();
         this.bufferSize = Math.min(this.chunkSize, BUFFER_SIZE);
         this.buffer = new byte[this.bufferSize];
     }
     
-    public FixedSizeChunkRecipeDriver(AbstractRecipeDriverConfig config) {
+    public OverlappedFixedSizeChunkRecipeDriver(AbstractRecipeDriverConfig config) {
         if(config == null) {
             throw new IllegalArgumentException("config is null");
         }
         
-        if(!(config instanceof FixedSizeChunkRecipeDriverConfig)) {
+        if(!(config instanceof OverlappedFixedSizeChunkRecipeDriverConfig)) {
             throw new IllegalArgumentException("config is not an instance of FixedSizeChunkRecipeDriver");
         }
         
-        this.config = (FixedSizeChunkRecipeDriverConfig) config;
+        this.config = (OverlappedFixedSizeChunkRecipeDriverConfig) config;
         this.chunkSize = this.config.getChunkSize();
+        this.overlapSize = this.config.getOverlapSize();
         this.hashAlgorithm = this.config.getHashAlgorithm();
         this.bufferSize = Math.min(this.chunkSize, BUFFER_SIZE);
         this.buffer = new byte[this.bufferSize];
     }
     
-    public FixedSizeChunkRecipeDriver(FixedSizeChunkRecipeDriverConfig config) {
+    public OverlappedFixedSizeChunkRecipeDriver(OverlappedFixedSizeChunkRecipeDriverConfig config) {
         if(config == null) {
             throw new IllegalArgumentException("config is null");
         }
         
         this.config = config;
         this.chunkSize = this.config.getChunkSize();
+        this.overlapSize = this.config.getOverlapSize();
         this.hashAlgorithm = this.config.getHashAlgorithm();
         this.bufferSize = Math.min(this.chunkSize, BUFFER_SIZE);
         this.buffer = new byte[this.bufferSize];
@@ -102,6 +107,10 @@ public class FixedSizeChunkRecipeDriver extends AbstractRecipeDriver {
         return this.chunkSize;
     }
     
+    public int getOverlapSize() {
+        return this.overlapSize;
+    }
+    
     @Override
     public String getHashAlgorithm() {
         return this.hashAlgorithm;
@@ -118,11 +127,69 @@ public class FixedSizeChunkRecipeDriver extends AbstractRecipeDriver {
         }
         
         List<RecipeChunk> chunks = new ArrayList<RecipeChunk>();
+        byte[] overlapBuffer = new byte[this.overlapSize];
+        int overlapBufferSize = 0;
         
         RecipeChunk chunk = null;
         do {
-            chunk = produceRecipeChunk(is);
-            chunks.add(chunk);
+            chunk = null;
+            try {
+                MessageDigest messageDigest = MessageDigest.getInstance(this.hashAlgorithm);
+                
+                int nread = 0;
+                int toread = this.chunkSize;
+                int chunkLength = 0;
+                
+                if(overlapBufferSize > 0) {
+                    // from previous iteration
+                    messageDigest.update(overlapBuffer, 0, overlapBufferSize);
+                    
+                    chunkLength += overlapBufferSize;
+                    toread -= overlapBufferSize;
+                    
+                    // reset
+                    overlapBufferSize = 0;
+                }
+                
+                DigestInputStream dis = new DigestInputStream(is, messageDigest);
+
+                while((nread = dis.read(this.buffer, 0, Math.min(toread, this.bufferSize))) > 0) {
+                    chunkLength += nread;
+                    toread -= nread;
+                    if(toread <= 0) {
+                        // read done
+                        break;
+                    }
+                }
+                
+                if(chunkLength == this.chunkSize) {
+                    // not EOF
+                    // read more
+                    int overlapBufferOffset = 0;
+                    while((nread = dis.read(overlapBuffer, overlapBufferOffset, this.overlapSize - overlapBufferOffset)) > 0) {
+                        chunkLength += nread;
+                        overlapBufferOffset += nread;
+                        if(this.overlapSize - overlapBufferOffset <= 0) {
+                            // read done
+                            break;
+                        }
+                    }
+                    
+                    overlapBufferSize = overlapBufferOffset;
+                }
+                
+                // do not close DigestInputStream because it closes inputstream that will be reused
+                //dis.close();
+
+                if(chunkLength > 0) {
+                    // create a new recipe chunk
+                    byte[] hash = messageDigest.digest();
+                    chunk = new RecipeChunk(0, chunkLength, hash, null);
+                    chunks.add(chunk);
+                }
+            } catch (NoSuchAlgorithmException ex) {
+                throw new IOException(ex);
+            }
         } while(chunk != null);
         
         return Collections.unmodifiableCollection(chunks);
@@ -135,7 +202,7 @@ public class FixedSizeChunkRecipeDriver extends AbstractRecipeDriver {
             DigestInputStream dis = new DigestInputStream(is, messageDigest);
             
             int nread = 0;
-            int toread = this.chunkSize;
+            int toread = this.chunkSize + this.overlapSize;
             int chunkLength = 0;
             
             while((nread = dis.read(this.buffer, 0, Math.min(toread, this.bufferSize))) > 0) {

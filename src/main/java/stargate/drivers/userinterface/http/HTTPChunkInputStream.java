@@ -187,37 +187,46 @@ public class HTTPChunkInputStream extends FSInputStream {
         HTTPUserInterfaceClient localClient = this.clients.get(LOCAL_NODE_NAME);
         HTTPUserInterfaceClient client = null;
         
-        // Step1. check if local node has the block
-        if(localClient != null) {
-            URI localServiceURI = localClient.getServiceURI();
-            
-            for(String nodeName : nodeNames) {
-                HTTPUserInterfaceClient candidateClient = this.clients.get(nodeName);
-                if(candidateClient != null) {
-                    URI candidateServiceURI = candidateClient.getServiceURI();
-                    if(candidateServiceURI.equals(localServiceURI)) {
+        if (this.clients.size() == 1) {
+            // no other choice
+            Collection<HTTPUserInterfaceClient> values = this.clients.values();
+            for(HTTPUserInterfaceClient value : values) {
+                client = value;
+                break;
+            }
+        } else if (this.clients.size() >= 2) {
+            // Step1. check if local node has the block
+            if(localClient != null) {
+                URI localServiceURI = localClient.getServiceURI();
+
+                for(String nodeName : nodeNames) {
+                    HTTPUserInterfaceClient candidateClient = this.clients.get(nodeName);
+                    if(candidateClient != null) {
+                        URI candidateServiceURI = candidateClient.getServiceURI();
+                        if(candidateServiceURI.equals(localServiceURI)) {
+                            // we found
+                            client = candidateClient;
+                            break;
+                        }
+                    }
+                }
+            }
+
+            // Step2. use any of nodes having the block
+            if(client == null) {
+                for(String nodeName : nodeNames) {
+                    client = this.clients.get(nodeName);
+                    if(client != null) {
                         // we found
-                        client = candidateClient;
                         break;
                     }
                 }
             }
-        }
-        
-        // Step2. use any of nodes having the block
-        if(client == null) {
-            for(String nodeName : nodeNames) {
-                client = this.clients.get(nodeName);
-                if(client != null) {
-                    // we found
-                    break;
-                }
+
+            // Step3. use wild card
+            if(client == null) {
+                client = this.clients.get(DEFAULT_NODE_NAME);
             }
-        }
-        
-        // Step3. use wild card
-        if(client == null) {
-            client = this.clients.get(DEFAULT_NODE_NAME);
         }
         
         if(client == null) {

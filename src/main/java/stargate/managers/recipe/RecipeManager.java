@@ -44,7 +44,6 @@ import stargate.commons.manager.ManagerNotInstantiatedException;
 import stargate.commons.recipe.AbstractRecipeDriver;
 import stargate.commons.recipe.Recipe;
 import stargate.commons.recipe.RecipeChunk;
-import stargate.commons.statistics.StatisticsType;
 import stargate.commons.utils.DateTimeUtils;
 import stargate.managers.cluster.ClusterManager;
 import stargate.managers.dataexport.DataExportManager;
@@ -630,29 +629,31 @@ public class RecipeManager extends AbstractManager<AbstractRecipeDriver> {
 
             long offset = 0;
             int chunkSize = driver.getChunkSize();
-            RecipeChunk recipeChunk = null;
-
+            
             InputStream is = dataSourceDriver.openFile(sourceMetadata.getURI());
             Recipe recipe = new Recipe(objMetadata, driver.getHashAlgorithm(), chunkSize, cluster.getNodeNames());
 
             // create recipe chunks
-            while((recipeChunk = driver.produceRecipeChunk(is, offset)) != null) {
+            Collection<RecipeChunk> chunks = driver.produceRecipeChunks(is);
+            for(RecipeChunk chunk : chunks) {
+                chunk.setOffset(offset);
+                
                 // update host
-                Collection<String> blockLocations = dataSourceDriver.listBlockLocations(cluster, sourceMetadata.getURI(), offset, chunkSize);
+                Collection<String> blockLocations = dataSourceDriver.listBlockLocations(cluster, sourceMetadata.getURI(), offset, Math.min(chunkSize, chunk.getLength()));
                 if(blockLocations.contains("*")) {
-                    recipeChunk.setAccessibleFromAllNode();
+                    chunk.setAccessibleFromAllNode();
                 } else {
                     for(String nodeName : blockLocations) {
                         int nodeID = recipe.getNodeID(nodeName);
-                        recipeChunk.addNodeID(nodeID);
+                        chunk.addNodeID(nodeID);
                     }
                 }
-
+                
                 // add to recipe
-                recipe.addChunk(recipeChunk);
-                offset += recipeChunk.getLength();
+                recipe.addChunk(chunk);
+                offset += chunkSize;
             }
-
+            
             is.close();
             return recipe;
         } catch (ManagerNotInstantiatedException ex) {
@@ -683,9 +684,10 @@ public class RecipeManager extends AbstractManager<AbstractRecipeDriver> {
             // create recipe chunk
             AbstractRecipeDriver driver = getDriver();
 
-            InputStream is = dataSourceDriver.openFile(sourceFileMetadata.getURI(), event.getOffset(), event.getLength());
-            // create recipe chunks
-            RecipeChunk recipeChunk = driver.produceRecipeChunk(is, 0);
+            InputStream is = dataSourceDriver.openFile(sourceFileMetadata.getURI(), event.getOffset(), sourceFileMetadata.getFileSize());
+            
+            // create recipe chunk
+            RecipeChunk recipeChunk = driver.produceRecipeChunk(is);
             recipeChunk.setOffset(event.getOffset());
             
             is.close();
@@ -827,7 +829,7 @@ public class RecipeManager extends AbstractManager<AbstractRecipeDriver> {
                     for(RecipeChunk recipeChunk : recipeChunks) {
                         LOG.debug(String.format("Received chunk - %s", recipeChunk.toString()));
 
-                        Collection<String> blockLocations = dataSourceDriver.listBlockLocations(cluster, sourceMetadata.getURI(), recipeChunk.getOffset(), recipeChunk.getLength());
+                        Collection<String> blockLocations = dataSourceDriver.listBlockLocations(cluster, sourceMetadata.getURI(), recipeChunk.getOffset(), Math.min(chunkSize, recipeChunk.getLength()));
                         if(blockLocations.contains("*")) {
                             LOG.debug("block location of recipechunk has *");
                             recipeChunk.setAccessibleFromAllNode();
