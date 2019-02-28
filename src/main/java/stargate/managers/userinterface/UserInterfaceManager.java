@@ -42,10 +42,10 @@ public class UserInterfaceManager extends AbstractManager<AbstractUserInterfaceD
     
     private static UserInterfaceManager instance;
 
-    public static UserInterfaceManager getInstance(StargateService service, Collection<AbstractUserInterfaceDriver> drivers) throws ManagerNotInstantiatedException {
+    public static UserInterfaceManager getInstance(StargateService service, ManagerConfig config, Collection<AbstractUserInterfaceDriver> drivers) throws ManagerNotInstantiatedException {
         synchronized (UserInterfaceManager.class) {
             if(instance == null) {
-                instance = new UserInterfaceManager(service, drivers);
+                instance = new UserInterfaceManager(service, config, drivers);
             }
             return instance;
         }
@@ -65,7 +65,7 @@ public class UserInterfaceManager extends AbstractManager<AbstractUserInterfaceD
                     for(AbstractDriver driver : drivers) {
                         userInterfaceDrivers.add((AbstractUserInterfaceDriver) driver);
                     }
-                    instance = new UserInterfaceManager(service, userInterfaceDrivers);
+                    instance = new UserInterfaceManager(service, config, userInterfaceDrivers);
                 } catch (DriverFailedToLoadException ex) {
                     LOG.error("Could not load driver", ex);
                     throw new ManagerNotInstantiatedException(ex.toString());
@@ -84,9 +84,13 @@ public class UserInterfaceManager extends AbstractManager<AbstractUserInterfaceD
         }
     }
     
-    UserInterfaceManager(StargateService service, Collection<AbstractUserInterfaceDriver> drivers) throws ManagerNotInstantiatedException {
+    UserInterfaceManager(StargateService service, ManagerConfig config, Collection<AbstractUserInterfaceDriver> drivers) throws ManagerNotInstantiatedException {
         if(service == null) {
             throw new IllegalArgumentException("service is null");
+        }
+        
+        if(config == null) {
+            throw new IllegalArgumentException("config is null");
         }
         
         if(drivers == null || drivers.isEmpty()) {
@@ -94,6 +98,7 @@ public class UserInterfaceManager extends AbstractManager<AbstractUserInterfaceD
         }
         
         this.setService(service);
+        this.setConfig(config);
         
         for(AbstractUserInterfaceDriver driver : drivers) {
             this.drivers.add(driver);

@@ -39,10 +39,10 @@ public class DataStoreManager extends AbstractManager<AbstractDataStoreDriver> {
     
     private static DataStoreManager instance;
     
-    public static DataStoreManager getInstance(StargateService service, Collection<AbstractDataStoreDriver> drivers) throws ManagerNotInstantiatedException {
+    public static DataStoreManager getInstance(StargateService service, ManagerConfig config, Collection<AbstractDataStoreDriver> drivers) throws ManagerNotInstantiatedException {
         synchronized (DataStoreManager.class) {
             if(instance == null) {
-                instance = new DataStoreManager(service, drivers);
+                instance = new DataStoreManager(service, config, drivers);
             }
             return instance;
         }
@@ -62,7 +62,7 @@ public class DataStoreManager extends AbstractManager<AbstractDataStoreDriver> {
                     for(AbstractDriver driver : drivers) {
                         dataStoreDrivers.add((AbstractDataStoreDriver) driver);
                     }
-                    instance = new DataStoreManager(service, dataStoreDrivers);
+                    instance = new DataStoreManager(service, config, dataStoreDrivers);
                 } catch (DriverFailedToLoadException ex) {
                     LOG.error("Could not load driver", ex);
                     throw new ManagerNotInstantiatedException(ex.toString());
@@ -81,9 +81,13 @@ public class DataStoreManager extends AbstractManager<AbstractDataStoreDriver> {
         }
     }
     
-    DataStoreManager(StargateService service, Collection<AbstractDataStoreDriver> drivers) throws ManagerNotInstantiatedException {
+    DataStoreManager(StargateService service, ManagerConfig config, Collection<AbstractDataStoreDriver> drivers) throws ManagerNotInstantiatedException {
         if(service == null) {
             throw new IllegalArgumentException("service is null");
+        }
+        
+        if(config == null) {
+            throw new IllegalArgumentException("config is null");
         }
         
         if(drivers == null || drivers.isEmpty()) {
@@ -91,6 +95,7 @@ public class DataStoreManager extends AbstractManager<AbstractDataStoreDriver> {
         }
         
         this.setService(service);
+        this.setConfig(config);
         
         for(AbstractDataStoreDriver driver : drivers) {
             this.drivers.add(driver);

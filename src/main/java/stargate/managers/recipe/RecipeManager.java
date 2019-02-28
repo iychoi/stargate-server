@@ -72,10 +72,10 @@ public class RecipeManager extends AbstractManager<AbstractRecipeDriver> {
     private static final String RECIPE_STORE = "recipe";
     private static final String HASH_STORE = "hash";
     
-    public static RecipeManager getInstance(StargateService service, Collection<AbstractRecipeDriver> drivers) throws ManagerNotInstantiatedException {
+    public static RecipeManager getInstance(StargateService service, ManagerConfig config, Collection<AbstractRecipeDriver> drivers) throws ManagerNotInstantiatedException {
         synchronized (RecipeManager.class) {
             if(instance == null) {
-                instance = new RecipeManager(service, drivers);
+                instance = new RecipeManager(service, config, drivers);
             }
             return instance;
         }
@@ -95,7 +95,7 @@ public class RecipeManager extends AbstractManager<AbstractRecipeDriver> {
                     for(AbstractDriver driver : drivers) {
                         recipeDrivers.add((AbstractRecipeDriver) driver);
                     }
-                    instance = new RecipeManager(service, recipeDrivers);
+                    instance = new RecipeManager(service, config, recipeDrivers);
                 } catch (DriverFailedToLoadException ex) {
                     LOG.error("Could not load driver", ex);
                     throw new ManagerNotInstantiatedException(ex.toString());
@@ -114,9 +114,13 @@ public class RecipeManager extends AbstractManager<AbstractRecipeDriver> {
         }
     }
     
-    RecipeManager(StargateService service, Collection<AbstractRecipeDriver> drivers) throws ManagerNotInstantiatedException {
+    RecipeManager(StargateService service, ManagerConfig config, Collection<AbstractRecipeDriver> drivers) throws ManagerNotInstantiatedException {
         if(service == null) {
             throw new IllegalArgumentException("service is null");
+        }
+        
+        if(config == null) {
+            throw new IllegalArgumentException("config is null");
         }
         
         if(drivers == null || drivers.isEmpty()) {
@@ -124,6 +128,7 @@ public class RecipeManager extends AbstractManager<AbstractRecipeDriver> {
         }
         
         this.setService(service);
+        this.setConfig(config);
         
         for(AbstractRecipeDriver driver : drivers) {
             this.drivers.add(driver);

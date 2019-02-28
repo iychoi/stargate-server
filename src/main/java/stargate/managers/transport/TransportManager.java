@@ -94,10 +94,12 @@ public class TransportManager extends AbstractManager<AbstractTransportDriver> {
     private static final String REMOTE_RECIPE_CACHE_STORE = "remote_recipe_cache";
     private static final String DATA_CHUNK_CACHE_STORE = "data_chunk_cache";
     
-    public static TransportManager getInstance(StargateService service, Collection<AbstractTransportDriver> drivers) throws ManagerNotInstantiatedException {
+    private static final String CONFIG_KEY_LAYOUT_ALGORITHM = "layout";
+    
+    public static TransportManager getInstance(StargateService service, ManagerConfig config, Collection<AbstractTransportDriver> drivers) throws ManagerNotInstantiatedException {
         synchronized (TransportManager.class) {
             if(instance == null) {
-                instance = new TransportManager(service, drivers);
+                instance = new TransportManager(service, config, drivers);
             }
             return instance;
         }
@@ -117,7 +119,7 @@ public class TransportManager extends AbstractManager<AbstractTransportDriver> {
                     for(AbstractDriver driver : drivers) {
                         transportDrivers.add((AbstractTransportDriver) driver);
                     }
-                    instance = new TransportManager(service, transportDrivers);
+                    instance = new TransportManager(service, config, transportDrivers);
                 } catch (DriverFailedToLoadException ex) {
                     LOG.error("Could not load driver", ex);
                     throw new ManagerNotInstantiatedException(ex.toString());
@@ -136,9 +138,13 @@ public class TransportManager extends AbstractManager<AbstractTransportDriver> {
         }
     }
     
-    TransportManager(StargateService service, Collection<AbstractTransportDriver> drivers) throws ManagerNotInstantiatedException {
+    TransportManager(StargateService service, ManagerConfig config, Collection<AbstractTransportDriver> drivers) throws ManagerNotInstantiatedException {
         if(service == null) {
             throw new IllegalArgumentException("service is null");
+        }
+        
+        if(config == null) {
+            throw new IllegalArgumentException("config is null");
         }
         
         if(drivers == null || drivers.isEmpty()) {
@@ -146,6 +152,7 @@ public class TransportManager extends AbstractManager<AbstractTransportDriver> {
         }
         
         this.setService(service);
+        this.setConfig(config);
         
         for(AbstractTransportDriver driver : drivers) {
             this.drivers.add(driver);
@@ -285,7 +292,20 @@ public class TransportManager extends AbstractManager<AbstractTransportDriver> {
         safeInitDataChunkCacheStore(); //  chunk cache store must be called before next line is executed
         if(this.transferLayoutAlgorithm == null) {
             StargateService stargateService = getStargateService();
-            this.transferLayoutAlgorithm = new StaticTransferLayoutAlgorithm(stargateService, this, this.dataChunkCacheStore);
+            ManagerConfig managerConfig = this.getConfig();
+            String algStr = managerConfig.getParam(CONFIG_KEY_LAYOUT_ALGORITHM, TransferLayoutAlgorithms.TRANSFER_LAYOUT_ALGORITHM_STATIC.getStringVal());
+            TransferLayoutAlgorithms transferAlg = TransferLayoutAlgorithms.fromStringVal(algStr);
+            if(transferAlg == null) {
+                transferAlg = TransferLayoutAlgorithms.TRANSFER_LAYOUT_ALGORITHM_STATIC;
+            }
+            
+            switch(transferAlg) {
+                case TRANSFER_LAYOUT_ALGORITHM_STATIC:
+                    this.transferLayoutAlgorithm = new StaticTransferLayoutAlgorithm(stargateService, this, this.dataChunkCacheStore);
+                    break;
+                default:
+                    throw new IOException(String.format("Cannot find transfer algorithm %s", transferAlg.name()));
+            }
         }
         
         if(this.contactNodeDeterminationAlgorithm == null) {

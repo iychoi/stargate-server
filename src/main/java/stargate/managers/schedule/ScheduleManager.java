@@ -45,10 +45,10 @@ public class ScheduleManager extends AbstractManager<AbstractScheduleDriver> {
     
     private Timer timer;
     
-    public static ScheduleManager getInstance(StargateService service, Collection<AbstractScheduleDriver> drivers) throws ManagerNotInstantiatedException {
+    public static ScheduleManager getInstance(StargateService service, ManagerConfig config, Collection<AbstractScheduleDriver> drivers) throws ManagerNotInstantiatedException {
         synchronized (ScheduleManager.class) {
             if(instance == null) {
-                instance = new ScheduleManager(service, drivers);
+                instance = new ScheduleManager(service, config, drivers);
             }
             return instance;
         }
@@ -68,7 +68,7 @@ public class ScheduleManager extends AbstractManager<AbstractScheduleDriver> {
                     for(AbstractDriver driver : drivers) {
                         scheduleDrivers.add((AbstractScheduleDriver) driver);
                     }
-                    instance = new ScheduleManager(service, scheduleDrivers);
+                    instance = new ScheduleManager(service, config, scheduleDrivers);
                 } catch (DriverFailedToLoadException ex) {
                     LOG.error("Could not load driver", ex);
                     throw new ManagerNotInstantiatedException(ex.toString());
@@ -87,9 +87,13 @@ public class ScheduleManager extends AbstractManager<AbstractScheduleDriver> {
         }
     }
     
-    ScheduleManager(StargateService service, Collection<AbstractScheduleDriver> drivers) throws ManagerNotInstantiatedException {
+    ScheduleManager(StargateService service, ManagerConfig config, Collection<AbstractScheduleDriver> drivers) throws ManagerNotInstantiatedException {
         if(service == null) {
             throw new IllegalArgumentException("service is null");
+        }
+        
+        if(config == null) {
+            throw new IllegalArgumentException("config is null");
         }
         
         if(drivers == null || drivers.isEmpty()) {
@@ -97,6 +101,7 @@ public class ScheduleManager extends AbstractManager<AbstractScheduleDriver> {
         }
         
         this.setService(service);
+        this.setConfig(config);
         
         for(AbstractScheduleDriver driver : drivers) {
             this.drivers.add(driver);

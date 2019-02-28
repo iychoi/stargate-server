@@ -42,10 +42,10 @@ public class EventManager extends AbstractManager<AbstractEventDriver> {
     
     private static EventManager instance;
     
-    public static EventManager getInstance(StargateService service, Collection<AbstractEventDriver> drivers) throws ManagerNotInstantiatedException {
+    public static EventManager getInstance(StargateService service, ManagerConfig config, Collection<AbstractEventDriver> drivers) throws ManagerNotInstantiatedException {
         synchronized (EventManager.class) {
             if(instance == null) {
-                instance = new EventManager(service, drivers);
+                instance = new EventManager(service, config, drivers);
             }
             return instance;
         }
@@ -65,7 +65,7 @@ public class EventManager extends AbstractManager<AbstractEventDriver> {
                     for(AbstractDriver driver : drivers) {
                         eventDrivers.add((AbstractEventDriver) driver);
                     }
-                    instance = new EventManager(service, eventDrivers);
+                    instance = new EventManager(service, config, eventDrivers);
                 } catch (DriverFailedToLoadException ex) {
                     LOG.error("Could not load driver", ex);
                     throw new ManagerNotInstantiatedException(ex.toString());
@@ -84,9 +84,13 @@ public class EventManager extends AbstractManager<AbstractEventDriver> {
         }
     }
     
-    EventManager(StargateService service, Collection<AbstractEventDriver> drivers) throws ManagerNotInstantiatedException {
+    EventManager(StargateService service, ManagerConfig config, Collection<AbstractEventDriver> drivers) throws ManagerNotInstantiatedException {
         if(service == null) {
             throw new IllegalArgumentException("service is null");
+        }
+        
+        if(config == null) {
+            throw new IllegalArgumentException("config is null");
         }
         
         if(drivers == null || drivers.isEmpty()) {
@@ -94,6 +98,7 @@ public class EventManager extends AbstractManager<AbstractEventDriver> {
         }
         
         this.setService(service);
+        this.setConfig(config);
         
         for(AbstractEventDriver driver : drivers) {
             this.drivers.add(driver);

@@ -69,10 +69,10 @@ public class ClusterManager extends AbstractManager<AbstractClusterDriver> {
     
     private static final String REMOTE_CLUSTER_STORE = "remote_cluster";
     
-    public static ClusterManager getInstance(StargateService service, Collection<AbstractClusterDriver> drivers) throws ManagerNotInstantiatedException {
+    public static ClusterManager getInstance(StargateService service, ManagerConfig config, Collection<AbstractClusterDriver> drivers) throws ManagerNotInstantiatedException {
         synchronized (ClusterManager.class) {
             if(instance == null) {
-                instance = new ClusterManager(service, drivers);
+                instance = new ClusterManager(service, config, drivers);
             }
             return instance;
         }
@@ -92,7 +92,7 @@ public class ClusterManager extends AbstractManager<AbstractClusterDriver> {
                     for(AbstractDriver driver : drivers) {
                         clusterDrivers.add((AbstractClusterDriver) driver);
                     }
-                    instance = new ClusterManager(service, clusterDrivers);
+                    instance = new ClusterManager(service, config, clusterDrivers);
                 } catch (DriverFailedToLoadException ex) {
                     LOG.error("Could not load driver", ex);
                     throw new ManagerNotInstantiatedException(ex.toString());
@@ -111,9 +111,13 @@ public class ClusterManager extends AbstractManager<AbstractClusterDriver> {
         }
     }
     
-    ClusterManager(StargateService service, Collection<AbstractClusterDriver> drivers) throws ManagerNotInstantiatedException {
+    ClusterManager(StargateService service, ManagerConfig config, Collection<AbstractClusterDriver> drivers) throws ManagerNotInstantiatedException {
         if(service == null) {
             throw new IllegalArgumentException("service is null");
+        }
+        
+        if(config == null) {
+            throw new IllegalArgumentException("config is null");
         }
         
         if(drivers == null || drivers.isEmpty()) {
@@ -121,6 +125,7 @@ public class ClusterManager extends AbstractManager<AbstractClusterDriver> {
         }
         
         this.setService(service);
+        this.setConfig(config);
         
         for(AbstractClusterDriver driver : drivers) {
             this.drivers.add(driver);

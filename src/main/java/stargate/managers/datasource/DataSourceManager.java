@@ -41,10 +41,10 @@ public class DataSourceManager extends AbstractManager<AbstractDataSourceDriver>
     
     private static DataSourceManager instance;
 
-    public static DataSourceManager getInstance(StargateService service, Collection<AbstractDataSourceDriver> drivers) throws ManagerNotInstantiatedException {
+    public static DataSourceManager getInstance(StargateService service, ManagerConfig config, Collection<AbstractDataSourceDriver> drivers) throws ManagerNotInstantiatedException {
         synchronized (DataSourceManager.class) {
             if(instance == null) {
-                instance = new DataSourceManager(service, drivers);
+                instance = new DataSourceManager(service, config, drivers);
             }
             return instance;
         }
@@ -64,7 +64,7 @@ public class DataSourceManager extends AbstractManager<AbstractDataSourceDriver>
                     for(AbstractDriver driver : drivers) {
                         dataSourceDrivers.add((AbstractDataSourceDriver) driver);
                     }
-                    instance = new DataSourceManager(service, dataSourceDrivers);
+                    instance = new DataSourceManager(service, config, dataSourceDrivers);
                 } catch (DriverFailedToLoadException ex) {
                     LOG.error("Could not load driver", ex);
                     throw new ManagerNotInstantiatedException(ex.toString());
@@ -83,9 +83,13 @@ public class DataSourceManager extends AbstractManager<AbstractDataSourceDriver>
         }
     }
     
-    DataSourceManager(StargateService service, Collection<AbstractDataSourceDriver> drivers) throws ManagerNotInstantiatedException {
+    DataSourceManager(StargateService service, ManagerConfig config, Collection<AbstractDataSourceDriver> drivers) throws ManagerNotInstantiatedException {
         if(service == null) {
             throw new IllegalArgumentException("service is null");
+        }
+        
+        if(config == null) {
+            throw new IllegalArgumentException("config is null");
         }
         
         if(drivers == null || drivers.isEmpty()) {
@@ -93,6 +97,7 @@ public class DataSourceManager extends AbstractManager<AbstractDataSourceDriver>
         }
         
         this.setService(service);
+        this.setConfig(config);
         
         for(AbstractDataSourceDriver driver : drivers) {
             this.drivers.add(driver);
