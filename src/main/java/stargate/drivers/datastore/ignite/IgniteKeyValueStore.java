@@ -37,7 +37,7 @@ import org.apache.ignite.cache.CacheWriteSynchronizationMode;
 import org.apache.ignite.cache.affinity.Affinity;
 import org.apache.ignite.cluster.ClusterNode;
 import org.apache.ignite.configuration.CacheConfiguration;
-import stargate.commons.datastore.AbstractDataStoreLayoutEventHandler;
+import stargate.commons.datastore.AbstractDataStoreEventHandler;
 import stargate.commons.datastore.AbstractKeyValueStore;
 import stargate.commons.datastore.EnumDataStoreProperty;
 import stargate.commons.utils.ByteArray;
@@ -53,25 +53,26 @@ public class IgniteKeyValueStore extends AbstractKeyValueStore {
     private static final Log LOG = LogFactory.getLog(IgniteKeyValueStore.class);
     
     private IgniteDataStoreDriver driver;
+    private IgniteDriver igniteDriver;
     private Ignite ignite;
     private String name;
     private Class valueClass;
     private EnumDataStoreProperty property;
     private TimeUnit expiryTimeUnit;
     private long expiryTimeValue;
-    private List<AbstractDataStoreLayoutEventHandler> layoutEventHandlers = new ArrayList<AbstractDataStoreLayoutEventHandler>();
+    private List<AbstractDataStoreEventHandler> layoutEventHandlers = new ArrayList<AbstractDataStoreEventHandler>();
     private final Object layoutEventHandlersSyncObj = new Object();
     
     private IgniteCache<String, ByteArray> store;
     private Affinity<String> affinity;
     
-    public IgniteKeyValueStore(IgniteDataStoreDriver driver, Ignite ignite, String name, Class valueClass, EnumDataStoreProperty property) {
+    public IgniteKeyValueStore(IgniteDataStoreDriver driver, IgniteDriver igniteDriver, String name, Class valueClass, EnumDataStoreProperty property) {
         if(driver == null) {
             throw new IllegalArgumentException("driver is null");
         }
         
-        if(ignite == null) {
-            throw new IllegalArgumentException("ignite is null");
+        if(igniteDriver == null) {
+            throw new IllegalArgumentException("igniteDriver is null");
         }
         
         if(name == null || name.isEmpty()) {
@@ -87,7 +88,8 @@ public class IgniteKeyValueStore extends AbstractKeyValueStore {
         }
         
         this.driver = driver;
-        this.ignite = ignite;
+        this.igniteDriver = igniteDriver;
+        this.ignite = igniteDriver.getIgnite();
         this.name = name;
         this.valueClass = valueClass;
         this.property = property;
@@ -119,13 +121,13 @@ public class IgniteKeyValueStore extends AbstractKeyValueStore {
         this.affinity = this.ignite.affinity(name);
     }
     
-    public IgniteKeyValueStore(IgniteDataStoreDriver driver, Ignite ignite, String name, Class valueClass, EnumDataStoreProperty property, TimeUnit timeunit, long timeval) {
+    public IgniteKeyValueStore(IgniteDataStoreDriver driver, IgniteDriver igniteDriver, String name, Class valueClass, EnumDataStoreProperty property, TimeUnit timeunit, long timeval) {
         if(driver == null) {
             throw new IllegalArgumentException("driver is null");
         }
         
-        if(ignite == null) {
-            throw new IllegalArgumentException("ignite is null");
+        if(igniteDriver == null) {
+            throw new IllegalArgumentException("igniteDriver is null");
         }
         
         if(name == null || name.isEmpty()) {
@@ -149,7 +151,8 @@ public class IgniteKeyValueStore extends AbstractKeyValueStore {
         }
                 
         this.driver = driver;
-        this.ignite = ignite;
+        this.igniteDriver = igniteDriver;
+        this.ignite = igniteDriver.getIgnite();
         this.name = name;
         this.valueClass = valueClass;
         this.property = property;
@@ -260,8 +263,7 @@ public class IgniteKeyValueStore extends AbstractKeyValueStore {
         this.store.put(key, new ByteArray(valueBytes));
         
         // call event
-        ClusterNode primaryNode = this.affinity.mapKeyToNode(key);
-        raiseEventForLayoutEventDataAdded(key, primaryNode.consistentId().toString());
+        raiseEventForLayoutEventDataAdded(key);
     }
 
     @Override
@@ -279,8 +281,7 @@ public class IgniteKeyValueStore extends AbstractKeyValueStore {
         
         // call event
         if(retval) {
-            ClusterNode primaryNode = this.affinity.mapKeyToNode(key);
-            raiseEventForLayoutEventDataAdded(key, primaryNode.consistentId().toString());
+            raiseEventForLayoutEventDataAdded(key);
         }
         
         return retval;
@@ -307,17 +308,57 @@ public class IgniteKeyValueStore extends AbstractKeyValueStore {
         
         // call event
         if(retval) {
-            ClusterNode primaryNode = this.affinity.mapKeyToNode(key);
-            raiseEventForLayoutEventDataAdded(key, primaryNode.consistentId().toString());
+            raiseEventForLayoutEventDataAdded(key);
         }
         
         return retval;
     }
     
     @Override
-    public String getNodeForData(String key) throws IOException {
+    public String getPrimaryNodeForData(String key) throws IOException {
         ClusterNode primaryNode = this.affinity.mapKeyToNode(key);
-        return primaryNode.consistentId().toString();
+        if(primaryNode == null) {
+            return null;
+        }
+        return this.igniteDriver.getNodeNameFromClusterNode(primaryNode);
+    }
+    
+    @Override
+    public Collection<String> getBackupNodesForData(String key) throws IOException {
+        List<String> backupNodes = new ArrayList<String>();
+        
+        Collection<ClusterNode> primaryAndBackupNodes = this.affinity.mapKeyToPrimaryAndBackups(key);
+        for(ClusterNode node : primaryAndBackupNodes) {
+            if(this.affinity.isBackup(node, key)) {
+                String nodeName = this.igniteDriver.getNodeNameFromClusterNode(node);
+                backupNodes.add(nodeName);
+            }
+        }
+        return backupNodes;
+    }
+    
+    @Override
+    public Collection<String> getPrimaryAndBackupNodesForData(String key) throws IOException {
+        String primaryNode = null;
+        List<String> nodes = new ArrayList<String>();
+        
+        Collection<ClusterNode> primaryAndBackupNodes = this.affinity.mapKeyToPrimaryAndBackups(key);
+        for(ClusterNode node : primaryAndBackupNodes) {
+            if(this.affinity.isBackup(node, key)) {
+                String nodeName = this.igniteDriver.getNodeNameFromClusterNode(node);
+                nodes.add(nodeName);
+            } else if(this.affinity.isPrimary(node, key)) {
+                String nodeName = this.igniteDriver.getNodeNameFromClusterNode(node);
+                primaryNode = nodeName;
+            }
+        }
+        
+        // put the primary node to front
+        if(primaryNode != null) {
+            nodes.add(0, primaryNode);
+        }
+        
+        return nodes;
     }
 
     @Override
@@ -364,7 +405,7 @@ public class IgniteKeyValueStore extends AbstractKeyValueStore {
     }
     
     @Override
-    public void addLayoutEventHandler(AbstractDataStoreLayoutEventHandler eventHandler) {
+    public void addLayoutEventHandler(AbstractDataStoreEventHandler eventHandler) {
         if(eventHandler == null) {
             throw new IllegalArgumentException("eventHandler is null");
         }
@@ -375,7 +416,7 @@ public class IgniteKeyValueStore extends AbstractKeyValueStore {
     }
 
     @Override
-    public void removeLayoutEventHandler(AbstractDataStoreLayoutEventHandler eventHandler) {
+    public void removeLayoutEventHandler(AbstractDataStoreEventHandler eventHandler) {
         if(eventHandler == null) {
             throw new IllegalArgumentException("eventHandler is null");
         }
@@ -385,18 +426,14 @@ public class IgniteKeyValueStore extends AbstractKeyValueStore {
         }
     }
     
-    private void raiseEventForLayoutEventDataAdded(String key, String node) {
+    private void raiseEventForLayoutEventDataAdded(String key) {
         if(key == null || key.isEmpty()) {
             throw new IllegalArgumentException("key is null or empty");
         }
         
-        if(node == null || node.isEmpty()) {
-            throw new IllegalArgumentException("node is null or empty");
-        }
-        
         synchronized(this.layoutEventHandlersSyncObj) {
-            for(AbstractDataStoreLayoutEventHandler handler: this.layoutEventHandlers) {
-                handler.added(this, key, node);
+            for(AbstractDataStoreEventHandler handler: this.layoutEventHandlers) {
+                handler.added(this, key);
             }
         }
     }

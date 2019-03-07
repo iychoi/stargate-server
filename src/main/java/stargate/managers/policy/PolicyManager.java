@@ -43,6 +43,7 @@ public class PolicyManager extends AbstractManager<NullDriver> {
     
     private ClusterPolicy clusterPolicy;
     private VolumePolicy volumePolicy;
+    private TransportPolicy transportPolicy;
     private AbstractKeyValueStore policyStore;
     private final Object policyStoreSyncObj = new Object();
     private List<AbstractPolicyEventHandler> policyEventHandlers = new ArrayList<AbstractPolicyEventHandler>();
@@ -203,6 +204,21 @@ public class PolicyManager extends AbstractManager<NullDriver> {
         }
         
         return this.volumePolicy;
+    }
+    
+    public TransportPolicy getTransportPolicy() throws IOException {
+        if(!this.started) {
+            throw new IllegalStateException("Manager is not started");
+        }
+        
+        safeInitPolicyStore();
+        
+        if(this.transportPolicy == null) {
+            this.transportPolicy = new TransportPolicy();
+            this.transportPolicy.setManager(this);
+        }
+        
+        return this.transportPolicy;
     }
     
     public void addPolicyEventHandler(AbstractPolicyEventHandler eventHandler) {

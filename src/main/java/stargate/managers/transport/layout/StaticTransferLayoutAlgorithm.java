@@ -13,17 +13,17 @@
    See the License for the specific language governing permissions and
    limitations under the License.
 */
-package stargate.managers.transport;
+package stargate.managers.transport.layout;
 
 import java.io.IOException;
 import java.util.Collection;
-import java.util.Iterator;
 import stargate.commons.cluster.Cluster;
 import stargate.commons.cluster.Node;
 import stargate.commons.datastore.AbstractKeyValueStore;
 import stargate.commons.recipe.Recipe;
 import stargate.commons.recipe.RecipeChunk;
 import stargate.commons.service.AbstractService;
+import stargate.managers.transport.TransportManager;
 import stargate.service.StargateService;
 
 /**
@@ -32,7 +32,6 @@ import stargate.service.StargateService;
  */
 public class StaticTransferLayoutAlgorithm extends AbstractTransferLayoutAlgorithm {
     
-    private long rountRobinTransferCounter;
     private AbstractKeyValueStore dataCacheStore;
     
     public StaticTransferLayoutAlgorithm(AbstractService service, TransportManager manager, AbstractKeyValueStore dataCacheStore) {
@@ -63,7 +62,6 @@ public class StaticTransferLayoutAlgorithm extends AbstractTransferLayoutAlgorit
         this.service = (StargateService) service;
         this.manager = manager;
         
-        this.rountRobinTransferCounter = 0;
         this.dataCacheStore = dataCacheStore;
     }
     
@@ -91,7 +89,6 @@ public class StaticTransferLayoutAlgorithm extends AbstractTransferLayoutAlgorit
         this.service = service;
         this.manager = manager;
         
-        this.rountRobinTransferCounter = 0;
         this.dataCacheStore = dataCacheStore;
     }
     
@@ -105,30 +102,6 @@ public class StaticTransferLayoutAlgorithm extends AbstractTransferLayoutAlgorit
         // noop
     }
     
-    @Override
-    public Node determineLocalNode(Cluster cluster) throws IOException {
-        if(cluster == null) {
-            throw new IllegalArgumentException("cluster is null");
-        }
-        
-        // round robin
-        Collection<Node> nodes = cluster.getNodes();
-        int decidedNodeIdx = (int) (this.rountRobinTransferCounter % nodes.size());
-        
-        Iterator<Node> iterator = nodes.iterator();
-        int idx = 0;
-        while(iterator.hasNext()) {
-            Node node = iterator.next();
-            if(idx >= decidedNodeIdx) {
-                this.rountRobinTransferCounter++;
-                return node;
-            }
-            
-            idx++;
-        }
-        return null;
-    }
-
     @Override
     public Node determineLocalNode(Cluster cluster, Recipe recipe, String hash) throws IOException {
         if(cluster == null) {
@@ -144,8 +117,9 @@ public class StaticTransferLayoutAlgorithm extends AbstractTransferLayoutAlgorit
         }
         
         // at this point there must be a pending cache
-        String nodeName = this.dataCacheStore.getNodeForData(hash);
-        Node node = cluster.getNode(nodeName);
+        // use always the master
+        String primaryNodeName = this.dataCacheStore.getPrimaryNodeForData(hash);
+        Node node = cluster.getNode(primaryNodeName);
         return node;
     }
 

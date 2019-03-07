@@ -20,10 +20,12 @@ import java.util.ArrayList;
 import java.util.Collection;
 import java.util.List;
 import java.util.TimerTask;
+import java.util.concurrent.TimeUnit;
 import org.apache.commons.logging.Log;
 import org.apache.commons.logging.LogFactory;
 import stargate.commons.cluster.Cluster;
 import stargate.commons.driver.DriverNotInitializedException;
+import stargate.commons.utils.DateTimeUtils;
 import stargate.managers.transport.TransportManager;
 
 /**
@@ -32,6 +34,12 @@ import stargate.managers.transport.TransportManager;
  */
 public class RemoteClusterSyncTask extends TimerTask {
     private static final Log LOG = LogFactory.getLog(RemoteClusterSyncTask.class);
+    
+    private static final long DEFAULT_TASK_DELAY_SEC = 60*60;
+    private static final long DEFAULT_TASK_PERIOD_SEC = 60*60;
+    
+    private long taskDelaySec = DEFAULT_TASK_DELAY_SEC;
+    private long taskPeriodSec = DEFAULT_TASK_PERIOD_SEC;
     
     private ClusterManager clusterManager;
     private TransportManager transportManager;
@@ -80,5 +88,13 @@ public class RemoteClusterSyncTask extends TimerTask {
         } catch (DriverNotInitializedException ex) {
             LOG.error("Driver is not initialized", ex);
         }
+    }
+    
+    public long getDelayMillisec() {
+        return DateTimeUtils.getMilliseconds(TimeUnit.SECONDS, this.taskDelaySec);
+    }
+    
+    public long getPeriodMillisec() {
+        return DateTimeUtils.getMilliseconds(TimeUnit.SECONDS, this.taskPeriodSec);
     }
 }

@@ -15,9 +15,13 @@
 */
 package stargate.managers.transport;
 
+import stargate.managers.transport.layout.AbstractContactNodeSelectionAlgorithm;
+import stargate.managers.transport.layout.AbstractTransferLayoutAlgorithm;
+import stargate.managers.transport.layout.RoundRobinContactNodeSelectionAlgorithm;
+import stargate.managers.transport.layout.StaticTransferLayoutAlgorithm;
+import stargate.managers.transport.layout.TransferLayoutAlgorithms;
 import stargate.commons.transport.TransferAssignment;
 import java.io.ByteArrayInputStream;
-import java.io.FileNotFoundException;
 import java.io.IOException;
 import java.io.InputStream;
 import java.net.URI;
@@ -63,6 +67,9 @@ import stargate.managers.datastore.DataStoreManager;
 import stargate.managers.event.EventManager;
 import stargate.managers.recipe.RecipeManager;
 import stargate.managers.statistics.StatisticsManager;
+import stargate.managers.transport.layout.ContactNodeSelectionAlgorithms;
+import stargate.managers.transport.layout.FairTransferLayoutAlgorithm;
+import stargate.managers.transport.layout.RandomContactNodeSelectionAlgorithm;
 import stargate.service.StargateService;
 
 /**
@@ -72,6 +79,8 @@ import stargate.service.StargateService;
 public class TransportManager extends AbstractManager<AbstractTransportDriver> {
 
     private static final Log LOG = LogFactory.getLog(TransportManager.class);
+    
+    private static final int DEFAULT_PREFETCH_THREAD_NUM = 5;
     
     private static TransportManager instance;
     
@@ -84,17 +93,20 @@ public class TransportManager extends AbstractManager<AbstractTransportDriver> {
     private final Object dataChunkSyncObj = new Object();
     private Map<String, TransferReference> waitObjects = new ConcurrentHashMap<String, TransferReference>();
     
-    private ExecutorService prefetchThreadPool = Executors.newFixedThreadPool(5);
-    
-    private AbstractContactNodeDeterminationAlgorithm contactNodeDeterminationAlgorithm;
+    private AbstractContactNodeSelectionAlgorithm contactNodeSelectionAlgorithm;
     private AbstractTransferLayoutAlgorithm transferLayoutAlgorithm;
+    
+    private int prefetchThreadNum = DEFAULT_PREFETCH_THREAD_NUM;
+    private ExecutorService prefetchThreadPool;
+    
     protected long lastUpdateTime;
     
     private static final String REMOTE_DIRECTORY_CACHE_STORE = "remote_dir_cache";
     private static final String REMOTE_RECIPE_CACHE_STORE = "remote_recipe_cache";
     private static final String DATA_CHUNK_CACHE_STORE = "data_chunk_cache";
     
-    private static final String CONFIG_KEY_LAYOUT_ALGORITHM = "layout";
+    private static final String CONFIG_KEY_TRANSFER_LAYOUT_ALGORITHM = "transfer_layout";
+    private static final String CONFIG_KEY_CONTACT_NODE_SELECTION_ALGORITHM = "contact_node_selection";
     
     public static TransportManager getInstance(StargateService service, ManagerConfig config, Collection<AbstractTransportDriver> drivers) throws ManagerNotInstantiatedException {
         synchronized (TransportManager.class) {
@@ -150,6 +162,8 @@ public class TransportManager extends AbstractManager<AbstractTransportDriver> {
         if(drivers == null || drivers.isEmpty()) {
             throw new IllegalArgumentException("drivers is null or empty");
         }
+        
+        this.prefetchThreadPool = Executors.newFixedThreadPool(this.prefetchThreadNum);
         
         this.setService(service);
         this.setConfig(config);
@@ -293,7 +307,7 @@ public class TransportManager extends AbstractManager<AbstractTransportDriver> {
         if(this.transferLayoutAlgorithm == null) {
             StargateService stargateService = getStargateService();
             ManagerConfig managerConfig = this.getConfig();
-            String algStr = managerConfig.getParam(CONFIG_KEY_LAYOUT_ALGORITHM, TransferLayoutAlgorithms.TRANSFER_LAYOUT_ALGORITHM_STATIC.getStringVal());
+            String algStr = managerConfig.getParam(CONFIG_KEY_TRANSFER_LAYOUT_ALGORITHM, TransferLayoutAlgorithms.TRANSFER_LAYOUT_ALGORITHM_STATIC.getStringVal());
             TransferLayoutAlgorithms transferAlg = TransferLayoutAlgorithms.fromStringVal(algStr);
             if(transferAlg == null) {
                 transferAlg = TransferLayoutAlgorithms.TRANSFER_LAYOUT_ALGORITHM_STATIC;
@@ -303,14 +317,33 @@ public class TransportManager extends AbstractManager<AbstractTransportDriver> {
                 case TRANSFER_LAYOUT_ALGORITHM_STATIC:
                     this.transferLayoutAlgorithm = new StaticTransferLayoutAlgorithm(stargateService, this, this.dataChunkCacheStore);
                     break;
+                case TRANSFER_LAYOUT_ALGORITHM_FAIR:
+                    this.transferLayoutAlgorithm = new FairTransferLayoutAlgorithm(stargateService, this, this.dataChunkCacheStore);
+                    break;
                 default:
                     throw new IOException(String.format("Cannot find transfer algorithm %s", transferAlg.name()));
             }
         }
         
-        if(this.contactNodeDeterminationAlgorithm == null) {
+        if(this.contactNodeSelectionAlgorithm == null) {
             StargateService stargateService = getStargateService();
-            this.contactNodeDeterminationAlgorithm = new RoundRobinContactNodeDeterminationAlgorithm(stargateService, this);
+            ManagerConfig managerConfig = this.getConfig();
+            String algStr = managerConfig.getParam(CONFIG_KEY_CONTACT_NODE_SELECTION_ALGORITHM, ContactNodeSelectionAlgorithms.CONTACT_NODE_SELECTION_ALGORITHM_ROUNDROBIN.getStringVal());
+            ContactNodeSelectionAlgorithms selectionAlg = ContactNodeSelectionAlgorithms.fromStringVal(algStr);
+            if(selectionAlg == null) {
+                selectionAlg = ContactNodeSelectionAlgorithms.CONTACT_NODE_SELECTION_ALGORITHM_ROUNDROBIN;
+            }
+            
+            switch(selectionAlg) {
+                case CONTACT_NODE_SELECTION_ALGORITHM_ROUNDROBIN:
+                    this.contactNodeSelectionAlgorithm = new RoundRobinContactNodeSelectionAlgorithm(stargateService, this);
+                    break;
+                case CONTACT_NODE_SELECTION_ALGORITHM_RANDOM:
+                    this.contactNodeSelectionAlgorithm = new RandomContactNodeSelectionAlgorithm(stargateService, this);
+                    break;
+                default:
+                    throw new IOException(String.format("Cannot find transfer algorithm %s", selectionAlg.name()));
+            }
         }
     }
     
@@ -329,7 +362,7 @@ public class TransportManager extends AbstractManager<AbstractTransportDriver> {
             StargateService stargateService = getStargateService();
             ClusterManager clusterManager = stargateService.getClusterManager();
             
-            Node remoteNode = this.contactNodeDeterminationAlgorithm.getResponsibleRemoteNode(clusterManager.getLocalCluster(), clusterManager.getLocalNode(), remoteCluster);
+            Node remoteNode = this.contactNodeSelectionAlgorithm.getResponsibleRemoteNode(clusterManager.getLocalCluster(), clusterManager.getLocalNode(), remoteCluster);
             if(remoteNode == null) {
                 throw new IOException(String.format("cannot determine a remote node for a remote cluster %s", remoteCluster.getName()));
             }
@@ -446,16 +479,6 @@ public class TransportManager extends AbstractManager<AbstractTransportDriver> {
                     throw new IOException(String.format("remote cluster %s does not exist", uri.getClusterName()));
                 }
 
-                Recipe recipe = getRecipe(uri);
-                Node remoteNode = this.transferLayoutAlgorithm.determineRemoteNode(remoteCluster, recipe, hash);
-                if(remoteNode == null) {
-                    reference.decreaseReference();
-                    if(reference.getReferenceCount() <= 0) {
-                        this.waitObjects.remove(hash);
-                    }
-                    throw new IOException(String.format("cannot determine a remote node for a remote cluster %s", uri.getClusterName()));
-                }
-            
                 // double-check cache
                 if(!putPendingChunkCache) {
                     byte[] existingData = (byte[]) this.dataChunkCacheStore.get(hash);
@@ -485,7 +508,17 @@ public class TransportManager extends AbstractManager<AbstractTransportDriver> {
                         }
                     }
                 }
-
+                
+                Recipe recipe = getRecipe(uri);
+                Node remoteNode = this.transferLayoutAlgorithm.determineRemoteNode(remoteCluster, recipe, hash);
+                if(remoteNode == null) {
+                    reference.decreaseReference();
+                    if(reference.getReferenceCount() <= 0) {
+                        this.waitObjects.remove(hash);
+                    }
+                    throw new IOException(String.format("cannot determine a remote node for a remote cluster %s", uri.getClusterName()));
+                }
+            
                 // go remote
                 AbstractTransportDriver driver = getDriver();
                 AbstractTransportClient client = driver.getClient(remoteNode);
@@ -553,6 +586,8 @@ public class TransportManager extends AbstractManager<AbstractTransportDriver> {
         
         safeInitLayoutAlgorithm();
         
+        LOG.debug(String.format("Get a remote data chunk - %s, %s", uri.toUri().toASCIIString(), hash));
+        
         try {
             StargateService stargateService = getStargateService();
             ClusterManager clusterManager = stargateService.getClusterManager();
@@ -561,43 +596,6 @@ public class TransportManager extends AbstractManager<AbstractTransportDriver> {
                 throw new IOException(String.format("remote cluster %s does not exist", uri.getClusterName()));
             }
             
-            Recipe recipe = getRecipe(uri);
-            Node remoteNode = this.transferLayoutAlgorithm.determineRemoteNode(remoteCluster, recipe, hash);
-            if(remoteNode == null) {
-                throw new IOException(String.format("cannot determine a remote node for a remote cluster %s", uri.getClusterName()));
-            }
-            
-            return getDataChunk(remoteNode, uri, hash);
-        } catch (ManagerNotInstantiatedException ex) {
-            LOG.error("Manager is not instantiated", ex);
-            throw new IOException(ex);
-        }
-    }
-    
-    private InputStream getDataChunk(Node remoteNode, DataObjectURI uri, String hash) throws IOException, FileNotFoundException, DriverNotInitializedException {
-        if(remoteNode == null) {
-            throw new IllegalArgumentException("remoteNode is null");
-        }
-        
-        if(uri == null) {
-            throw new IllegalArgumentException("uri is null");
-        }
-        
-        if(hash == null || hash.isEmpty()) {
-            throw new IllegalArgumentException("hash is null or empty");
-        }
-        
-        if(!this.started) {
-            throw new IllegalStateException("Manager is not started");
-        }
-        
-        safeInitLayoutAlgorithm();
-        
-        LOG.debug(String.format("Get a remote data chunk - %s, %s", uri.toUri().toASCIIString(), hash));
-        
-        try {
-            StargateService stargateService = getStargateService();
-            ClusterManager clusterManager = stargateService.getClusterManager();
             Node localNode = clusterManager.getLocalNode();
             
             // check local recipes
@@ -739,14 +737,19 @@ public class TransportManager extends AbstractManager<AbstractTransportDriver> {
                     }
                 }
                 
+                Recipe recipe = getRecipe(uri);
+                Node remoteNode = this.transferLayoutAlgorithm.determineRemoteNode(remoteCluster, recipe, hash);
+                if(remoteNode == null) {
+                    throw new IOException(String.format("cannot determine a remote node for a remote cluster %s", uri.getClusterName()));
+                }
+                
                 // go remote
                 AbstractTransportDriver driver = getDriver();
                 AbstractTransportClient client = driver.getClient(remoteNode);
 
                 // increase workload
                 Cluster localCluster = clusterManager.getLocalCluster();
-                Cluster remoteCluster = clusterManager.getRemoteCluster(remoteNode.getClusterName());
-            
+                
                 this.transferLayoutAlgorithm.increaseNodeWorkload(localCluster, localNode);
                 this.transferLayoutAlgorithm.increaseNodeWorkload(remoteCluster, remoteNode);
 
@@ -955,7 +958,7 @@ public class TransportManager extends AbstractManager<AbstractTransportDriver> {
                         LOG.debug(String.format("Found a pending prefetch schedule for - %s, %s at %s", metadata.getURI().toUri().toASCIIString(), hash, existingCache.getTransferNode()));
                         return assignment;
                     } else if(existingCache.getType() == DataChunkCacheType.DATA_CHUNK_CACHE_PRESENT) {
-                        String nodeName = this.dataChunkCacheStore.getNodeForData(hash);
+                        String nodeName = this.dataChunkCacheStore.getPrimaryNodeForData(hash);
                         TransferAssignment assignment = new TransferAssignment(recipe.getMetadata().getURI(), hash, nodeName);
                         LOG.debug(String.format("Found a local cache for - %s, %s at %s", metadata.getURI().toUri().toASCIIString(), hash, nodeName));
                         return assignment;
@@ -1017,7 +1020,7 @@ public class TransportManager extends AbstractManager<AbstractTransportDriver> {
                 throw new IOException(String.format("remote cluster %s does not exist", clusterName));
             }
 
-            Node remoteNode = this.contactNodeDeterminationAlgorithm.getResponsibleRemoteNode(clusterManager.getLocalCluster(), clusterManager.getLocalNode(), remoteCluster);
+            Node remoteNode = this.contactNodeSelectionAlgorithm.getResponsibleRemoteNode(clusterManager.getLocalCluster(), clusterManager.getLocalNode(), remoteCluster);
             if(remoteNode == null) {
                 throw new IOException(String.format("cannot determine a remote node for a remote cluster %s", clusterName));
             }
@@ -1081,7 +1084,7 @@ public class TransportManager extends AbstractManager<AbstractTransportDriver> {
                 throw new IOException(String.format("remote cluster %s does not exist", clusterName));
             }
             
-            Node remoteNode = this.contactNodeDeterminationAlgorithm.getResponsibleRemoteNode(clusterManager.getLocalCluster(), clusterManager.getLocalNode(), remoteCluster);
+            Node remoteNode = this.contactNodeSelectionAlgorithm.getResponsibleRemoteNode(clusterManager.getLocalCluster(), clusterManager.getLocalNode(), remoteCluster);
             if(remoteNode == null) {
                 throw new IOException(String.format("cannot determine a remote node for a remote cluster %s", clusterName));
             }
@@ -1132,7 +1135,7 @@ public class TransportManager extends AbstractManager<AbstractTransportDriver> {
                 throw new IOException(String.format("remote cluster %s does not exist", clusterName));
             }
 
-            Node remoteNode = this.contactNodeDeterminationAlgorithm.getResponsibleRemoteNode(clusterManager.getLocalCluster(), clusterManager.getLocalNode(), remoteCluster);
+            Node remoteNode = this.contactNodeSelectionAlgorithm.getResponsibleRemoteNode(clusterManager.getLocalCluster(), clusterManager.getLocalNode(), remoteCluster);
             if(remoteNode == null) {
                 throw new IOException(String.format("cannot determine a remote node for a remote cluster %s", clusterName));
             }

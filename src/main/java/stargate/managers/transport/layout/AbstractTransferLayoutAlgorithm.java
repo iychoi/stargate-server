@@ -13,7 +13,7 @@
    See the License for the specific language governing permissions and
    limitations under the License.
 */
-package stargate.managers.transport;
+package stargate.managers.transport.layout;
 
 import java.io.IOException;
 import java.util.Collection;
@@ -21,6 +21,7 @@ import stargate.commons.cluster.Cluster;
 import stargate.commons.cluster.Node;
 import stargate.commons.recipe.Recipe;
 import stargate.commons.service.AbstractService;
+import stargate.managers.transport.TransportManager;
 import stargate.service.StargateService;
 
 /**
@@ -71,7 +72,6 @@ public abstract class AbstractTransferLayoutAlgorithm {
     public abstract void increaseNodeWorkload(Cluster cluster, Node node) throws IOException;
     public abstract void decreaseNodeWorkload(Cluster cluster, Node node) throws IOException;
     
-    public abstract Node determineLocalNode(Cluster cluster) throws IOException;
     public abstract Node determineLocalNode(Cluster cluster, Recipe recipe, String hash) throws IOException;
     
     public abstract Node determineRemoteNode(Cluster remoteCluster, Recipe recipe, String hash) throws IOException;

@@ -26,6 +26,7 @@ import org.apache.ignite.configuration.CollectionConfiguration;
 import stargate.commons.datastore.AbstractQueue;
 import stargate.commons.datastore.EnumDataStoreProperty;
 import stargate.commons.utils.ObjectSerializer;
+import stargate.drivers.ignite.IgniteDriver;
 
 /**
  *
@@ -34,6 +35,7 @@ import stargate.commons.utils.ObjectSerializer;
 public class IgniteQueue extends AbstractQueue {
 
     private IgniteDataStoreDriver driver;
+    private IgniteDriver igniteDriver;
     private Ignite ignite;
     private String name;
     private Class valueClass;
@@ -41,13 +43,13 @@ public class IgniteQueue extends AbstractQueue {
     
     private org.apache.ignite.IgniteQueue<byte[]> store;
     
-    public IgniteQueue(IgniteDataStoreDriver driver, Ignite ignite, String name, Class valueClass, EnumDataStoreProperty property) {
+    public IgniteQueue(IgniteDataStoreDriver driver, IgniteDriver igniteDriver, String name, Class valueClass, EnumDataStoreProperty property) {
         if(driver == null) {
             throw new IllegalArgumentException("driver is null");
         }
         
-        if(ignite == null) {
-            throw new IllegalArgumentException("ignite is null");
+        if(igniteDriver == null) {
+            throw new IllegalArgumentException("igniteDriver is null");
         }
         
         if(name == null || name.isEmpty()) {
@@ -63,7 +65,8 @@ public class IgniteQueue extends AbstractQueue {
         }
         
         this.driver = driver;
-        this.ignite = ignite;
+        this.igniteDriver = igniteDriver;
+        this.ignite = igniteDriver.getIgnite();
         this.name = name;
         this.valueClass = valueClass;
         this.property = property;

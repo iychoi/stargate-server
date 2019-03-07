@@ -13,31 +13,12 @@
    See the License for the specific language governing permissions and
    limitations under the License.
 */
-package stargate.managers.transport;
+package stargate.managers.transport.layout;
 
 /**
  *
  * @author iychoi
  */
-public enum TransferLayoutAlgorithms {
-    TRANSFER_LAYOUT_ALGORITHM_STATIC ("static");
-    
-    private String strVal;
-    
-    TransferLayoutAlgorithms(String strVal) {
-        this.strVal = strVal;
-    }
-    
-    public String getStringVal() {
-        return this.strVal;
-    }
-    
-    public static TransferLayoutAlgorithms fromStringVal(String strVal) {
-        for(TransferLayoutAlgorithms type : TransferLayoutAlgorithms.values()) {
-            if(type.getStringVal().equalsIgnoreCase(strVal)) {
-                return type;
-            }
-        }
-        return null;
-    }
+public enum TransferWorkloadEventType {
+    TRANSFER_WORKLOAD_EVENT_TYPE_SYNC_DELTA
 }

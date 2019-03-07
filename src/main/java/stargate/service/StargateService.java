@@ -18,7 +18,6 @@ package stargate.service;
 import java.io.IOException;
 import java.util.ArrayList;
 import java.util.List;
-import java.util.concurrent.TimeUnit;
 import org.apache.commons.logging.Log;
 import org.apache.commons.logging.LogFactory;
 import stargate.commons.driver.DriverNotInitializedException;
@@ -26,7 +25,6 @@ import stargate.commons.event.AbstractEventHandler;
 import stargate.commons.manager.ManagerNotInstantiatedException;
 import stargate.commons.service.AbstractService;
 import stargate.commons.service.ServiceNotStartedException;
-import stargate.commons.utils.DateTimeUtils;
 import stargate.managers.cluster.ClusterManager;
 import stargate.managers.dataexport.DataExportManager;
 import stargate.managers.datasource.DataSourceManager;
@@ -168,8 +166,7 @@ public class StargateService extends AbstractService {
         
         LOG.info("Scheduling background tasks");
         RemoteClusterSyncTask remoteClusterSyncTask = new RemoteClusterSyncTask(this.clusterManager, this.transportManager);
-        long tenMin = DateTimeUtils.getMilliseconds(TimeUnit.HOURS, 1);
-        this.scheduleManager.scheduleTask(remoteClusterSyncTask, tenMin, tenMin);
+        this.scheduleManager.scheduleTask(remoteClusterSyncTask, remoteClusterSyncTask.getDelayMillisec(), remoteClusterSyncTask.getPeriodMillisec());
         LOG.info("Background tasks are scheduled");
         
         this.started = true;

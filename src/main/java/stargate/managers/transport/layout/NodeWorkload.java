@@ -13,7 +13,7 @@
    See the License for the specific language governing permissions and
    limitations under the License.
 */
-package stargate.managers.transport;
+package stargate.managers.transport.layout;
 
 import java.io.File;
 import java.io.IOException;
@@ -96,11 +96,8 @@ public class NodeWorkload {
     }
     
     @JsonIgnore
-    public void decreaseScheduledTransfers(double delta) {
-        this.workload -= delta;
-        if(this.workload < 0) {
-            this.workload = 0;
-        }
+    public void clear() {
+        this.workload = 0;
     }
     
     @JsonIgnore

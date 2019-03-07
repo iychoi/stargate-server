@@ -200,7 +200,7 @@ public class IgniteClusterDriver extends AbstractClusterDriver {
             @Override
             public boolean apply(DiscoveryEvent event) {
                 ClusterNode eventNode = event.eventNode();
-                String eventNodeName = eventNode.consistentId().toString();
+                String eventNodeName = igniteDriver.getNodeNameFromClusterNode(eventNode);
                 
                 switch(event.type()) {
                     case EventType.EVT_NODE_JOINED:

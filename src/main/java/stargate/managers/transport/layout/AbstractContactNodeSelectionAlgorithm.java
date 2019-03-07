@@ -13,19 +13,20 @@
    See the License for the specific language governing permissions and
    limitations under the License.
 */
-package stargate.managers.transport;
+package stargate.managers.transport.layout;
 
 import java.io.IOException;
 import stargate.commons.cluster.Cluster;
 import stargate.commons.cluster.Node;
 import stargate.commons.service.AbstractService;
+import stargate.managers.transport.TransportManager;
 import stargate.service.StargateService;
 
 /**
  *
  * @author iychoi
  */
-public abstract class AbstractContactNodeDeterminationAlgorithm {
+public abstract class AbstractContactNodeSelectionAlgorithm {
 
     protected StargateService service;
     protected TransportManager manager;
@@ -67,5 +68,4 @@ public abstract class AbstractContactNodeDeterminationAlgorithm {
     }
     
     public abstract Node getResponsibleRemoteNode(Cluster localCluster, Node localNode, Cluster remoteCluster) throws IOException;
-    public abstract ResponsibleNodeMapping getResponsibleRemoteNodeMappings(Cluster localCluster, Cluster remoteCluster) throws IOException;
 }
