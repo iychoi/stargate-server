@@ -99,6 +99,7 @@ public class IgniteKeyValueStore extends AbstractKeyValueStore {
         CacheConfiguration<String, ByteArray> cc = new CacheConfiguration<String, ByteArray>();
         if(EnumDataStoreProperty.isDistributed(property)) {
             cc.setCacheMode(CacheMode.PARTITIONED);
+            cc.setBackups(3);
         } else if(EnumDataStoreProperty.isReplciated(property)) {
             cc.setCacheMode(CacheMode.REPLICATED);
         }
@@ -112,7 +113,7 @@ public class IgniteKeyValueStore extends AbstractKeyValueStore {
         cc.setWriteSynchronizationMode(CacheWriteSynchronizationMode.FULL_SYNC);
         cc.setAtomicityMode(CacheAtomicityMode.ATOMIC);
         cc.setEvictionPolicy(null);
-        cc.setCopyOnRead(false);
+        cc.setCopyOnRead(true);
         cc.setOnheapCacheEnabled(true);
         cc.setReadFromBackup(true);
         cc.setName(name);
@@ -162,6 +163,7 @@ public class IgniteKeyValueStore extends AbstractKeyValueStore {
         CacheConfiguration<String, ByteArray> cc = new CacheConfiguration<String, ByteArray>();
         if(EnumDataStoreProperty.isDistributed(property)) {
             cc.setCacheMode(CacheMode.PARTITIONED);
+            cc.setBackups(3);
         } else if(EnumDataStoreProperty.isReplciated(property)) {
             cc.setCacheMode(CacheMode.REPLICATED);
         }
