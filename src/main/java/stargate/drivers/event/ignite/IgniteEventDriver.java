@@ -46,14 +46,20 @@ public class IgniteEventDriver extends AbstractEventDriver {
 
     private static final Log LOG = LogFactory.getLog(IgniteEventDriver.class);
     
+    private static final int DEFAULT_EVENT_HANDLER_THREAD_NUM = 5;
+    private static final int DEFAULT_EVENT_SENDER_THREAD_NUM = 5;
+    
+    private int eventHandlerThreadNum = DEFAULT_EVENT_HANDLER_THREAD_NUM;
+    private int eventSenderThreadNum = DEFAULT_EVENT_SENDER_THREAD_NUM;
+    
     private IgniteEventDriverConfig config;
     private IgniteDriver igniteDriver;
     private IgniteMessaging msg;
     private boolean listenEvent = true;
     private Map<StargateEventType, Set<AbstractEventHandler>> eventHandlers = new HashMap<StargateEventType, Set<AbstractEventHandler>>();
     private final Object eventHandlersSyncObj = new Object();
-    private ExecutorService eventHandlerThreadPool = Executors.newFixedThreadPool(1);
-    private ExecutorService eventSenderThreadPool = Executors.newFixedThreadPool(1);
+    private ExecutorService eventHandlerThreadPool = Executors.newFixedThreadPool(eventHandlerThreadNum);
+    private ExecutorService eventSenderThreadPool = Executors.newFixedThreadPool(eventSenderThreadNum);
     
     private final String STARGATE_TOPIC = "STARGATE_TOPIC";
     
