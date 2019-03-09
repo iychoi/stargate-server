@@ -223,6 +223,8 @@ public class FairTransferLayoutAlgorithm extends AbstractTransferLayoutAlgorithm
             throw new IllegalArgumentException("node is null");
         }
         
+        LOG.info(String.format("Increase node workload - %s %s", cluster.getName(), node.getName()));
+        
         ClusterWorkload clusterWorkload = this.clusterWorkloadDelta.get(cluster.getName());
         if(clusterWorkload == null) {
             clusterWorkload = new ClusterWorkload(cluster.getName());
@@ -249,6 +251,8 @@ public class FairTransferLayoutAlgorithm extends AbstractTransferLayoutAlgorithm
         if(node == null) {
             throw new IllegalArgumentException("node is null");
         }
+        
+        LOG.info(String.format("Decrease node workload - %s %s", cluster.getName(), node.getName()));
         
         ClusterWorkload clusterWorkload = this.clusterWorkloadDelta.get(cluster.getName());
         if(clusterWorkload == null) {
@@ -307,6 +311,7 @@ public class FairTransferLayoutAlgorithm extends AbstractTransferLayoutAlgorithm
         Collection<String> nodeNames = recipe.getNodeNames(nodeIDs);
 
         ClusterWorkload clusterWorkload = getCurrentNodeWorkloads(remoteCluster);
+        LOG.debug(String.format("Cluster workload : %s", clusterWorkload.toString()));
         
         NodeWorkload lowestWorkload = null;
         
@@ -329,6 +334,8 @@ public class FairTransferLayoutAlgorithm extends AbstractTransferLayoutAlgorithm
         }
         
         String nodeName = lowestWorkload.getNodeName();
+        
+        LOG.debug(String.format("Node %s is selected as a source node", nodeName));
         return remoteCluster.getNode(nodeName);
     }
     
