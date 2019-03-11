@@ -313,6 +313,8 @@ public class TransportManager extends AbstractManager<AbstractTransportDriver> {
                 transferAlg = TransferLayoutAlgorithms.TRANSFER_LAYOUT_ALGORITHM_STATIC;
             }
             
+            LOG.info(String.format("Using transfer layout algorithm - %s", transferAlg.name()));
+            
             switch(transferAlg) {
                 case TRANSFER_LAYOUT_ALGORITHM_STATIC:
                     this.transferLayoutAlgorithm = new StaticTransferLayoutAlgorithm(stargateService, this, this.dataChunkCacheStore);
@@ -333,6 +335,8 @@ public class TransportManager extends AbstractManager<AbstractTransportDriver> {
             if(selectionAlg == null) {
                 selectionAlg = ContactNodeSelectionAlgorithms.CONTACT_NODE_SELECTION_ALGORITHM_ROUNDROBIN;
             }
+            
+            LOG.info(String.format("Using contact node selection algorithm - %s", selectionAlg.name()));
             
             switch(selectionAlg) {
                 case CONTACT_NODE_SELECTION_ALGORITHM_ROUNDROBIN:
