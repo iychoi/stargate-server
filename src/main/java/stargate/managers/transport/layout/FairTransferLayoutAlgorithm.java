@@ -231,11 +231,13 @@ public class FairTransferLayoutAlgorithm extends AbstractTransferLayoutAlgorithm
             this.clusterWorkloadDelta.put(cluster.getName(), clusterWorkload);
         }
         
+        NodeWorkload nodeWorkloadDelta = new NodeWorkload(node.getName(), WORKLOAD_INCREMENT);
+        
         NodeWorkload nodeWorkload = clusterWorkload.getNodeWorkloadWithDefault(node.getName());
-        nodeWorkload.increaseWorkload(WORKLOAD_INCREMENT);
+        nodeWorkload.increaseWorkload(nodeWorkloadDelta.getWorkload());
         
         try {
-            syncWorkloadDelta(cluster.getName(), nodeWorkload);
+            syncWorkloadDelta(cluster.getName(), nodeWorkloadDelta);
         } catch (DriverNotInitializedException ex) {
             LOG.error("Driver is not initialized", ex);
             throw new IOException(ex);
@@ -260,11 +262,13 @@ public class FairTransferLayoutAlgorithm extends AbstractTransferLayoutAlgorithm
             this.clusterWorkloadDelta.put(cluster.getName(), clusterWorkload);
         }
         
+        NodeWorkload nodeWorkloadDelta = new NodeWorkload(node.getName(), -1 * WORKLOAD_INCREMENT);
+        
         NodeWorkload nodeWorkload = clusterWorkload.getNodeWorkloadWithDefault(node.getName());
-        nodeWorkload.increaseWorkload(-1 * WORKLOAD_INCREMENT);
+        nodeWorkload.increaseWorkload(nodeWorkloadDelta.getWorkload());
         
         try {
-            syncWorkloadDelta(cluster.getName(), nodeWorkload);
+            syncWorkloadDelta(cluster.getName(), nodeWorkloadDelta);
         } catch (DriverNotInitializedException ex) {
             LOG.error("Driver is not initialized", ex);
             throw new IOException(ex);
