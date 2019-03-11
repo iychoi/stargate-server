@@ -38,6 +38,10 @@ public enum TransferLayoutAlgorithms {
             if(type.getStringVal().equalsIgnoreCase(strVal)) {
                 return type;
             }
+            
+            if(type.name().equalsIgnoreCase(strVal)) {
+                return type;
+            }
         }
         return null;
     }

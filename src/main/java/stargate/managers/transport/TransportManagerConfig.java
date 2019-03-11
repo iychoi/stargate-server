@@ -17,6 +17,7 @@ package stargate.managers.transport;
 
 import java.io.File;
 import java.io.IOException;
+import org.codehaus.jackson.annotate.JsonIgnore;
 import org.codehaus.jackson.annotate.JsonProperty;
 import stargate.commons.utils.JsonSerializer;
 import stargate.commons.manager.ManagerConfig;
@@ -51,7 +52,7 @@ public class TransportManagerConfig extends ManagerConfig {
     public TransportManagerConfig() {
     }
     
-    @JsonProperty("transfer_layout")
+    @JsonIgnore
     public void setLayoutAlgorithm(TransferLayoutAlgorithms layoutAlgorithm) {
         if(layoutAlgorithm == null) {
             throw new IllegalArgumentException("layoutAlgorithm is null");
@@ -63,11 +64,30 @@ public class TransportManagerConfig extends ManagerConfig {
     }
     
     @JsonProperty("transfer_layout")
+    public void setLayoutAlgorithmString(String layoutAlgorithm) {
+        if(layoutAlgorithm == null || layoutAlgorithm.isEmpty()) {
+            throw new IllegalArgumentException("layoutAlgorithm is null or empty");
+        }
+        
+        super.checkMutableAndRaiseException();
+        
+        this.layoutAlgorithm = TransferLayoutAlgorithms.fromStringVal(layoutAlgorithm);
+    }
+    
+    @JsonIgnore
     public TransferLayoutAlgorithms getLayoutAlgorithm() {
         return this.layoutAlgorithm;
     }
     
-    @JsonProperty("contact_node_selection")
+    @JsonProperty("transfer_layout")
+    public String getLayoutAlgorithmString() {
+        if(this.layoutAlgorithm != null) {
+            return this.layoutAlgorithm.getStringVal();
+        }
+        return null;
+    }
+    
+    @JsonIgnore
     public void setContactNodeSelectionAlgorithm(ContactNodeSelectionAlgorithms nodeSelectionAlgorithm) {
         if(nodeSelectionAlgorithm == null) {
             throw new IllegalArgumentException("nodeSelectionAlgorithm is null");
@@ -79,7 +99,26 @@ public class TransportManagerConfig extends ManagerConfig {
     }
     
     @JsonProperty("contact_node_selection")
+    public void setContactNodeSelectionAlgorithmString(String nodeSelectionAlgorithm) {
+        if(nodeSelectionAlgorithm == null || nodeSelectionAlgorithm.isEmpty()) {
+            throw new IllegalArgumentException("nodeSelectionAlgorithm is null or empty");
+        }
+        
+        super.checkMutableAndRaiseException();
+        
+        this.nodeSelectionAlgorithm = ContactNodeSelectionAlgorithms.fromStringVal(nodeSelectionAlgorithm);
+    }
+    
+    @JsonIgnore
     public ContactNodeSelectionAlgorithms getContactNodeSelectionAlgorithm() {
         return this.nodeSelectionAlgorithm;
+    }
+    
+    @JsonProperty("contact_node_selection")
+    public String getContactNodeSelectionAlgorithmString() {
+        if(this.nodeSelectionAlgorithm != null) {
+            return this.nodeSelectionAlgorithm.getStringVal();
+        }
+        return null;
     }
 }

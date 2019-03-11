@@ -52,7 +52,9 @@
         "service_host_name_pattern" : ".*",
         "service_port" : 31010
       }
-    } ]
+    } ],
+    "transfer_layout" : "fair",
+    "contact_node_selection" : "roundrobin"
   },
   "user_interface" : {
     "driver_setting" : [ {
@@ -62,11 +64,7 @@
         "service_host_name_pattern" : ".*",
         "service_port" : 41010
       }
-    } ],
-    "params" : {
-      "transfer_layout" : "fair",
-      "contact_node_selection" : "roundrobin"
-    }
+    } ]
   },
   "schedule" : {
     "driver_setting" : [ {

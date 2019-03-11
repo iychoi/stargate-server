@@ -54,10 +54,8 @@
         "service_port" : 31010
       }
     } ],
-    "params" : {
-      "transfer_layout" : "fair",
-      "contact_node_selection" : "roundrobin"
-    }
+    "transfer_layout" : "fair",
+    "contact_node_selection" : "roundrobin"
   },
   "user_interface" : {
     "driver_setting" : [ {
