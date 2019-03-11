@@ -105,10 +105,7 @@ public class TransportManager extends AbstractManager<AbstractTransportDriver> {
     private static final String REMOTE_RECIPE_CACHE_STORE = "remote_recipe_cache";
     private static final String DATA_CHUNK_CACHE_STORE = "data_chunk_cache";
     
-    private static final String CONFIG_KEY_TRANSFER_LAYOUT_ALGORITHM = "transfer_layout";
-    private static final String CONFIG_KEY_CONTACT_NODE_SELECTION_ALGORITHM = "contact_node_selection";
-    
-    public static TransportManager getInstance(StargateService service, ManagerConfig config, Collection<AbstractTransportDriver> drivers) throws ManagerNotInstantiatedException {
+    public static TransportManager getInstance(StargateService service, TransportManagerConfig config, Collection<AbstractTransportDriver> drivers) throws ManagerNotInstantiatedException {
         synchronized (TransportManager.class) {
             if(instance == null) {
                 instance = new TransportManager(service, config, drivers);
@@ -117,7 +114,7 @@ public class TransportManager extends AbstractManager<AbstractTransportDriver> {
         }
     }
     
-    public static TransportManager getInstance(StargateService service, ManagerConfig config) throws ManagerNotInstantiatedException {
+    public static TransportManager getInstance(StargateService service, TransportManagerConfig config) throws ManagerNotInstantiatedException {
         synchronized (TransportManager.class) {
             if(instance == null) {
                 if(config == null) {
@@ -150,7 +147,7 @@ public class TransportManager extends AbstractManager<AbstractTransportDriver> {
         }
     }
     
-    TransportManager(StargateService service, ManagerConfig config, Collection<AbstractTransportDriver> drivers) throws ManagerNotInstantiatedException {
+    TransportManager(StargateService service, TransportManagerConfig config, Collection<AbstractTransportDriver> drivers) throws ManagerNotInstantiatedException {
         if(service == null) {
             throw new IllegalArgumentException("service is null");
         }
@@ -306,9 +303,8 @@ public class TransportManager extends AbstractManager<AbstractTransportDriver> {
         safeInitDataChunkCacheStore(); //  chunk cache store must be called before next line is executed
         if(this.transferLayoutAlgorithm == null) {
             StargateService stargateService = getStargateService();
-            ManagerConfig managerConfig = this.getConfig();
-            String algStr = managerConfig.getParam(CONFIG_KEY_TRANSFER_LAYOUT_ALGORITHM, TransferLayoutAlgorithms.TRANSFER_LAYOUT_ALGORITHM_STATIC.getStringVal());
-            TransferLayoutAlgorithms transferAlg = TransferLayoutAlgorithms.fromStringVal(algStr);
+            TransportManagerConfig managerConfig = (TransportManagerConfig) this.getConfig();
+            TransferLayoutAlgorithms transferAlg = managerConfig.getLayoutAlgorithm();
             if(transferAlg == null) {
                 transferAlg = TransferLayoutAlgorithms.TRANSFER_LAYOUT_ALGORITHM_STATIC;
             }
@@ -329,9 +325,8 @@ public class TransportManager extends AbstractManager<AbstractTransportDriver> {
         
         if(this.contactNodeSelectionAlgorithm == null) {
             StargateService stargateService = getStargateService();
-            ManagerConfig managerConfig = this.getConfig();
-            String algStr = managerConfig.getParam(CONFIG_KEY_CONTACT_NODE_SELECTION_ALGORITHM, ContactNodeSelectionAlgorithms.CONTACT_NODE_SELECTION_ALGORITHM_ROUNDROBIN.getStringVal());
-            ContactNodeSelectionAlgorithms selectionAlg = ContactNodeSelectionAlgorithms.fromStringVal(algStr);
+            TransportManagerConfig managerConfig = (TransportManagerConfig) this.getConfig();
+            ContactNodeSelectionAlgorithms selectionAlg = managerConfig.getContactNodeSelectionAlgorithm();
             if(selectionAlg == null) {
                 selectionAlg = ContactNodeSelectionAlgorithms.CONTACT_NODE_SELECTION_ALGORITHM_ROUNDROBIN;
             }

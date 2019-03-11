@@ -19,9 +19,9 @@ import java.io.File;
 import java.io.IOException;
 import org.codehaus.jackson.annotate.JsonIgnore;
 import org.codehaus.jackson.annotate.JsonProperty;
+import stargate.commons.config.AbstractImmutableConfig;
 import stargate.commons.driver.DriverInjection;
 import stargate.commons.manager.ManagerConfig;
-import stargate.commons.service.ServiceConfig;
 import stargate.commons.utils.JsonSerializer;
 import stargate.commons.utils.PathUtils;
 import stargate.drivers.cluster.ignite.IgniteClusterDriver;
@@ -40,15 +40,26 @@ import stargate.drivers.transport.http.HTTPTransportDriver;
 import stargate.drivers.transport.http.HTTPTransportDriverConfig;
 import stargate.drivers.userinterface.http.HTTPUserInterfaceDriver;
 import stargate.drivers.userinterface.http.HTTPUserInterfaceDriverConfig;
+import stargate.managers.transport.TransportManagerConfig;
 
 
 /**
  *
  * @author iychoi
  */
-public class StargateServiceConfig extends ServiceConfig {
+public class StargateServiceConfig extends AbstractImmutableConfig {
+    
+    protected ManagerConfig clusterManagerConfig;
+    protected ManagerConfig eventManagerConfig;
+    protected ManagerConfig dataSourceManagerConfig;
+    protected ManagerConfig dataStoreManagerConfig;
+    protected ManagerConfig recipeManagerConfig;
+    protected TransportManagerConfig transportManagerConfig;
+    protected ManagerConfig userInterfaceManagerConfig;
+    protected ManagerConfig scheduleManagerConfig;
     
     private UserConfig userConfig;
+    
     
     public static StargateServiceConfig createInstance(File file) throws IOException {
         if(file == null) {
@@ -83,11 +94,172 @@ public class StargateServiceConfig extends ServiceConfig {
     }
     
     @Override
-    @JsonIgnore
     public void setImmutable() {
         super.setImmutable();
         
-        this.userConfig.setImmutable();
+        if(this.clusterManagerConfig != null) {
+            this.clusterManagerConfig.setImmutable();
+        }
+        
+        if(this.eventManagerConfig != null) {
+            this.eventManagerConfig.setImmutable();
+        }
+        
+        if(this.dataSourceManagerConfig != null) {
+            this.dataSourceManagerConfig.setImmutable();
+        }
+        
+        if(this.dataStoreManagerConfig != null) {
+            this.dataStoreManagerConfig.setImmutable();
+        }
+    
+        if(this.recipeManagerConfig != null) {
+            this.recipeManagerConfig.setImmutable();
+        }
+        
+        if(this.transportManagerConfig != null) {
+            this.transportManagerConfig.setImmutable();
+        }
+        
+        if(this.userInterfaceManagerConfig != null) {
+            this.userInterfaceManagerConfig.setImmutable();
+        }
+        
+        if(this.scheduleManagerConfig != null) {
+            this.scheduleManagerConfig.setImmutable();
+        }
+        
+        if(this.userConfig != null) {
+            this.userConfig.setImmutable();
+        }
+    }
+    
+    @JsonProperty("cluster")
+    public void setClusterConfig(ManagerConfig clusterConfig) {
+        if(clusterConfig == null) {
+            throw new IllegalArgumentException("clusterConfig is null");
+        }
+        
+        super.checkMutableAndRaiseException();
+        
+        this.clusterManagerConfig = clusterConfig;
+    }
+    
+    @JsonProperty("cluster")
+    public ManagerConfig getClusterConfig() {
+        return this.clusterManagerConfig;
+    }
+    
+    @JsonProperty("event")
+    public void setEventConfig(ManagerConfig eventConfig) {
+        if(eventConfig == null) {
+            throw new IllegalArgumentException("eventConfig is null");
+        }
+        
+        super.checkMutableAndRaiseException();
+        
+        this.eventManagerConfig = eventConfig;
+    }
+    
+    @JsonProperty("event")
+    public ManagerConfig getEventConfig() {
+        return this.eventManagerConfig;
+    }
+    
+    @JsonProperty("data_source")
+    public void setDataSourceConfig(ManagerConfig dataSourceConfig) {
+        if(dataSourceConfig == null) {
+            throw new IllegalArgumentException("dataSourceConfig is null");
+        }
+        
+        super.checkMutableAndRaiseException();
+        
+        this.dataSourceManagerConfig = dataSourceConfig;
+    }
+    
+    @JsonProperty("data_source")
+    public ManagerConfig getDataSourceConfig() {
+        return this.dataSourceManagerConfig;
+    }
+    
+    @JsonProperty("data_store")
+    public void setDataStoreConfig(ManagerConfig dataStoreConfig) {
+        if(dataStoreConfig == null) {
+            throw new IllegalArgumentException("dataStoreConfig is null");
+        }
+        
+        super.checkMutableAndRaiseException();
+        
+        this.dataStoreManagerConfig = dataStoreConfig;
+    }
+    
+    @JsonProperty("data_store")
+    public ManagerConfig getDataStoreConfig() {
+        return this.dataStoreManagerConfig;
+    }
+    
+    @JsonProperty("recipe")
+    public void setRecipeConfig(ManagerConfig recipeConfig) {
+        if(recipeConfig == null) {
+            throw new IllegalArgumentException("recipeConfig is null");
+        }
+        
+        super.checkMutableAndRaiseException();
+        
+        this.recipeManagerConfig = recipeConfig;
+    }
+    
+    @JsonProperty("recipe")
+    public ManagerConfig getRecipeConfig() {
+        return this.recipeManagerConfig;
+    }
+    
+    @JsonProperty("transport")
+    public void setTransportConfig(TransportManagerConfig transportConfig) {
+        if(transportConfig == null) {
+            throw new IllegalArgumentException("transportConfig is null");
+        }
+        
+        super.checkMutableAndRaiseException();
+        
+        this.transportManagerConfig = transportConfig;
+    }
+    
+    @JsonProperty("transport")
+    public TransportManagerConfig getTransportConfig() {
+        return this.transportManagerConfig;
+    }
+    
+    @JsonProperty("user_interface")
+    public void setUserInterfaceConfig(ManagerConfig userInterfaceConfig) {
+        if(userInterfaceConfig == null) {
+            throw new IllegalArgumentException("userInterfaceConfig is null");
+        }
+        
+        super.checkMutableAndRaiseException();
+        
+        this.userInterfaceManagerConfig = userInterfaceConfig;
+    }
+    
+    @JsonProperty("user_interface")
+    public ManagerConfig getUserInterfaceConfig() {
+        return this.userInterfaceManagerConfig;
+    }
+    
+    @JsonProperty("schedule")
+    public void setScheduleConfig(ManagerConfig scheduleConfig) {
+        if(scheduleConfig == null) {
+            throw new IllegalArgumentException("scheduleConfig is null");
+        }
+        
+        super.checkMutableAndRaiseException();
+        
+        this.scheduleManagerConfig = scheduleConfig;
+    }
+    
+    @JsonProperty("schedule")
+    public ManagerConfig getScheduleConfig() {
+        return this.scheduleManagerConfig;
     }
     
     @JsonProperty("user_config")
@@ -178,14 +350,14 @@ public class StargateServiceConfig extends ServiceConfig {
     }
 
     @JsonIgnore
-    public ManagerConfig getDefaultTransportConfig() {
+    public TransportManagerConfig getDefaultTransportConfig() {
         DriverInjection driverInjection = new DriverInjection();
         driverInjection.setDriverClass(HTTPTransportDriver.class);
         
         HTTPTransportDriverConfig driverConfiguration = new HTTPTransportDriverConfig();
         driverInjection.setDriverConfig(driverConfiguration);
         
-        ManagerConfig managerConfig = new ManagerConfig();
+        TransportManagerConfig managerConfig = new TransportManagerConfig();
         managerConfig.addDriverSetting(driverInjection);
         return managerConfig;
     }
@@ -214,19 +386,5 @@ public class StargateServiceConfig extends ServiceConfig {
         ManagerConfig managerConfig = new ManagerConfig();
         managerConfig.addDriverSetting(driverInjection);
         return managerConfig;
-    }
-
-    @JsonIgnore
-    public ServiceConfig toServiceConfig() {
-        ServiceConfig serviceConfig = new ServiceConfig();
-        serviceConfig.setClusterConfig(this.clusterManagerConfig);
-        serviceConfig.setEventConfig(this.eventManagerConfig);
-        serviceConfig.setDataSourceConfig(this.dataSourceManagerConfig);
-        serviceConfig.setDataStoreConfig(this.dataStoreManagerConfig);
-        serviceConfig.setRecipeConfig(this.recipeManagerConfig);
-        serviceConfig.setTransportConfig(this.transportManagerConfig);
-        serviceConfig.setUserInterfaceConfig(this.userInterfaceManagerConfig);
-        serviceConfig.setScheduleConfig(this.scheduleManagerConfig);
-        return serviceConfig;
     }
 }
