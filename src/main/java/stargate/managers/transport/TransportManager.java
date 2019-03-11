@@ -523,9 +523,9 @@ public class TransportManager extends AbstractManager<AbstractTransportDriver> {
                 AbstractTransportClient client = driver.getClient(remoteNode);
 
                 // increase workload
-                Cluster localCluster = clusterManager.getLocalCluster();
+                //Cluster localCluster = clusterManager.getLocalCluster();
 
-                this.transferLayoutAlgorithm.increaseNodeWorkload(localCluster, localNode);
+                //this.transferLayoutAlgorithm.increaseNodeWorkload(localCluster, localNode);
                 this.transferLayoutAlgorithm.increaseNodeWorkload(remoteCluster, remoteNode);
 
                 InputStream dataChunkInputStream = client.getDataChunk(hash);
@@ -542,7 +542,7 @@ public class TransportManager extends AbstractManager<AbstractTransportDriver> {
                 dataChunkInputStream.close();
 
                 // decrease workload
-                this.transferLayoutAlgorithm.decreaseNodeWorkload(localCluster, localNode);
+                //this.transferLayoutAlgorithm.decreaseNodeWorkload(localCluster, localNode);
                 this.transferLayoutAlgorithm.decreaseNodeWorkload(remoteCluster, remoteNode);
 
                 // put to the cache
@@ -747,9 +747,9 @@ public class TransportManager extends AbstractManager<AbstractTransportDriver> {
                 AbstractTransportClient client = driver.getClient(remoteNode);
 
                 // increase workload
-                Cluster localCluster = clusterManager.getLocalCluster();
+                //Cluster localCluster = clusterManager.getLocalCluster();
                 
-                this.transferLayoutAlgorithm.increaseNodeWorkload(localCluster, localNode);
+                //this.transferLayoutAlgorithm.increaseNodeWorkload(localCluster, localNode);
                 this.transferLayoutAlgorithm.increaseNodeWorkload(remoteCluster, remoteNode);
 
                 InputStream dataChunkInputStream = client.getDataChunk(hash);
@@ -759,7 +759,7 @@ public class TransportManager extends AbstractManager<AbstractTransportDriver> {
                 dataChunkInputStream.close();
                 
                 // decrease workload
-                this.transferLayoutAlgorithm.decreaseNodeWorkload(localCluster, localNode);
+                //this.transferLayoutAlgorithm.decreaseNodeWorkload(localCluster, localNode);
                 this.transferLayoutAlgorithm.decreaseNodeWorkload(remoteCluster, remoteNode);
                 
                 // put to the cache
