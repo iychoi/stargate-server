@@ -527,6 +527,9 @@ public class TransportManager extends AbstractManager<AbstractTransportDriver> {
 
                 //this.transferLayoutAlgorithm.increaseNodeWorkload(localCluster, localNode);
                 this.transferLayoutAlgorithm.increaseNodeWorkload(remoteCluster, remoteNode);
+                
+                StatisticsManager statisticsManager = stargateService.getStatisticsManager();
+                statisticsManager.addDataChunkTransferReceiveStartStatistics(uri.toUri().toASCIIString(), hash);
 
                 InputStream dataChunkInputStream = client.getDataChunk(hash);
                 if (dataChunkInputStream == null) {
@@ -540,6 +543,8 @@ public class TransportManager extends AbstractManager<AbstractTransportDriver> {
                 // fully download the chunk and cache and return
                 byte[] cacheDataBytes = IOUtils.toByteArray(dataChunkInputStream);
                 dataChunkInputStream.close();
+                
+                statisticsManager.addDataChunkTransferReceiveEndStatistics(uri.toUri().toASCIIString(), hash);
 
                 // decrease workload
                 //this.transferLayoutAlgorithm.decreaseNodeWorkload(localCluster, localNode);
@@ -558,9 +563,6 @@ public class TransportManager extends AbstractManager<AbstractTransportDriver> {
                 
                 //notify
                 raiseEventForTransferCompletion(uri, hash);
-                
-                StatisticsManager statisticsManager = stargateService.getStatisticsManager();
-                statisticsManager.addDataChunkTransferReceiveStatistics(uri.toUri().toASCIIString(), hash);
                 
                 LOG.debug(String.format("Cached a chunk for - %s, %s at %s", uri.toUri().toASCIIString(), hash, localNode.getName()));
             }
@@ -752,11 +754,16 @@ public class TransportManager extends AbstractManager<AbstractTransportDriver> {
                 //this.transferLayoutAlgorithm.increaseNodeWorkload(localCluster, localNode);
                 this.transferLayoutAlgorithm.increaseNodeWorkload(remoteCluster, remoteNode);
 
+                StatisticsManager statisticsManager = stargateService.getStatisticsManager();
+                statisticsManager.addDataChunkTransferReceiveStartStatistics(uri.toUri().toASCIIString(), hash);
+                
                 InputStream dataChunkInputStream = client.getDataChunk(hash);
                 
                 // fully download the chunk and cache and return
                 byte[] cacheDataBytes = IOUtils.toByteArray(dataChunkInputStream);
                 dataChunkInputStream.close();
+                
+                statisticsManager.addDataChunkTransferReceiveEndStatistics(uri.toUri().toASCIIString(), hash);
                 
                 // decrease workload
                 //this.transferLayoutAlgorithm.decreaseNodeWorkload(localCluster, localNode);
@@ -775,9 +782,6 @@ public class TransportManager extends AbstractManager<AbstractTransportDriver> {
                 
                 //notify
                 raiseEventForTransferCompletion(uri, hash);
-                
-                StatisticsManager statisticsManager = stargateService.getStatisticsManager();
-                statisticsManager.addDataChunkTransferReceiveStatistics(uri.toUri().toASCIIString(), hash);
                 
                 LOG.debug(String.format("Get a chunk for - %s, %s", uri.toUri().toASCIIString(), hash));
                 

@@ -168,8 +168,13 @@ public class StatisticsManager extends AbstractManager<NullDriver> {
         addStatistics(StatisticsType.STATISTICS_TYPE_RECIPE_CHUNK_CREATION, format);
     }
     
-    public synchronized void addDataChunkTransferReceiveStatistics(String path, String hash) throws IOException {
-        String format = String.format("path(%s) hash(%s)", path, hash);
+    public synchronized void addDataChunkTransferReceiveStartStatistics(String path, String hash) throws IOException {
+        String format = String.format("RECV_BEGIN path(%s) hash(%s)", path, hash);
+        addStatistics(StatisticsType.STATISTICS_TYPE_DATA_CHUNK_TRANSFER_RECEIVE, format);
+    }
+    
+    public synchronized void addDataChunkTransferReceiveEndStatistics(String path, String hash) throws IOException {
+        String format = String.format("RECV_FINISH path(%s) hash(%s)", path, hash);
         addStatistics(StatisticsType.STATISTICS_TYPE_DATA_CHUNK_TRANSFER_RECEIVE, format);
     }
     
