@@ -179,6 +179,7 @@ public class FileSystem {
                         for(DataObjectMetadata m : listDataObjectMetadatas) {
                             System.out.println(formatDataObjectMetadata(m));
                         }
+                        System.out.println(String.format("TOTAL %d entries", listDataObjectMetadatas.size()));
                     }
                 }
             } catch (FileNotFoundException ex) {

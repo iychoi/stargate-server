@@ -26,7 +26,6 @@ import stargate.commons.statistics.StatisticsEntry;
 import stargate.commons.statistics.StatisticsType;
 import stargate.commons.userinterface.UserInterfaceServiceInfo;
 import stargate.commons.utils.DateTimeUtils;
-import stargate.commons.utils.JsonSerializer;
 import stargate.drivers.userinterface.http.HTTPUserInterfaceClient;
 
 /**

@@ -150,6 +150,7 @@ public class DataExports {
                     String json = JsonSerializer.formatPretty(entry.toJson());
                     System.out.println(json);
                 }
+                System.out.println(String.format("TOTAL %d entries", dataExportEntries.size()));
             }
             String dateTimeString = DateTimeUtils.getDateTimeString(client.getLastActiveTime());
             System.out.println(String.format("<Request processed %s>", dateTimeString));

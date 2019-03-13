@@ -102,6 +102,7 @@ public class DataSources {
                 for(String dataSource : dataSources) {
                     System.out.println(dataSource);
                 }
+                System.out.println(String.format("TOTAL %d data sources", dataSources.size()));
             }
             String dateTimeString = DateTimeUtils.getDateTimeString(client.getLastActiveTime());
             System.out.println(String.format("<Request processed %s>", dateTimeString));

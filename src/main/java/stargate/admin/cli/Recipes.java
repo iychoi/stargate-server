@@ -146,6 +146,7 @@ public class Recipes {
                 for(String entry : recipes) {
                     System.out.println(entry);
                 }
+                System.out.println(String.format("TOTAL %d recipes", recipes.size()));
             }
             String dateTimeString = DateTimeUtils.getDateTimeString(client.getLastActiveTime());
             System.out.println(String.format("<Request processed %s>", dateTimeString));

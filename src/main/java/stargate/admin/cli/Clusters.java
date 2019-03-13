@@ -395,6 +395,7 @@ public class Clusters {
                     String json = JsonSerializer.formatPretty(cluster.toJson());
                     System.out.println(json);
                 }
+                System.out.println(String.format("TOTAL %d remote clusters", remoteClusters.size()));
             }
             String dateTimeString = DateTimeUtils.getDateTimeString(client.getLastActiveTime());
             System.out.println(String.format("<Request processed %s>", dateTimeString));
