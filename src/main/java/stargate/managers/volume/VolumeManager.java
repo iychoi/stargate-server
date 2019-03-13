@@ -482,12 +482,21 @@ public class VolumeManager extends AbstractManager<NullDriver> {
                 
                 Collection<RecipeChunk> recipeChunks = remoteRecipe.getChunks();
                 for(RecipeChunk chunk : recipeChunks) {
+                    RecipeChunk newChunk = new RecipeChunk(chunk.getOffset(), chunk.getLength(), chunk.getHash());
+                    
                     TransferAssignment assignment = transportManager.prefetchDataChunk(localCluster, remoteRecipe, chunk.getHash());
+                    
                     String assignedNodeName = assignment.getTransferNode();
                     int assignedNodeID = newRecipe.getNodeID(assignedNodeName);
-                    
-                    RecipeChunk newChunk = new RecipeChunk(chunk.getOffset(), chunk.getLength(), chunk.getHash());
                     newChunk.addNodeID(assignedNodeID);
+                    
+                    Collection<String> accessNodeNames = assignment.getAccessNodes();
+                    for(String accessNodeName : accessNodeNames) {
+                        int accessNodeID = newRecipe.getNodeID(accessNodeName);
+                        if(accessNodeID != assignedNodeID) {
+                            newChunk.addNodeID(accessNodeID);
+                        }
+                    }
                     
                     newRecipe.addChunk(newChunk);
                 }

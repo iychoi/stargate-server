@@ -938,11 +938,11 @@ public class TransportManager extends AbstractManager<AbstractTransportDriver> {
                     RecipeChunk localChunk = localRecipe.getChunk(hash);
                     Collection<Integer> nodeIDs = localChunk.getNodeIDs();
                     Collection<String> nodeNames = localRecipe.getNodeNames(nodeIDs);
-                    for(String nodeName : nodeNames) {
-                        TransferAssignment assignment = new TransferAssignment(recipe.getMetadata().getURI(), hash, nodeName);
-                        LOG.debug(String.format("Found a local recipe (%s) for - %s, %s at %s", localMetadata.getURI().toUri().toASCIIString(), metadata.getURI().toUri().toASCIIString(), hash, nodeName));
-                        return assignment;
-                    }
+                    
+                    String nodeName = nodeNames.iterator().next();
+                    TransferAssignment assignment = new TransferAssignment(recipe.getMetadata().getURI(), hash, nodeName, nodeNames);
+                    LOG.debug(String.format("Found a local recipe (%s) for - %s, %s at %s", localMetadata.getURI().toUri().toASCIIString(), metadata.getURI().toUri().toASCIIString(), hash, nodeName));
+                    return assignment;
                 }
             }
             
@@ -957,13 +957,15 @@ public class TransportManager extends AbstractManager<AbstractTransportDriver> {
                 if(existingData != null) {
                     DataChunkCache existingCache = DataChunkCache.fromBytes(existingData);
                     if(existingCache.getType() == DataChunkCacheType.DATA_CHUNK_CACHE_PENDING) {
-                        TransferAssignment assignment = new TransferAssignment(recipe.getMetadata().getURI(), hash, existingCache.getTransferNode());
+                        Collection<String> primaryAndBackupNodesForData = this.dataChunkCacheStore.getPrimaryAndBackupNodesForData(hash);
+                        TransferAssignment assignment = new TransferAssignment(recipe.getMetadata().getURI(), hash, existingCache.getTransferNode(), primaryAndBackupNodesForData);
                         LOG.debug(String.format("Found a pending prefetch schedule for - %s, %s at %s", metadata.getURI().toUri().toASCIIString(), hash, existingCache.getTransferNode()));
                         return assignment;
                     } else if(existingCache.getType() == DataChunkCacheType.DATA_CHUNK_CACHE_PRESENT) {
-                        String nodeName = this.dataChunkCacheStore.getPrimaryNodeForData(hash);
-                        TransferAssignment assignment = new TransferAssignment(recipe.getMetadata().getURI(), hash, nodeName);
-                        LOG.debug(String.format("Found a local cache for - %s, %s at %s", metadata.getURI().toUri().toASCIIString(), hash, nodeName));
+                        Collection<String> primaryAndBackupNodesForData = this.dataChunkCacheStore.getPrimaryAndBackupNodesForData(hash);
+                        String primaryNodeForData = primaryAndBackupNodesForData.iterator().next();
+                        TransferAssignment assignment = new TransferAssignment(recipe.getMetadata().getURI(), hash, primaryNodeForData, primaryAndBackupNodesForData);
+                        LOG.debug(String.format("Found a local cache for - %s, %s at %s", metadata.getURI().toUri().toASCIIString(), hash, primaryNodeForData));
                         return assignment;
                     }
                 }
@@ -993,7 +995,8 @@ public class TransportManager extends AbstractManager<AbstractTransportDriver> {
             // send to remote
             raiseEventForPrefetchTransfer(metadata.getURI(), hash, determinedLocalNode.getName());
 
-            TransferAssignment assignment = new TransferAssignment(recipe.getMetadata().getURI(), hash, determinedLocalNode.getName());
+            Collection<String> primaryAndBackupNodesForData = this.dataChunkCacheStore.getPrimaryAndBackupNodesForData(hash);
+            TransferAssignment assignment = new TransferAssignment(recipe.getMetadata().getURI(), hash, determinedLocalNode.getName(), primaryAndBackupNodesForData);
             LOG.debug(String.format("Scheduled a prefetching for - %s, %s at %s", metadata.getURI().toUri().toASCIIString(), hash, determinedLocalNode.getName()));
             return assignment;
         } catch (ManagerNotInstantiatedException ex) {
