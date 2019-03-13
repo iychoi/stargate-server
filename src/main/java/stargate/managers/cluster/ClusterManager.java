@@ -43,8 +43,6 @@ import stargate.commons.event.AbstractEventHandler;
 import stargate.managers.event.EventManager;
 import stargate.commons.event.StargateEvent;
 import stargate.commons.event.StargateEventType;
-import stargate.managers.policy.ClusterPolicy;
-import stargate.managers.policy.PolicyManager;
 import stargate.service.StargateService;
 
 /**
@@ -55,10 +53,15 @@ public class ClusterManager extends AbstractManager<AbstractClusterDriver> {
     
     private static final Log LOG = LogFactory.getLog(ClusterManager.class);
     
+    private static final int DEFAULT_NODE_FAILURE_REPORT_INTERVAL_SEC = 60*5;
+    private static final int DEFAULT_NUM_FAILURES_TO_BE_BLACKLISTED = 5;
+    
     private static ClusterManager instance;
     
+    private int nodeFailureReportIntervalSec = DEFAULT_NODE_FAILURE_REPORT_INTERVAL_SEC;
+    private int numFailuresToBeBlacklisted = DEFAULT_NUM_FAILURES_TO_BE_BLACKLISTED;
+    
     // store cluster information
-    private ClusterPolicy policy;
     private Node localNode;
     private Cluster localCluster;
     private AbstractKeyValueStore remoteClusterStore;
@@ -219,19 +222,6 @@ public class ClusterManager extends AbstractManager<AbstractClusterDriver> {
                     LOG.error("Driver is not initialized", ex);
                     throw new IOException(ex);
                 }
-            }
-        }
-    }
-    
-    private void safeInitClusterPolicy() throws IOException {
-        if(this.policy == null) {
-            try {
-                StargateService stargateService = getStargateService();
-                PolicyManager policyManager = stargateService.getPolicyManager();
-                this.policy = policyManager.getClusterPolicy();
-            } catch (ManagerNotInstantiatedException ex) {
-                LOG.error("Manager is not initialized", ex);
-                throw new IOException(ex);
             }
         }
     }
@@ -639,18 +629,17 @@ public class ClusterManager extends AbstractManager<AbstractClusterDriver> {
         }
 
         safeInitLocalCluster();
-        safeInitClusterPolicy();
         
         Node node = this.localCluster.getNode(name);
         if(node != null) {
             long currentTime = DateTimeUtils.getTimestamp();
             NodeStatus status = node.getStatus();
 
-            if(DateTimeUtils.timeElapsedSec(status.getLastFailureTime(), currentTime, this.policy.getNodeFailureReportIntervalSec())) {
+            if(DateTimeUtils.timeElapsedSec(status.getLastFailureTime(), currentTime, this.nodeFailureReportIntervalSec)) {
                 status.increaseFailureCount(true);
 
                 if(!status.isBlacklisted()) {
-                    if(status.getFailureCount() >= this.policy.getNumFailuresToBeBlacklisted()) {
+                    if(status.getFailureCount() >= this.numFailuresToBeBlacklisted) {
                         status.setBlacklisted(true);
                     }
                 }
@@ -673,7 +662,6 @@ public class ClusterManager extends AbstractManager<AbstractClusterDriver> {
             throw new IllegalStateException("Manager is not started");
         }
         
-        safeInitClusterPolicy();
         safeInitRemoteClusterStore();
         
         synchronized(this.remoteClusterStoreSyncObj) {
@@ -684,11 +672,11 @@ public class ClusterManager extends AbstractManager<AbstractClusterDriver> {
                     long currentTime = DateTimeUtils.getTimestamp();
                     NodeStatus status = node.getStatus();
 
-                    if(DateTimeUtils.timeElapsedSec(status.getLastFailureTime(), currentTime, this.policy.getNodeFailureReportIntervalSec())) {
+                    if(DateTimeUtils.timeElapsedSec(status.getLastFailureTime(), currentTime, this.nodeFailureReportIntervalSec)) {
                         status.increaseFailureCount(true);
 
                         if(!status.isBlacklisted()) {
-                            if(status.getFailureCount() >= this.policy.getNumFailuresToBeBlacklisted()) {
+                            if(status.getFailureCount() >= this.numFailuresToBeBlacklisted) {
                                 status.setBlacklisted(true);
                             }
                         }

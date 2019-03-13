@@ -29,7 +29,6 @@ import stargate.managers.cluster.ClusterManager;
 import stargate.managers.dataexport.DataExportManager;
 import stargate.managers.datasource.DataSourceManager;
 import stargate.managers.datastore.DataStoreManager;
-import stargate.managers.policy.PolicyManager;
 import stargate.managers.recipe.RecipeManager;
 import stargate.managers.recipe.RecipeManagerException;
 import stargate.managers.schedule.ScheduleManager;
@@ -63,7 +62,6 @@ public class StargateService extends AbstractService {
     private ScheduleManager scheduleManager;
     private TransportManager transportManager;
     private UserInterfaceManager userInterfaceManager;
-    private PolicyManager policyManager;
     private VolumeManager volumeManager;
     private StatisticsManager statisticsManager;
     
@@ -122,7 +120,6 @@ public class StargateService extends AbstractService {
             this.scheduleManager = ScheduleManager.getInstance(this, this.config.getScheduleConfig());
             this.transportManager = TransportManager.getInstance(this, this.config.getTransportConfig());
             this.userInterfaceManager = UserInterfaceManager.getInstance(this, this.config.getUserInterfaceConfig());
-            this.policyManager = PolicyManager.getInstance(this);
             this.volumeManager = VolumeManager.getInstance(this);
         } catch (ManagerNotInstantiatedException ex) {
             throw new IOException(ex);
@@ -135,7 +132,6 @@ public class StargateService extends AbstractService {
         this.eventManager.start();
         this.dataStoreManager.start();
         this.dataSourceManager.start();
-        this.policyManager.start();
         this.dataExportManager.start();
         this.scheduleManager.start();
         this.recipeManager.start();
@@ -194,7 +190,6 @@ public class StargateService extends AbstractService {
         this.recipeManager.stop();
         this.scheduleManager.stop();
         this.dataExportManager.stop();
-        this.policyManager.stop();
         this.dataSourceManager.stop();
         this.dataStoreManager.stop();
         this.eventManager.stop();
@@ -288,14 +283,6 @@ public class StargateService extends AbstractService {
         return this.userInterfaceManager;
     }
 
-    public PolicyManager getPolicyManager() throws ManagerNotInstantiatedException {
-        if(this.policyManager == null || !this.policyManager.isStarted()) {
-            throw new ManagerNotInstantiatedException("PolicyManager is not started");
-        }
-        
-        return this.policyManager;
-    }
-    
     public VolumeManager getVolumeManager() throws ManagerNotInstantiatedException {
         if(this.volumeManager == null || !this.volumeManager.isStarted()) {
             throw new ManagerNotInstantiatedException("VolumeManager is not started");
