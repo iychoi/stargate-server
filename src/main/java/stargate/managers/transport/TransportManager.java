@@ -928,7 +928,7 @@ public class TransportManager extends AbstractManager<AbstractTransportDriver> {
             // check local recipes
             RecipeManager recipeManager = stargateService.getRecipeManager();
             
-            LOG.debug(String.format("Checking local recipes for a prefetching for - %s, %s at %s", metadata.getURI().toUri().toASCIIString(), hash));
+            LOG.debug(String.format("Checking local recipes for a prefetching for - %s, %s", metadata.getURI().toUri().toASCIIString(), hash));
             
             Recipe localRecipe = recipeManager.getRecipeByHash(hash);
             if(localRecipe != null) {
@@ -948,7 +948,7 @@ public class TransportManager extends AbstractManager<AbstractTransportDriver> {
                 }
             }
             
-            LOG.debug(String.format("Checking a pending request for a prefetching for - %s, %s at %s", metadata.getURI().toUri().toASCIIString(), hash));
+            LOG.debug(String.format("Checking a pending request for a prefetching for - %s, %s", metadata.getURI().toUri().toASCIIString(), hash));
             
             // check cache and go remote
             // put a placeholder
@@ -975,7 +975,7 @@ public class TransportManager extends AbstractManager<AbstractTransportDriver> {
                 }
             }
             
-            LOG.debug(String.format("Putting a pending request for a prefetching for - %s, %s at %s", metadata.getURI().toUri().toASCIIString(), hash));
+            LOG.debug(String.format("Putting a pending request for a prefetching for - %s, %s", metadata.getURI().toUri().toASCIIString(), hash));
             
             // determine where to copy 
             Node determinedLocalNode = this.transferLayoutAlgorithm.determineLocalNode(localCluster, recipe, hash);
@@ -998,7 +998,7 @@ public class TransportManager extends AbstractManager<AbstractTransportDriver> {
                 }
             }
             
-            LOG.debug(String.format("Sending a prefetching request for - %s, %s at %s", metadata.getURI().toUri().toASCIIString(), hash));
+            LOG.debug(String.format("Sending a prefetching request for - %s, %s", metadata.getURI().toUri().toASCIIString(), hash));
 
             // send to remote
             raiseEventForPrefetchTransfer(metadata.getURI(), hash, determinedLocalNode.getName());
