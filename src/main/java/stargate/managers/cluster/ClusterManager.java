@@ -32,7 +32,7 @@ import stargate.commons.cluster.NodeStatus;
 import stargate.commons.driver.AbstractDriver;
 import stargate.commons.driver.DriverFailedToLoadException;
 import stargate.commons.datastore.AbstractKeyValueStore;
-import stargate.commons.datastore.EnumDataStoreProperty;
+import stargate.commons.datastore.DataStoreProperties;
 import stargate.commons.driver.DriverNotInitializedException;
 import stargate.commons.manager.AbstractManager;
 import stargate.commons.manager.ManagerConfig;
@@ -214,7 +214,10 @@ public class ClusterManager extends AbstractManager<AbstractClusterDriver> {
                     StargateService stargateService = getStargateService();
                     DataStoreManager keyValueStoreManager = stargateService.getDataStoreManager();
 
-                    this.remoteClusterStore = keyValueStoreManager.getDriver().getKeyValueStore(REMOTE_CLUSTER_STORE, Cluster.class, EnumDataStoreProperty.DATASTORE_PROP_PERSISTENT_REPLICATED);
+                    DataStoreProperties properties = new DataStoreProperties();
+                    properties.setReplicated(true);
+                    properties.setPersistent(true);
+                    this.remoteClusterStore = keyValueStoreManager.getDriver().getKeyValueStore(REMOTE_CLUSTER_STORE, Cluster.class, properties);
                 } catch (ManagerNotInstantiatedException ex) {
                     LOG.error("Manager is not instantiated", ex);
                     throw new IOException(ex);

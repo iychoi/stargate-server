@@ -45,13 +45,12 @@ import stargate.commons.datasource.DataExportEntry;
 import stargate.commons.driver.AbstractDriver;
 import stargate.commons.driver.DriverFailedToLoadException;
 import stargate.commons.datastore.AbstractKeyValueStore;
-import stargate.commons.datastore.EnumDataStoreProperty;
+import stargate.commons.datastore.DataStoreProperties;
 import stargate.commons.driver.DriverNotInitializedException;
 import stargate.commons.event.AbstractEventHandler;
 import stargate.commons.event.StargateEvent;
 import stargate.commons.event.StargateEventType;
 import stargate.commons.manager.AbstractManager;
-import stargate.commons.manager.ManagerConfig;
 import stargate.commons.manager.ManagerNotInstantiatedException;
 import stargate.commons.recipe.Recipe;
 import stargate.commons.recipe.RecipeChunk;
@@ -250,7 +249,14 @@ public class TransportManager extends AbstractManager<AbstractTransportDriver> {
                 try {
                     StargateService stargateService = getStargateService();
                     DataStoreManager keyValueStoreManager = stargateService.getDataStoreManager();
-                    this.remoteDirectoryCacheStore = keyValueStoreManager.getDriver().getExpiringKeyValueStore(REMOTE_DIRECTORY_CACHE_STORE, Directory.class, EnumDataStoreProperty.DATASTORE_PROP_VOLATILE_REPLICATED, TimeUnit.MINUTES, 5);
+                    
+                    DataStoreProperties properties = new DataStoreProperties();
+                    properties.setReplicated(true);
+                    properties.setPersistent(false);
+                    properties.setExpirable(true);
+                    properties.setExpireTimeUnit(TimeUnit.MINUTES);
+                    properties.setExpireTimeVal(5);
+                    this.remoteDirectoryCacheStore = keyValueStoreManager.getDriver().getKeyValueStore(REMOTE_DIRECTORY_CACHE_STORE, Directory.class, properties);
                 } catch (ManagerNotInstantiatedException ex) {
                     LOG.error("Manager is not instantiated", ex);
                     throw new IOException(ex);
@@ -268,7 +274,14 @@ public class TransportManager extends AbstractManager<AbstractTransportDriver> {
                 try {
                     StargateService stargateService = getStargateService();
                     DataStoreManager keyValueStoreManager = stargateService.getDataStoreManager();
-                    this.remoteRecipeCacheStore = keyValueStoreManager.getDriver().getExpiringKeyValueStore(REMOTE_RECIPE_CACHE_STORE, Recipe.class, EnumDataStoreProperty.DATASTORE_PROP_VOLATILE_REPLICATED, TimeUnit.DAYS, 1);
+                    
+                    DataStoreProperties properties = new DataStoreProperties();
+                    properties.setReplicated(true);
+                    properties.setPersistent(false);
+                    properties.setExpirable(true);
+                    properties.setExpireTimeUnit(TimeUnit.DAYS);
+                    properties.setExpireTimeVal(1);
+                    this.remoteRecipeCacheStore = keyValueStoreManager.getDriver().getKeyValueStore(REMOTE_RECIPE_CACHE_STORE, Recipe.class, properties);
                 } catch (ManagerNotInstantiatedException ex) {
                     LOG.error("Manager is not instantiated", ex);
                     throw new IOException(ex);
@@ -286,7 +299,15 @@ public class TransportManager extends AbstractManager<AbstractTransportDriver> {
                 try {
                     StargateService stargateService = getStargateService();
                     DataStoreManager keyValueStoreManager = stargateService.getDataStoreManager();
-                    this.dataChunkCacheStore = keyValueStoreManager.getDriver().getExpiringKeyValueStore(DATA_CHUNK_CACHE_STORE, byte[].class, EnumDataStoreProperty.DATASTORE_PROP_PERSISTENT_DISTRIBUTED, TimeUnit.DAYS, 0);
+                    
+                    DataStoreProperties properties = new DataStoreProperties();
+                    properties.setSharded(true);
+                    properties.setReplicaNum(0);
+                    properties.setPersistent(true);
+                    properties.setExpirable(true);
+                    properties.setExpireTimeUnit(TimeUnit.DAYS);
+                    properties.setExpireTimeVal(7);
+                    this.dataChunkCacheStore = keyValueStoreManager.getDriver().getKeyValueStore(DATA_CHUNK_CACHE_STORE, byte[].class, properties);
                 } catch (ManagerNotInstantiatedException ex) {
                     LOG.error("Manager is not instantiated", ex);
                     throw new IOException(ex);

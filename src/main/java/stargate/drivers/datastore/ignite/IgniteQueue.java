@@ -24,7 +24,7 @@ import org.apache.ignite.cache.CacheAtomicityMode;
 import org.apache.ignite.cache.CacheMode;
 import org.apache.ignite.configuration.CollectionConfiguration;
 import stargate.commons.datastore.AbstractQueue;
-import stargate.commons.datastore.EnumDataStoreProperty;
+import stargate.commons.datastore.DataStoreProperties;
 import stargate.commons.utils.ObjectSerializer;
 import stargate.drivers.ignite.IgniteDriver;
 
@@ -39,11 +39,11 @@ public class IgniteQueue extends AbstractQueue {
     private Ignite ignite;
     private String name;
     private Class valueClass;
-    private EnumDataStoreProperty property;
+    private DataStoreProperties properties;
     
     private org.apache.ignite.IgniteQueue<byte[]> store;
     
-    public IgniteQueue(IgniteDataStoreDriver driver, IgniteDriver igniteDriver, String name, Class valueClass, EnumDataStoreProperty property) {
+    public IgniteQueue(IgniteDataStoreDriver driver, IgniteDriver igniteDriver, String name, Class valueClass, DataStoreProperties properties) {
         if(driver == null) {
             throw new IllegalArgumentException("driver is null");
         }
@@ -60,7 +60,7 @@ public class IgniteQueue extends AbstractQueue {
             throw new IllegalArgumentException("valueClass is null");
         }
         
-        if(property == null) {
+        if(properties == null) {
             throw new IllegalArgumentException("property is null");
         }
         
@@ -69,10 +69,17 @@ public class IgniteQueue extends AbstractQueue {
         this.ignite = igniteDriver.getIgnite();
         this.name = name;
         this.valueClass = valueClass;
-        this.property = property;
+        this.properties = properties;
         
         CollectionConfiguration cc = new CollectionConfiguration();
-        cc.setCacheMode(CacheMode.PARTITIONED);
+        if(properties.isSharded()) {
+            cc.setCacheMode(CacheMode.PARTITIONED);
+            
+            int replicaNum = properties.getReplicaNum();
+            cc.setBackups(replicaNum);
+        } else {
+            cc.setCacheMode(CacheMode.REPLICATED);
+        }
         cc.setAtomicityMode(CacheAtomicityMode.ATOMIC);
         
         this.store = this.ignite.queue(name, 0, cc);
@@ -84,8 +91,8 @@ public class IgniteQueue extends AbstractQueue {
     }
 
     @Override
-    public EnumDataStoreProperty getProperty() {
-        return this.property;
+    public DataStoreProperties getProperties() {
+        return this.properties;
     }
     
     @Override

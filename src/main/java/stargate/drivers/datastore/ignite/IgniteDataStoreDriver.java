@@ -18,16 +18,14 @@ package stargate.drivers.datastore.ignite;
 import java.io.IOException;
 import java.util.HashMap;
 import java.util.Map;
-import java.util.concurrent.TimeUnit;
 import org.apache.commons.logging.Log;
 import org.apache.commons.logging.LogFactory;
-import org.apache.ignite.Ignite;
 import stargate.commons.driver.AbstractDriverConfig;
 import stargate.commons.datastore.AbstractKeyValueStore;
 import stargate.commons.datastore.AbstractDataStoreDriver;
 import stargate.commons.datastore.AbstractDataStoreDriverConfig;
 import stargate.commons.datastore.AbstractQueue;
-import stargate.commons.datastore.EnumDataStoreProperty;
+import stargate.commons.datastore.DataStoreProperties;
 import stargate.commons.driver.DriverNotInitializedException;
 import stargate.drivers.ignite.IgniteDriver;
 
@@ -100,7 +98,7 @@ public class IgniteDataStoreDriver extends AbstractDataStoreDriver {
     }
     
     @Override
-    public synchronized AbstractKeyValueStore getKeyValueStore(String name, Class valueClass, EnumDataStoreProperty property) throws IOException, DriverNotInitializedException {
+    public synchronized AbstractKeyValueStore getKeyValueStore(String name, Class valueClass, DataStoreProperties properties) throws IOException, DriverNotInitializedException {
         if(name == null || name.isEmpty()) {
             throw new IllegalArgumentException("name is null or empty");
         }
@@ -115,7 +113,7 @@ public class IgniteDataStoreDriver extends AbstractDataStoreDriver {
         
         IgniteKeyValueStore store = this.kvStores.get(name);
         if(store == null) {
-            store = new IgniteKeyValueStore(this, this.igniteDriver, name, valueClass, property);
+            store = new IgniteKeyValueStore(this, this.igniteDriver, name, valueClass, properties);
             this.kvStores.put(name, store);
         }
         
@@ -123,30 +121,7 @@ public class IgniteDataStoreDriver extends AbstractDataStoreDriver {
     }
     
     @Override
-    public synchronized AbstractKeyValueStore getExpiringKeyValueStore(String name, Class valueClass, EnumDataStoreProperty property, TimeUnit timeunit, long timeval) throws IOException, DriverNotInitializedException {
-        if(name == null || name.isEmpty()) {
-            throw new IllegalArgumentException("name is null or empty");
-        }
-        
-        if(valueClass == null) {
-            throw new IllegalArgumentException("valueClass is null");
-        }
-        
-        if(!isStarted()) {
-            throw new DriverNotInitializedException("driver is not initialized");
-        }
-        
-        IgniteKeyValueStore store = this.kvStores.get(name);
-        if(store == null) {
-            store = new IgniteKeyValueStore(this, this.igniteDriver, name, valueClass, property, timeunit, timeval);
-            this.kvStores.put(name, store);
-        }
-        
-        return store;
-    }
-
-    @Override
-    public synchronized AbstractQueue getQueue(String name, Class valueClass, EnumDataStoreProperty property) throws IOException, DriverNotInitializedException {
+    public synchronized AbstractQueue getQueue(String name, Class valueClass, DataStoreProperties properties) throws IOException, DriverNotInitializedException {
         if(name == null || name.isEmpty()) {
             throw new IllegalArgumentException("name is null or empty");
         }
@@ -161,7 +136,7 @@ public class IgniteDataStoreDriver extends AbstractDataStoreDriver {
         
         IgniteQueue queue = this.queueStores.get(name);
         if(queue == null) {
-            queue = new IgniteQueue(this, this.igniteDriver, name, valueClass, property);
+            queue = new IgniteQueue(this, this.igniteDriver, name, valueClass, properties);
             this.queueStores.put(name, queue);
         }
         

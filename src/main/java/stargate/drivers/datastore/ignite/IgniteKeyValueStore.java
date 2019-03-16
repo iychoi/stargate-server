@@ -37,9 +37,8 @@ import org.apache.ignite.cache.CacheWriteSynchronizationMode;
 import org.apache.ignite.cache.affinity.Affinity;
 import org.apache.ignite.cluster.ClusterNode;
 import org.apache.ignite.configuration.CacheConfiguration;
-import stargate.commons.datastore.AbstractDataStoreEventHandler;
 import stargate.commons.datastore.AbstractKeyValueStore;
-import stargate.commons.datastore.EnumDataStoreProperty;
+import stargate.commons.datastore.DataStoreProperties;
 import stargate.commons.utils.ByteArray;
 import stargate.commons.utils.ObjectSerializer;
 import stargate.drivers.ignite.IgniteDriver;
@@ -57,16 +56,11 @@ public class IgniteKeyValueStore extends AbstractKeyValueStore {
     private Ignite ignite;
     private String name;
     private Class valueClass;
-    private EnumDataStoreProperty property;
-    private TimeUnit expiryTimeUnit;
-    private long expiryTimeValue;
-    private List<AbstractDataStoreEventHandler> layoutEventHandlers = new ArrayList<AbstractDataStoreEventHandler>();
-    private final Object layoutEventHandlersSyncObj = new Object();
-    
+    private DataStoreProperties properties;
     private IgniteCache<String, ByteArray> store;
     private Affinity<String> affinity;
     
-    public IgniteKeyValueStore(IgniteDataStoreDriver driver, IgniteDriver igniteDriver, String name, Class valueClass, EnumDataStoreProperty property) {
+    public IgniteKeyValueStore(IgniteDataStoreDriver driver, IgniteDriver igniteDriver, String name, Class valueClass, DataStoreProperties properties) {
         if(driver == null) {
             throw new IllegalArgumentException("driver is null");
         }
@@ -83,7 +77,7 @@ public class IgniteKeyValueStore extends AbstractKeyValueStore {
             throw new IllegalArgumentException("valueClass is null");
         }
         
-        if(property == null) {
+        if(properties == null) {
             throw new IllegalArgumentException("property is null");
         }
         
@@ -92,25 +86,25 @@ public class IgniteKeyValueStore extends AbstractKeyValueStore {
         this.ignite = igniteDriver.getIgnite();
         this.name = name;
         this.valueClass = valueClass;
-        this.property = property;
-        this.expiryTimeUnit = TimeUnit.SECONDS;
-        this.expiryTimeValue = 0;
+        this.properties = properties;
         
         CacheConfiguration<String, ByteArray> cc = new CacheConfiguration<String, ByteArray>();
-        if(EnumDataStoreProperty.isDistributed(property)) {
+        if(properties.isSharded()) {
             cc.setCacheMode(CacheMode.PARTITIONED);
-            cc.setBackups(3);
-        } else if(EnumDataStoreProperty.isReplciated(property)) {
+            
+            int replicaNum = properties.getReplicaNum();
+            cc.setBackups(replicaNum);
+        } else {
             cc.setCacheMode(CacheMode.REPLICATED);
         }
         
-        if(EnumDataStoreProperty.isPersistent(property)) {
+        if(properties.isPersistent()) {
             cc.setDataRegionName(IgniteDriver.PERSISTENT_REGION_NAME);
-        } else if(EnumDataStoreProperty.isVolatile(property)) {
+        } else {
             cc.setDataRegionName(IgniteDriver.VOLATILE_REGION_NAME);
         }
         
-        cc.setWriteSynchronizationMode(CacheWriteSynchronizationMode.FULL_SYNC);
+        cc.setWriteSynchronizationMode(CacheWriteSynchronizationMode.PRIMARY_SYNC);
         cc.setAtomicityMode(CacheAtomicityMode.ATOMIC);
         cc.setEvictionPolicy(null);
         cc.setCopyOnRead(true);
@@ -119,76 +113,17 @@ public class IgniteKeyValueStore extends AbstractKeyValueStore {
         cc.setName(name);
         
         this.store = this.ignite.getOrCreateCache(cc);
-        this.affinity = this.ignite.affinity(name);
-    }
-    
-    public IgniteKeyValueStore(IgniteDataStoreDriver driver, IgniteDriver igniteDriver, String name, Class valueClass, EnumDataStoreProperty property, TimeUnit timeunit, long timeval) {
-        if(driver == null) {
-            throw new IllegalArgumentException("driver is null");
-        }
         
-        if(igniteDriver == null) {
-            throw new IllegalArgumentException("igniteDriver is null");
-        }
-        
-        if(name == null || name.isEmpty()) {
-            throw new IllegalArgumentException("name is null or empty");
-        }
-        
-        if(valueClass == null) {
-            throw new IllegalArgumentException("valueClass is null");
-        }
-        
-        if(property == null) {
-            throw new IllegalArgumentException("property is null");
-        }
-        
-        if(timeunit == null) {
-            throw new IllegalArgumentException("timeunit is null");
-        }
-        
-        if(timeval < 0) {
-            throw new IllegalArgumentException("timeval is negative");
-        }
-                
-        this.driver = driver;
-        this.igniteDriver = igniteDriver;
-        this.ignite = igniteDriver.getIgnite();
-        this.name = name;
-        this.valueClass = valueClass;
-        this.property = property;
-        this.expiryTimeUnit = timeunit;
-        this.expiryTimeValue = timeval;
-        
-        CacheConfiguration<String, ByteArray> cc = new CacheConfiguration<String, ByteArray>();
-        if(EnumDataStoreProperty.isDistributed(property)) {
-            cc.setCacheMode(CacheMode.PARTITIONED);
-            cc.setBackups(3);
-        } else if(EnumDataStoreProperty.isReplciated(property)) {
-            cc.setCacheMode(CacheMode.REPLICATED);
-        }
-        
-        if(EnumDataStoreProperty.isPersistent(property)) {
-            cc.setDataRegionName(IgniteDriver.PERSISTENT_REGION_NAME);
-        } else if(EnumDataStoreProperty.isVolatile(property)) {
-            cc.setDataRegionName(IgniteDriver.VOLATILE_REGION_NAME);
-        }
-        
-        cc.setWriteSynchronizationMode(CacheWriteSynchronizationMode.FULL_SYNC);
-        cc.setAtomicityMode(CacheAtomicityMode.ATOMIC);
-        cc.setEvictionPolicy(null);
-        cc.setCopyOnRead(false);
-        cc.setOnheapCacheEnabled(true);
-        cc.setReadFromBackup(true);
-        cc.setName(name);
-        
-        Duration duration = new Duration(timeunit, timeval);
-        
-        if(timeval > 0) {
-            CreatedExpiryPolicy expiryPolicy = new CreatedExpiryPolicy(duration);
-            this.store = this.ignite.getOrCreateCache(cc).withExpiryPolicy(expiryPolicy);
-        } else {
-            this.store = this.ignite.getOrCreateCache(cc);
+        if(properties.isExpirable()) {
+            TimeUnit expirationTimeUnit = properties.getExpireTimeUnit();
+            long expirationTimeValue = properties.getExpireTimeVal();
+            
+            if(expirationTimeValue > 0) {
+                Duration duration = new Duration(expirationTimeUnit, expirationTimeValue);
+                CreatedExpiryPolicy expiryPolicy = new CreatedExpiryPolicy(duration);
+
+                this.store = store.withExpiryPolicy(expiryPolicy);
+            }
         }
         
         this.affinity = this.ignite.affinity(name);
@@ -200,16 +135,8 @@ public class IgniteKeyValueStore extends AbstractKeyValueStore {
     }
 
     @Override
-    public EnumDataStoreProperty getProperty() {
-        return this.property;
-    }
-    
-    public TimeUnit getExpiryTimeUnit() {
-        return this.expiryTimeUnit;
-    }
-    
-    public long getExpiryTime() {
-        return this.expiryTimeValue;
+    public DataStoreProperties getProperties() {
+        return this.properties;
     }
     
     @Override
@@ -218,18 +145,18 @@ public class IgniteKeyValueStore extends AbstractKeyValueStore {
     }
     
     @Override
-    public synchronized int size() {
+    public int size() {
         CachePeekMode[] cpms = { CachePeekMode.ALL };
         return this.store.size(cpms);
     }
 
     @Override
-    public synchronized boolean isEmpty() {
+    public boolean isEmpty() {
         return size() == 0;
     }
 
     @Override
-    public synchronized boolean containsKey(String key) {
+    public boolean containsKey(String key) {
         if(key == null || key.isEmpty()) {
             throw new IllegalArgumentException("key is null or empty");
         }
@@ -238,7 +165,7 @@ public class IgniteKeyValueStore extends AbstractKeyValueStore {
     }
 
     @Override
-    public synchronized Object get(String key) throws IOException {
+    public Object get(String key) throws IOException {
         if(key == null || key.isEmpty()) {
             throw new IllegalArgumentException("key is null or empty");
         }
@@ -252,7 +179,7 @@ public class IgniteKeyValueStore extends AbstractKeyValueStore {
     }
 
     @Override
-    public synchronized void put(String key, Object value) throws IOException {
+    public void put(String key, Object value) throws IOException {
         if(key == null || key.isEmpty()) {
             throw new IllegalArgumentException("key is null or empty");
         }
@@ -263,13 +190,10 @@ public class IgniteKeyValueStore extends AbstractKeyValueStore {
         
         byte[] valueBytes = ObjectSerializer.toByteArray(value);
         this.store.put(key, new ByteArray(valueBytes));
-        
-        // call event
-        raiseEventForLayoutEventDataAdded(key);
     }
 
     @Override
-    public synchronized boolean putIfAbsent(String key, Object value) throws IOException {
+    public boolean putIfAbsent(String key, Object value) throws IOException {
         if(key == null || key.isEmpty()) {
             throw new IllegalArgumentException("key is null or empty");
         }
@@ -279,18 +203,11 @@ public class IgniteKeyValueStore extends AbstractKeyValueStore {
         }
         
         byte[] valueBytes = ObjectSerializer.toByteArray(value);
-        boolean retval = this.store.putIfAbsent(key, new ByteArray(valueBytes));
-        
-        // call event
-        if(retval) {
-            raiseEventForLayoutEventDataAdded(key);
-        }
-        
-        return retval;
+        return this.store.putIfAbsent(key, new ByteArray(valueBytes));
     }
     
     @Override
-    public synchronized boolean replace(String key, Object oldValue, Object newValue) throws IOException {
+    public boolean replace(String key, Object oldValue, Object newValue) throws IOException {
         if(key == null || key.isEmpty()) {
             throw new IllegalArgumentException("key is null or empty");
         }
@@ -306,14 +223,7 @@ public class IgniteKeyValueStore extends AbstractKeyValueStore {
         byte[] oldValueBytes = ObjectSerializer.toByteArray(oldValue);
         byte[] newValueBytes = ObjectSerializer.toByteArray(newValue);
         
-        boolean retval = this.store.replace(key, new ByteArray(oldValueBytes), new ByteArray(newValueBytes));
-        
-        // call event
-        if(retval) {
-            raiseEventForLayoutEventDataAdded(key);
-        }
-        
-        return retval;
+        return this.store.replace(key, new ByteArray(oldValueBytes), new ByteArray(newValueBytes));
     }
     
     @Override
@@ -364,7 +274,7 @@ public class IgniteKeyValueStore extends AbstractKeyValueStore {
     }
 
     @Override
-    public synchronized void remove(String key) throws IOException {
+    public void remove(String key) throws IOException {
         if(key == null || key.isEmpty()) {
             throw new IllegalArgumentException("key is null or empty");
         }
@@ -373,12 +283,12 @@ public class IgniteKeyValueStore extends AbstractKeyValueStore {
     }
 
     @Override
-    public synchronized void clear() {
+    public void clear() {
         this.store.clear();
     }
 
     @Override
-    public synchronized Map<String, Object> toMap() throws IOException {
+    public Map<String, Object> toMap() throws IOException {
         Map<String, Object> map = new HashMap<String, Object>();
         
         Iterator<Cache.Entry<String, ByteArray>> iterator = this.store.iterator();
@@ -395,7 +305,7 @@ public class IgniteKeyValueStore extends AbstractKeyValueStore {
     }
 
     @Override
-    public synchronized Collection<String> keys() throws IOException {
+    public Collection<String> keys() throws IOException {
         List<String> keys = new ArrayList<String>();
         
         Iterator<Cache.Entry<String, ByteArray>> iterator = this.store.iterator();
@@ -404,39 +314,5 @@ public class IgniteKeyValueStore extends AbstractKeyValueStore {
             keys.add(entry.getKey());
         }
         return keys;
-    }
-    
-    @Override
-    public void addLayoutEventHandler(AbstractDataStoreEventHandler eventHandler) {
-        if(eventHandler == null) {
-            throw new IllegalArgumentException("eventHandler is null");
-        }
-        
-        synchronized(this.layoutEventHandlersSyncObj) {
-            this.layoutEventHandlers.add(eventHandler);
-        }
-    }
-
-    @Override
-    public void removeLayoutEventHandler(AbstractDataStoreEventHandler eventHandler) {
-        if(eventHandler == null) {
-            throw new IllegalArgumentException("eventHandler is null");
-        }
-        
-        synchronized(this.layoutEventHandlersSyncObj) {
-            this.layoutEventHandlers.remove(eventHandler);
-        }
-    }
-    
-    private void raiseEventForLayoutEventDataAdded(String key) {
-        if(key == null || key.isEmpty()) {
-            throw new IllegalArgumentException("key is null or empty");
-        }
-        
-        synchronized(this.layoutEventHandlersSyncObj) {
-            for(AbstractDataStoreEventHandler handler: this.layoutEventHandlers) {
-                handler.added(this, key);
-            }
-        }
     }
 }

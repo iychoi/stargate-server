@@ -37,7 +37,7 @@ import stargate.commons.datasource.DataExportEntry;
 import stargate.commons.datasource.SourceFileMetadata;
 import stargate.commons.driver.NullDriver;
 import stargate.commons.datastore.AbstractKeyValueStore;
-import stargate.commons.datastore.EnumDataStoreProperty;
+import stargate.commons.datastore.DataStoreProperties;
 import stargate.commons.driver.DriverNotInitializedException;
 import stargate.commons.manager.AbstractManager;
 import stargate.commons.manager.ManagerNotInstantiatedException;
@@ -116,7 +116,11 @@ public class VolumeManager extends AbstractManager<NullDriver> {
             try {
                 StargateService stargateService = getStargateService();
                 DataStoreManager keyValueStoreManager = stargateService.getDataStoreManager();
-                this.localVolumeStore = keyValueStoreManager.getDriver().getKeyValueStore(VOLUME_STORE, Directory.class, EnumDataStoreProperty.DATASTORE_PROP_PERSISTENT_REPLICATED);
+                
+                DataStoreProperties properties = new DataStoreProperties();
+                properties.setReplicated(true);
+                properties.setPersistent(true);
+                this.localVolumeStore = keyValueStoreManager.getDriver().getKeyValueStore(VOLUME_STORE, Directory.class, properties);
             } catch (ManagerNotInstantiatedException ex) {
                 LOG.error("Manager is not instantiated", ex);
                 throw new IOException(ex);

@@ -36,7 +36,7 @@ import stargate.commons.datasource.SourceFileMetadata;
 import stargate.commons.driver.AbstractDriver;
 import stargate.commons.driver.DriverFailedToLoadException;
 import stargate.commons.datastore.AbstractKeyValueStore;
-import stargate.commons.datastore.EnumDataStoreProperty;
+import stargate.commons.datastore.DataStoreProperties;
 import stargate.commons.driver.DriverNotInitializedException;
 import stargate.commons.manager.AbstractManager;
 import stargate.commons.manager.ManagerConfig;
@@ -162,7 +162,12 @@ public class RecipeManager extends AbstractManager<AbstractRecipeDriver> {
                 try {
                     StargateService stargateService = getStargateService();
                     DataStoreManager keyValueStoreManager = stargateService.getDataStoreManager();
-                    this.recipeStore = keyValueStoreManager.getDriver().getKeyValueStore(RECIPE_STORE, Recipe.class, EnumDataStoreProperty.DATASTORE_PROP_PERSISTENT_DISTRIBUTED);
+                    
+                    DataStoreProperties properties = new DataStoreProperties();
+                    properties.setSharded(true);
+                    properties.setReplicaNum(2);
+                    properties.setPersistent(true);
+                    this.recipeStore = keyValueStoreManager.getDriver().getKeyValueStore(RECIPE_STORE, Recipe.class, properties);
                 } catch (ManagerNotInstantiatedException ex) {
                     LOG.error("Manager is not instantiated", ex);
                     throw new IOException(ex);
@@ -176,7 +181,12 @@ public class RecipeManager extends AbstractManager<AbstractRecipeDriver> {
                 try {
                     StargateService stargateService = getStargateService();
                     DataStoreManager keyValueStoreManager = stargateService.getDataStoreManager();
-                    this.hashStore = keyValueStoreManager.getDriver().getKeyValueStore(HASH_STORE, ReverseRecipeMapping.class, EnumDataStoreProperty.DATASTORE_PROP_PERSISTENT_DISTRIBUTED);
+                    
+                    DataStoreProperties properties = new DataStoreProperties();
+                    properties.setSharded(true);
+                    properties.setReplicaNum(2);
+                    properties.setPersistent(true);
+                    this.hashStore = keyValueStoreManager.getDriver().getKeyValueStore(HASH_STORE, ReverseRecipeMapping.class, properties);
                 } catch (ManagerNotInstantiatedException ex) {
                     LOG.error("Manager is not instantiated", ex);
                     throw new IOException(ex);
