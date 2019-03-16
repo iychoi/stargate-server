@@ -327,6 +327,19 @@ public class HTTPUserInterfaceClient extends AbstractUserInterfaceClient {
     }
     
     @Override
+    public void syncRemoteClusters() throws IOException {
+        if(!this.connected) {
+            throw new IOException("Client is not connected");
+        }
+        
+        // URL pattern = http://xxx.xxx.xxx.xxx/api/srclusters
+        String url = makeAPIPath(HTTPUserInterfaceRestfulConstants.API_SYNC_REMOTE_CLUSTERS_PATH);
+        Boolean response = (Boolean) this.restfulClient.post(url, null);
+
+        updateLastActivetime();
+    }
+    
+    @Override
     public DataObjectMetadata getDataObjectMetadata(DataObjectURI uri) throws FileNotFoundException, IOException {
         if(!this.connected) {
             throw new IOException("Client is not connected");

@@ -709,6 +709,58 @@ public class HTTPUserInterfaceServlet extends AbstractUserInterfaceServer {
         }
     }
     
+    @POST
+    @Path(HTTPUserInterfaceRestfulConstants.API_PATH + "/" + HTTPUserInterfaceRestfulConstants.API_SYNC_REMOTE_CLUSTERS_PATH)
+    @Produces(MediaType.APPLICATION_JSON)
+    public Response syncRemoteClustersRestful() throws IOException {
+        LOG.info("REQ - syncRemoteClustersRestful");
+        
+        try {
+            syncRemoteClusters();
+            RestfulResponse rres = new RestfulResponse(true);
+            Response res = Response.status(Response.Status.OK).entity(rres).build();
+            
+            LOG.info("RES - syncRemoteClustersRestful");
+            
+            return res;
+        } catch(Exception ex) {
+            RestfulResponse rres = new RestfulResponse(ex);
+            Response res = Response.status(Response.Status.INTERNAL_SERVER_ERROR).entity(rres).build();
+            
+            LOG.info("RES (ERR) - syncRemoteClustersRestful");
+            
+            return res;
+        }
+    }
+    
+    @Override
+    public void syncRemoteClusters() throws IOException {
+        try {
+            StargateService service = getStargateService();
+            ClusterManager clusterManager = service.getClusterManager();
+            TransportManager transportManager = service.getTransportManager();
+            
+            List<Cluster> syncedRemoteClusters = new ArrayList<Cluster>();
+            
+            Collection<Cluster> remoteClusters = clusterManager.getRemoteClusters();
+            for(Cluster remoteCluster : remoteClusters) {
+                Cluster syncedRemoteCluster = transportManager.getRemoteCluster(remoteCluster);
+                syncedRemoteClusters.add(syncedRemoteCluster);
+            }
+
+            clusterManager.updateRemoteClusters(syncedRemoteClusters);
+        } catch (ManagerNotInstantiatedException ex) {
+            LOG.error("Manager is not instantiated", ex);
+            throw new IOException(ex);
+        } catch (DriverNotInitializedException ex) {
+            LOG.error("Driver is not initialized", ex);
+            throw new IOException(ex);
+        } catch (Exception ex) {
+            LOG.error("Unknown exception", ex);
+            throw new IOException(ex);
+        }
+    }
+    
     @GET
     @Path(HTTPUserInterfaceRestfulConstants.API_PATH + "/" + HTTPUserInterfaceRestfulConstants.API_GET_METADATA_PATH + "/{path:.*}")
     @Produces(MediaType.APPLICATION_JSON)
