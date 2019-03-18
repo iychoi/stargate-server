@@ -20,9 +20,8 @@ package stargate.managers.transport;
  * @author iychoi
  */
 public enum DataChunkCacheType {
-    DATA_CHUNK_CACHE_PLACEHOLDER (0), 
-    DATA_CHUNK_CACHE_PENDING (1),
-    DATA_CHUNK_CACHE_PRESENT (2);
+    DATA_CHUNK_CACHE_PENDING (0),
+    DATA_CHUNK_CACHE_PRESENT (1);
     
     private int numVal;
     

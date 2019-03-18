@@ -302,7 +302,7 @@ public class TransportManager extends AbstractManager<AbstractTransportDriver> {
                     
                     DataStoreProperties properties = new DataStoreProperties();
                     properties.setSharded(true);
-                    properties.setReplicaNum(0);
+                    properties.setReplicaNum(1);
                     properties.setPersistent(true);
                     properties.setExpirable(true);
                     properties.setExpireTimeUnit(TimeUnit.DAYS);
@@ -972,27 +972,20 @@ public class TransportManager extends AbstractManager<AbstractTransportDriver> {
             LOG.debug(String.format("Checking a pending request for a prefetching for - %s, %s", metadata.getURI().toUri().toASCIIString(), hash));
             
             // check cache and go remote
-            // put a placeholder
-            DataChunkCache placeholderDataChunkCache = new DataChunkCache(DataChunkCacheType.DATA_CHUNK_CACHE_PLACEHOLDER, hash, 1, null, null);
-            boolean insert = this.dataChunkCacheStore.putIfAbsent(hash, placeholderDataChunkCache.toBytes());
-            if(insert) {
-                this.lastUpdateTime = DateTimeUtils.getTimestamp();
-            } else {
-                byte[] existingData = (byte[]) this.dataChunkCacheStore.get(hash);
-                if(existingData != null) {
-                    DataChunkCache existingCache = DataChunkCache.fromBytes(existingData);
-                    if(existingCache.getType() == DataChunkCacheType.DATA_CHUNK_CACHE_PENDING) {
-                        Collection<String> primaryAndBackupNodesForData = this.dataChunkCacheStore.getPrimaryAndBackupNodesForData(hash);
-                        TransferAssignment assignment = new TransferAssignment(recipe.getMetadata().getURI(), hash, existingCache.getTransferNode(), primaryAndBackupNodesForData);
-                        LOG.debug(String.format("Found a pending prefetch schedule for - %s, %s at %s", metadata.getURI().toUri().toASCIIString(), hash, existingCache.getTransferNode()));
-                        return assignment;
-                    } else if(existingCache.getType() == DataChunkCacheType.DATA_CHUNK_CACHE_PRESENT) {
-                        Collection<String> primaryAndBackupNodesForData = this.dataChunkCacheStore.getPrimaryAndBackupNodesForData(hash);
-                        String primaryNodeForData = primaryAndBackupNodesForData.iterator().next();
-                        TransferAssignment assignment = new TransferAssignment(recipe.getMetadata().getURI(), hash, primaryNodeForData, primaryAndBackupNodesForData);
-                        LOG.debug(String.format("Found a local cache for - %s, %s at %s", metadata.getURI().toUri().toASCIIString(), hash, primaryNodeForData));
-                        return assignment;
-                    }
+            byte[] existingData = (byte[]) this.dataChunkCacheStore.get(hash);
+            if(existingData != null) {
+                DataChunkCache existingCache = DataChunkCache.fromBytes(existingData);
+                if(existingCache.getType() == DataChunkCacheType.DATA_CHUNK_CACHE_PENDING) {
+                    Collection<String> primaryAndBackupNodesForData = this.dataChunkCacheStore.getPrimaryAndBackupNodesForData(hash);
+                    TransferAssignment assignment = new TransferAssignment(recipe.getMetadata().getURI(), hash, existingCache.getTransferNode(), primaryAndBackupNodesForData);
+                    LOG.debug(String.format("Found a pending prefetch schedule for - %s, %s at %s", metadata.getURI().toUri().toASCIIString(), hash, existingCache.getTransferNode()));
+                    return assignment;
+                } else if(existingCache.getType() == DataChunkCacheType.DATA_CHUNK_CACHE_PRESENT) {
+                    Collection<String> primaryAndBackupNodesForData = this.dataChunkCacheStore.getPrimaryAndBackupNodesForData(hash);
+                    String primaryNodeForData = primaryAndBackupNodesForData.iterator().next();
+                    TransferAssignment assignment = new TransferAssignment(recipe.getMetadata().getURI(), hash, primaryNodeForData, primaryAndBackupNodesForData);
+                    LOG.debug(String.format("Found a local cache for - %s, %s at %s", metadata.getURI().toUri().toASCIIString(), hash, primaryNodeForData));
+                    return assignment;
                 }
             }
             
@@ -1002,22 +995,10 @@ public class TransportManager extends AbstractManager<AbstractTransportDriver> {
             Node determinedLocalNode = this.transferLayoutAlgorithm.determineLocalNode(localCluster, recipe, hash);
 
             // put to the pending chunk cache
-            while(true) {
-                byte[] bytes = (byte[]) this.dataChunkCacheStore.get(hash);
-                DataChunkCache dataChunkCache = DataChunkCache.fromBytes(bytes);
-
-                DataChunkCache newDataChunkCache = new DataChunkCache(DataChunkCacheType.DATA_CHUNK_CACHE_PENDING, hash, dataChunkCache.getVersion() + 1, determinedLocalNode.getName(), null);
-                newDataChunkCache.addWaitingNode(determinedLocalNode.getName());
-                newDataChunkCache.addWaitingNodes(dataChunkCache.getWaitingNodes());
-
-                boolean replaced = this.dataChunkCacheStore.replace(hash, bytes, newDataChunkCache.toBytes());
-                if(replaced) {
-                    this.lastUpdateTime = DateTimeUtils.getTimestamp();
-                    break;
-                } else {
-                    LOG.warn("Could not replaced chunk cache entry - try it again");
-                }
-            }
+            DataChunkCache newDataChunkCache = new DataChunkCache(DataChunkCacheType.DATA_CHUNK_CACHE_PENDING, hash, 1, determinedLocalNode.getName(), null);
+            newDataChunkCache.addWaitingNode(determinedLocalNode.getName());
+            this.dataChunkCacheStore.put(hash, newDataChunkCache.toBytes());
+            this.lastUpdateTime = DateTimeUtils.getTimestamp();
             
             LOG.debug(String.format("Sending a prefetching request for - %s, %s", metadata.getURI().toUri().toASCIIString(), hash));
 

@@ -143,6 +143,7 @@ public class IgniteDriver {
             
             igniteConfig.setMetricsLogFrequency(0);
             igniteConfig.setCollisionSpi(null); // disable collisionSPI
+            igniteConfig.setPeerClassLoadingEnabled(false); // disable peer class loading
             
             // discovery
             IgniteDiscoverySpi discoveryConfig = null;
