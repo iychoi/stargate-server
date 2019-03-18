@@ -30,6 +30,7 @@ public abstract class HTTPUserInterfaceRestfulConstants {
     public static final String API_CHECK_LIVE_PATH = "live";
     public static final String API_GET_SERVICE_CONFIG_PATH = "svcconfig";
     public static final String API_GET_FS_SERVICE_INFO_PATH = "fssvcinfo";
+    public static final String API_GET_INITIAL_DATA_PACK_PATH = "idatapack";
     public static final String API_GET_CLUSTER_PATH = "cluster";
     public static final String API_GET_LOCAL_CLUSTER_PATH = "lcluster";
     public static final String API_ACTIVATE_CLUSTER_PATH = "activate";

@@ -64,6 +64,7 @@ import stargate.managers.datasource.DataSourceManager;
 import stargate.managers.recipe.RecipeManager;
 import stargate.managers.recipe.RecipeManagerException;
 import stargate.commons.transport.TransferAssignment;
+import stargate.commons.userinterface.UserInterfaceInitialDataPack;
 import stargate.managers.statistics.StatisticsManager;
 import stargate.managers.transport.TransportManager;
 import stargate.managers.volume.VolumeManager;
@@ -202,6 +203,59 @@ public class HTTPUserInterfaceServlet extends AbstractUserInterfaceServer {
             
             FSServiceInfo serviceInfo = new FSServiceInfo(chunkSize, hashAlgorithm);
             return serviceInfo;
+        } catch (ManagerNotInstantiatedException ex) {
+            LOG.error("Manager is not instantiated", ex);
+            throw new IOException(ex);
+        } catch (Exception ex) {
+            LOG.error("Unknown exception", ex);
+            throw new IOException(ex);
+        }
+    }
+    
+    @GET
+    @Path(HTTPUserInterfaceRestfulConstants.API_PATH + "/" + HTTPUserInterfaceRestfulConstants.API_GET_INITIAL_DATA_PACK_PATH)
+    @Produces(MediaType.APPLICATION_JSON)
+    public Response getInitialDataPackRestful() throws IOException {
+        LOG.info("REQ - getInitialDataPackRestful");
+        
+        try {
+            UserInterfaceInitialDataPack dataPack = getInitialDataPack();
+            RestfulResponse rres = new RestfulResponse(dataPack);
+            Response res = Response.status(Response.Status.OK).entity(rres).build();
+            
+            LOG.info("RES - getInitialDataPackRestful");
+            
+            return res;
+        } catch(Exception ex) {
+            RestfulResponse rres = new RestfulResponse(ex);
+            Response res = Response.status(Response.Status.INTERNAL_SERVER_ERROR).entity(rres).build();
+            
+            LOG.info("RES (ERR) - getInitialDataPackRestful");
+            
+            return res;
+        }
+    }
+    
+    @Override
+    public UserInterfaceInitialDataPack getInitialDataPack() throws IOException {
+        try {
+            StargateService stargateService = getStargateService();
+            StargateService service = getStargateService();
+            ClusterManager clusterManager = service.getClusterManager();
+            Cluster localCluster = clusterManager.getLocalCluster();
+            
+            RecipeManager recipeManager = stargateService.getRecipeManager();
+            AbstractRecipeDriver recipeDriver = recipeManager.getDriver();
+            int chunkSize = recipeDriver.getChunkSize();
+            String hashAlgorithm = recipeDriver.getHashAlgorithm();
+            FSServiceInfo serviceInfo = new FSServiceInfo(chunkSize, hashAlgorithm);
+            
+            VolumeManager volumeManager = service.getVolumeManager();
+            DataObjectURI rootUri = new DataObjectURI("", "/");
+            DataObjectMetadata dataObjectMetadata = volumeManager.getDataObjectMetadata(rootUri);
+            
+            UserInterfaceInitialDataPack dataPack = new UserInterfaceInitialDataPack(true, localCluster, serviceInfo, dataObjectMetadata);
+            return dataPack;
         } catch (ManagerNotInstantiatedException ex) {
             LOG.error("Manager is not instantiated", ex);
             throw new IOException(ex);

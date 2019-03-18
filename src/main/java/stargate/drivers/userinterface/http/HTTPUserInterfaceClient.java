@@ -33,6 +33,7 @@ import stargate.commons.statistics.StatisticsEntry;
 import stargate.commons.statistics.StatisticsType;
 import stargate.commons.transport.TransferAssignment;
 import stargate.commons.userinterface.AbstractUserInterfaceClient;
+import stargate.commons.userinterface.UserInterfaceInitialDataPack;
 import stargate.commons.utils.DateTimeUtils;
 import stargate.commons.utils.PathUtils;
 
@@ -155,6 +156,20 @@ public class HTTPUserInterfaceClient extends AbstractUserInterfaceClient {
 
         updateLastActivetime();
         return info;
+    }
+    
+    @Override
+    public UserInterfaceInitialDataPack getInitialDataPack() throws IOException {
+        if(!this.connected) {
+            throw new IOException("Client is not connected");
+        }
+        
+        // URL pattern = http://xxx.xxx.xxx.xxx/api/idatapack
+        String url = makeAPIPath(HTTPUserInterfaceRestfulConstants.API_GET_INITIAL_DATA_PACK_PATH);
+        UserInterfaceInitialDataPack dataPack = (UserInterfaceInitialDataPack) this.restfulClient.get(url);
+
+        updateLastActivetime();
+        return dataPack;
     }
 
     @Override
