@@ -144,6 +144,7 @@ public class IgniteDriver {
             igniteConfig.setMetricsLogFrequency(0);
             igniteConfig.setCollisionSpi(null); // disable collisionSPI
             igniteConfig.setPeerClassLoadingEnabled(false); // disable peer class loading
+            igniteConfig.setSystemWorkerBlockedTimeout(60*60*1000);
             
             // discovery
             IgniteDiscoverySpi discoveryConfig = null;
@@ -296,6 +297,7 @@ public class IgniteDriver {
         dsCfg.setWalArchivePath(walArchivePath.getAbsolutePath());
         
         dsCfg.setCheckpointReadLockTimeout(0); // bugfix: ignite 2.7 has a bug for this.
+        
         return dsCfg;
     }
     
