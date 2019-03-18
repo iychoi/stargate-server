@@ -294,6 +294,8 @@ public class IgniteDriver {
         dsCfg.setStoragePath(storagePath.getAbsolutePath());
         dsCfg.setWalPath(walPath.getAbsolutePath());
         dsCfg.setWalArchivePath(walArchivePath.getAbsolutePath());
+        
+        dsCfg.setCheckpointReadLockTimeout(0); // bugfix: ignite 2.7 has a bug for this.
         return dsCfg;
     }
     
