@@ -536,6 +536,8 @@ public class VolumeManager extends AbstractManager<NullDriver> {
                                 transportManager.processPendingPrefetchSchedules(pendingPrefetchSchedules);
                             } catch (IOException ex) {
                                 LOG.error("IOException", ex);
+                            } catch (DriverNotInitializedException ex) {
+                                LOG.error("Driver is not initialized", ex);
                             }
                         }
                     };
