@@ -24,7 +24,9 @@ import java.util.Collection;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Queue;
 import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.ConcurrentLinkedQueue;
 import java.util.function.Consumer;
 import org.apache.commons.logging.Log;
 import org.apache.commons.logging.LogFactory;
@@ -51,6 +53,7 @@ import stargate.managers.datasource.DataSourceManager;
 import stargate.managers.datastore.DataStoreManager;
 import stargate.managers.recipe.RecipeManager;
 import stargate.commons.transport.TransferAssignment;
+import stargate.managers.transport.PendingPrefetchSchedule;
 import stargate.managers.transport.TransportManager;
 import stargate.service.StargateService;
 
@@ -488,6 +491,7 @@ public class VolumeManager extends AbstractManager<NullDriver> {
                 
                 Collection<RecipeChunk> recipeChunks = remoteRecipe.getChunks();
                 Map<RecipeChunk, Exception> streamExMap = new ConcurrentHashMap<RecipeChunk, Exception>();
+                Queue<PendingPrefetchSchedule> pendingPrefetchSchedules = new ConcurrentLinkedQueue<PendingPrefetchSchedule>();
                 
                 recipeChunks.parallelStream().forEach(new Consumer<RecipeChunk>() {
                     @Override
@@ -495,7 +499,8 @@ public class VolumeManager extends AbstractManager<NullDriver> {
                         try {
                             RecipeChunk newChunk = new RecipeChunk(chunk.getOffset(), chunk.getLength(), chunk.getHash());
                             
-                            TransferAssignment assignment = transportManager.prefetchDataChunk(localCluster, remoteRecipe, chunk.getHash());
+                            PendingPrefetchSchedule pendingPrefetchSchedule = transportManager.prefetchDataChunk2(localCluster, remoteRecipe, chunk.getHash());
+                            TransferAssignment assignment = pendingPrefetchSchedule.getTransferAssignment();
                             
                             String assignedNodeName = assignment.getTransferNode();
                             int assignedNodeID = newRecipe.getNodeID(assignedNodeName);
@@ -510,6 +515,10 @@ public class VolumeManager extends AbstractManager<NullDriver> {
                             }
                             
                             newRecipe.addChunk(newChunk);
+                            
+                            if(pendingPrefetchSchedule.hasDataChunkCache()) {
+                                pendingPrefetchSchedules.add(pendingPrefetchSchedule);
+                            }
                         } catch (IOException ex) {
                             streamExMap.put(chunk, ex);
                         } catch (DriverNotInitializedException ex) {
@@ -518,31 +527,28 @@ public class VolumeManager extends AbstractManager<NullDriver> {
                     }
                 });
                 
-                if(streamExMap.size() != 0) {
+                // process pending prefetch schedules in the background
+                if(!pendingPrefetchSchedules.isEmpty()) {
+                    Runnable r = new Runnable() {
+                        @Override
+                        public void run() {
+                            try {
+                                transportManager.processPendingPrefetchSchedules(pendingPrefetchSchedules);
+                            } catch (IOException ex) {
+                                LOG.error("IOException", ex);
+                            }
+                        }
+                    };
+                    
+                    Thread processorThread = new Thread(r);
+                    processorThread.run();
+                }
+                
+                if(!streamExMap.isEmpty()) {
                     Collection<Exception> values = streamExMap.values();
                     Exception ex = values.iterator().next();
                     throw new IOException(ex);
                 }
-                
-//                for(RecipeChunk chunk : recipeChunks) {
-//                    RecipeChunk newChunk = new RecipeChunk(chunk.getOffset(), chunk.getLength(), chunk.getHash());
-//                    
-//                    TransferAssignment assignment = transportManager.prefetchDataChunk(localCluster, remoteRecipe, chunk.getHash());
-//                    
-//                    String assignedNodeName = assignment.getTransferNode();
-//                    int assignedNodeID = newRecipe.getNodeID(assignedNodeName);
-//                    newChunk.addNodeID(assignedNodeID);
-//                    
-//                    Collection<String> accessNodeNames = assignment.getAccessNodes();
-//                    for(String accessNodeName : accessNodeNames) {
-//                        int accessNodeID = newRecipe.getNodeID(accessNodeName);
-//                        if(accessNodeID != assignedNodeID) {
-//                            newChunk.addNodeID(accessNodeID);
-//                        }
-//                    }
-//                    
-//                    newRecipe.addChunk(newChunk);
-//                }
                 
                 return newRecipe;
             } catch (ManagerNotInstantiatedException ex) {

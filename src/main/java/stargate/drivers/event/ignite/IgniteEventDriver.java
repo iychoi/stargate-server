@@ -34,6 +34,7 @@ import stargate.commons.driver.DriverNotInitializedException;
 import stargate.commons.event.AbstractEventDriver;
 import stargate.commons.event.AbstractEventDriverConfig;
 import stargate.commons.event.AbstractEventHandler;
+import stargate.commons.event.BulkStargateEvent;
 import stargate.commons.event.StargateEvent;
 import stargate.commons.event.StargateEventType;
 import stargate.drivers.ignite.IgniteDriver;
@@ -58,10 +59,11 @@ public class IgniteEventDriver extends AbstractEventDriver {
     private boolean listenEvent = true;
     private Map<StargateEventType, Set<AbstractEventHandler>> eventHandlers = new HashMap<StargateEventType, Set<AbstractEventHandler>>();
     private final Object eventHandlersSyncObj = new Object();
-    private ExecutorService eventHandlerThreadPool = Executors.newFixedThreadPool(eventHandlerThreadNum);
-    private ExecutorService eventSenderThreadPool = Executors.newFixedThreadPool(eventSenderThreadNum);
+    private ExecutorService eventHandlerThreadPool = Executors.newFixedThreadPool(this.eventHandlerThreadNum);
+    private ExecutorService eventSenderThreadPool = Executors.newFixedThreadPool(this.eventSenderThreadNum);
     
     private final String STARGATE_TOPIC = "STARGATE_TOPIC";
+    private final String STARGATE_BULK_TOPIC = "STARGATE_BULK_TOPIC";
     
     public IgniteEventDriver(AbstractDriverConfig config) {
         if(config == null) {
@@ -165,6 +167,42 @@ public class IgniteEventDriver extends AbstractEventDriver {
         };
         
         this.msg.localListen(STARGATE_TOPIC, ignitePredicate);
+        
+        // bulk
+        IgniteBiPredicate<UUID, String> ignitePredicateForBulk = new IgniteBiPredicate<UUID, String>() {
+            @Override
+            public boolean apply(UUID nodeId, String msg) {
+                LOG.debug(String.format("Received a bulk event from %s - %s", nodeId.toString(), msg));
+                
+                try {
+                    // msg is a BulkStargateEvent object
+                    BulkStargateEvent event = BulkStargateEvent.createInstance(msg);
+                    
+                    Runnable r = new Runnable() {
+                        @Override
+                        public void run() {
+                            try {
+                                processBulkEvent(event);
+                            } catch (IOException ex) {
+                                LOG.error("IOException", ex);
+                            }
+                        }
+                    };
+                    
+                    eventHandlerThreadPool.execute(r);
+            
+                    // do not call synchronously
+                    //processEvent(event);
+                } catch (IOException ex) {
+                    LOG.error("IOException", ex);
+                }
+                
+                // continue listening
+                return listenEvent;
+            }
+        };
+        
+        this.msg.localListen(STARGATE_BULK_TOPIC, ignitePredicateForBulk);
     }
     
     @Override
@@ -233,6 +271,16 @@ public class IgniteEventDriver extends AbstractEventDriver {
         }
     }
     
+    private void processBulkEvent(BulkStargateEvent event) throws IOException {
+        if(event == null) {
+            throw new IllegalArgumentException("event is null");
+        }
+        
+        for(StargateEvent sevent : event.getEvents()) {
+            processEvent(sevent);
+        }
+    }
+    
     @Override
     public void raiseEvent(StargateEvent event) throws IOException, DriverNotInitializedException {
         if(event == null) {
@@ -250,6 +298,34 @@ public class IgniteEventDriver extends AbstractEventDriver {
                     LOG.debug(String.format("Raise an event : %s", event.getEventType().toString()));
                     synchronized(msg) {
                         msg.send(STARGATE_TOPIC, event.toJson());
+                    }
+                } catch (IOException ex) {
+                    LOG.error("IOException", ex);
+                }
+            }
+        };
+        
+        this.eventSenderThreadPool.execute(r);
+    }
+    
+    @Override
+    public void raiseEvents(Collection<StargateEvent> events) throws IOException, DriverNotInitializedException {
+        if(events == null) {
+            throw new IllegalArgumentException("events is null");
+        }
+        
+        if(!isStarted()) {
+            throw new DriverNotInitializedException("driver is not initialized");
+        }
+        
+        Runnable r = new Runnable() {
+            @Override
+            public void run() {
+                try {
+                    LOG.debug("Raise a bulk event");
+                    synchronized(msg) {
+                        BulkStargateEvent event = new BulkStargateEvent(events);
+                        msg.send(STARGATE_BULK_TOPIC, event.toJson());
                     }
                 } catch (IOException ex) {
                     LOG.error("IOException", ex);

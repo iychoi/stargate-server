@@ -963,7 +963,7 @@ public class TransportManager extends AbstractManager<AbstractTransportDriver> {
                     Collection<String> nodeNames = localRecipe.getNodeNames(nodeIDs);
                     
                     String nodeName = nodeNames.iterator().next();
-                    TransferAssignment assignment = new TransferAssignment(recipe.getMetadata().getURI(), hash, nodeName, nodeNames);
+                    TransferAssignment assignment = new TransferAssignment(metadata.getURI(), hash, nodeName, nodeNames);
                     LOG.debug(String.format("Found a local recipe (%s) for - %s, %s at %s", localMetadata.getURI().toUri().toASCIIString(), metadata.getURI().toUri().toASCIIString(), hash, nodeName));
                     return assignment;
                 }
@@ -977,13 +977,13 @@ public class TransportManager extends AbstractManager<AbstractTransportDriver> {
                 DataChunkCache existingCache = DataChunkCache.fromBytes(existingData);
                 if(existingCache.getType() == DataChunkCacheType.DATA_CHUNK_CACHE_PENDING) {
                     Collection<String> primaryAndBackupNodesForData = this.dataChunkCacheStore.getPrimaryAndBackupNodesForData(hash);
-                    TransferAssignment assignment = new TransferAssignment(recipe.getMetadata().getURI(), hash, existingCache.getTransferNode(), primaryAndBackupNodesForData);
+                    TransferAssignment assignment = new TransferAssignment(metadata.getURI(), hash, existingCache.getTransferNode(), primaryAndBackupNodesForData);
                     LOG.debug(String.format("Found a pending prefetch schedule for - %s, %s at %s", metadata.getURI().toUri().toASCIIString(), hash, existingCache.getTransferNode()));
                     return assignment;
                 } else if(existingCache.getType() == DataChunkCacheType.DATA_CHUNK_CACHE_PRESENT) {
                     Collection<String> primaryAndBackupNodesForData = this.dataChunkCacheStore.getPrimaryAndBackupNodesForData(hash);
                     String primaryNodeForData = primaryAndBackupNodesForData.iterator().next();
-                    TransferAssignment assignment = new TransferAssignment(recipe.getMetadata().getURI(), hash, primaryNodeForData, primaryAndBackupNodesForData);
+                    TransferAssignment assignment = new TransferAssignment(metadata.getURI(), hash, primaryNodeForData, primaryAndBackupNodesForData);
                     LOG.debug(String.format("Found a local cache for - %s, %s at %s", metadata.getURI().toUri().toASCIIString(), hash, primaryNodeForData));
                     return assignment;
                 }
@@ -1006,13 +1006,205 @@ public class TransportManager extends AbstractManager<AbstractTransportDriver> {
             raiseEventForPrefetchTransfer(metadata.getURI(), hash, determinedLocalNode.getName());
 
             Collection<String> primaryAndBackupNodesForData = this.dataChunkCacheStore.getPrimaryAndBackupNodesForData(hash);
-            TransferAssignment assignment = new TransferAssignment(recipe.getMetadata().getURI(), hash, determinedLocalNode.getName(), primaryAndBackupNodesForData);
+            TransferAssignment assignment = new TransferAssignment(metadata.getURI(), hash, determinedLocalNode.getName(), primaryAndBackupNodesForData);
             LOG.debug(String.format("Scheduled a prefetching for - %s, %s at %s", metadata.getURI().toUri().toASCIIString(), hash, determinedLocalNode.getName()));
             return assignment;
         } catch (ManagerNotInstantiatedException ex) {
             LOG.error("Manager is not instantiated", ex);
             throw new IOException(ex);
         }
+    }
+    
+    public PendingPrefetchSchedule prefetchDataChunk2(DataObjectURI uri, String hash) throws IOException, DriverNotInitializedException {
+        if(uri == null) {
+            throw new IllegalArgumentException("uri is null");
+        }
+        
+        if(hash == null || hash.isEmpty()) {
+            throw new IllegalArgumentException("hash is null or empty");
+        }
+        
+        if(!this.started) {
+            throw new IllegalStateException("Manager is not started");
+        }
+        
+        try {
+            StargateService stargateService = getStargateService();
+            ClusterManager clusterManager = stargateService.getClusterManager();
+
+            Cluster localCluster = clusterManager.getLocalCluster();
+            
+            Recipe recipe = getRecipe(uri);
+            return prefetchDataChunk2(localCluster, recipe, hash);
+        } catch (ManagerNotInstantiatedException ex) {
+            LOG.error("Manager is not instantiated", ex);
+            throw new IOException(ex);
+        }
+    }
+    
+    public PendingPrefetchSchedule prefetchDataChunk2(Cluster localCluster, DataObjectURI uri, String hash) throws IOException, DriverNotInitializedException {
+        if(localCluster == null) {
+            throw new IllegalArgumentException("localCluster is null or empty");
+        }
+        
+        if(uri == null) {
+            throw new IllegalArgumentException("uri is null");
+        }
+        
+        if(hash == null || hash.isEmpty()) {
+            throw new IllegalArgumentException("hash is null or empty");
+        }
+        
+        if(!this.started) {
+            throw new IllegalStateException("Manager is not started");
+        }
+        
+        Recipe recipe = getRecipe(uri);
+        return prefetchDataChunk2(localCluster, recipe, hash);
+    }
+    
+    public PendingPrefetchSchedule prefetchDataChunk2(Recipe recipe, String hash) throws IOException, DriverNotInitializedException {
+        if(recipe == null) {
+            throw new IllegalArgumentException("recipe is null");
+        }
+        
+        if(hash == null || hash.isEmpty()) {
+            throw new IllegalArgumentException("hash is null or empty");
+        }
+        
+        if(!this.started) {
+            throw new IllegalStateException("Manager is not started");
+        }
+        
+        try {
+            StargateService stargateService = getStargateService();
+            ClusterManager clusterManager = stargateService.getClusterManager();
+
+            Cluster localCluster = clusterManager.getLocalCluster();
+            
+            return prefetchDataChunk2(localCluster, recipe, hash);
+        } catch (ManagerNotInstantiatedException ex) {
+            LOG.error("Manager is not instantiated", ex);
+            throw new IOException(ex);
+        }
+    }
+    
+    public PendingPrefetchSchedule prefetchDataChunk2(Cluster localCluster, Recipe recipe, String hash) throws IOException, DriverNotInitializedException {
+        if(localCluster == null) {
+            throw new IllegalArgumentException("localCluster is null");
+        }
+        
+        if(recipe == null) {
+            throw new IllegalArgumentException("recipe is null");
+        }
+        
+        if(hash == null || hash.isEmpty()) {
+            throw new IllegalArgumentException("hash is null or empty");
+        }
+        
+        if(!this.started) {
+            throw new IllegalStateException("Manager is not started");
+        }
+        
+        safeInitLayoutAlgorithm();
+        
+        DataObjectMetadata metadata = recipe.getMetadata();
+        RecipeChunk chunk = recipe.getChunk(hash);
+        
+        LOG.debug(String.format("Scheduling a prefetching - %s, %s", metadata.getURI().toUri().toASCIIString(), hash));
+        
+        if(chunk == null) {
+            throw new IllegalArgumentException(String.format("cannot find recipe chunk for hash %s", hash));
+        }
+        
+        try {
+            StargateService stargateService = getStargateService();
+
+            // check local recipes
+            RecipeManager recipeManager = stargateService.getRecipeManager();
+            
+            LOG.debug(String.format("Checking local recipes for a prefetching for - %s, %s", metadata.getURI().toUri().toASCIIString(), hash));
+            
+            Recipe localRecipe = recipeManager.getRecipeByHash(hash);
+            if(localRecipe != null) {
+                DataExportManager dataExportManager = stargateService.getDataExportManager();
+                DataObjectMetadata localMetadata = localRecipe.getMetadata();
+                
+                DataExportEntry dataExportEntry = dataExportManager.getDataExportEntry(localMetadata.getURI().getPath());
+                if(dataExportEntry != null) {
+                    RecipeChunk localChunk = localRecipe.getChunk(hash);
+                    Collection<Integer> nodeIDs = localChunk.getNodeIDs();
+                    Collection<String> nodeNames = localRecipe.getNodeNames(nodeIDs);
+                    
+                    String nodeName = nodeNames.iterator().next();
+                    TransferAssignment assignment = new TransferAssignment(metadata.getURI(), hash, nodeName, nodeNames);
+                    LOG.debug(String.format("Found a local recipe (%s) for - %s, %s at %s", localMetadata.getURI().toUri().toASCIIString(), metadata.getURI().toUri().toASCIIString(), hash, nodeName));
+                    return new PendingPrefetchSchedule(assignment);
+                }
+            }
+            
+            LOG.debug(String.format("Checking a pending request for a prefetching for - %s, %s", metadata.getURI().toUri().toASCIIString(), hash));
+            
+            // check cache and go remote
+            byte[] existingData = (byte[]) this.dataChunkCacheStore.get(hash);
+            if(existingData != null) {
+                DataChunkCache existingCache = DataChunkCache.fromBytes(existingData);
+                if(existingCache.getType() == DataChunkCacheType.DATA_CHUNK_CACHE_PENDING) {
+                    Collection<String> primaryAndBackupNodesForData = this.dataChunkCacheStore.getPrimaryAndBackupNodesForData(hash);
+                    TransferAssignment assignment = new TransferAssignment(metadata.getURI(), hash, existingCache.getTransferNode(), primaryAndBackupNodesForData);
+                    LOG.debug(String.format("Found a pending prefetch schedule for - %s, %s at %s", metadata.getURI().toUri().toASCIIString(), hash, existingCache.getTransferNode()));
+                    return new PendingPrefetchSchedule(assignment);
+                } else if(existingCache.getType() == DataChunkCacheType.DATA_CHUNK_CACHE_PRESENT) {
+                    Collection<String> primaryAndBackupNodesForData = this.dataChunkCacheStore.getPrimaryAndBackupNodesForData(hash);
+                    String primaryNodeForData = primaryAndBackupNodesForData.iterator().next();
+                    TransferAssignment assignment = new TransferAssignment(metadata.getURI(), hash, primaryNodeForData, primaryAndBackupNodesForData);
+                    LOG.debug(String.format("Found a local cache for - %s, %s at %s", metadata.getURI().toUri().toASCIIString(), hash, primaryNodeForData));
+                    return new PendingPrefetchSchedule(assignment);
+                }
+            }
+            
+            LOG.debug(String.format("Making a pending request for a prefetching for - %s, %s", metadata.getURI().toUri().toASCIIString(), hash));
+            
+            // determine where to copy 
+            Node determinedLocalNode = this.transferLayoutAlgorithm.determineLocalNode(localCluster, recipe, hash);
+
+            // make the pending chunk cache
+            DataChunkCache newDataChunkCache = new DataChunkCache(DataChunkCacheType.DATA_CHUNK_CACHE_PENDING, hash, 1, determinedLocalNode.getName(), null);
+            newDataChunkCache.addWaitingNode(determinedLocalNode.getName());
+            
+            Collection<String> primaryAndBackupNodesForData = this.dataChunkCacheStore.getPrimaryAndBackupNodesForData(hash);
+            TransferAssignment assignment = new TransferAssignment(metadata.getURI(), hash, determinedLocalNode.getName(), primaryAndBackupNodesForData);
+            return new PendingPrefetchSchedule(assignment, newDataChunkCache);
+        } catch (ManagerNotInstantiatedException ex) {
+            LOG.error("Manager is not instantiated", ex);
+            throw new IOException(ex);
+        }
+    }
+    
+    public void processPendingPrefetchSchedules(Collection<PendingPrefetchSchedule> pendingPrefetchSchedules) throws IOException, DriverNotInitializedException {
+        if(pendingPrefetchSchedules == null) {
+            throw new IllegalArgumentException("pendingPrefetchSchedules is null");
+        }
+        
+        LOG.debug("Processing pending prefetching schedules");
+        List<PrefetchTransferEvent> events = new ArrayList<PrefetchTransferEvent>();
+        
+        for(PendingPrefetchSchedule schedule : pendingPrefetchSchedules) {
+            TransferAssignment transferAssignment = schedule.getTransferAssignment();
+            DataChunkCache dataChunkCache = schedule.getDataChunkCache();
+            
+            LOG.debug(String.format("Putting a pending request for a prefetching for - %s, %s", transferAssignment.getDataObjectURI().toUri().toASCIIString(), dataChunkCache.getHash()));
+            this.dataChunkCacheStore.put(dataChunkCache.getHash(), dataChunkCache.toBytes());
+            
+            PrefetchTransferEvent event = new PrefetchTransferEvent(transferAssignment.getDataObjectURI(), transferAssignment.getHash(), transferAssignment.getTransferNode());
+            events.add(event);
+        }
+        
+        this.lastUpdateTime = DateTimeUtils.getTimestamp();
+        
+        // send to remote
+        LOG.debug("Sending a prefetching request");
+        raiseEventForPrefetchTransfer(events);
     }
     
     public Directory getDirectory(DataObjectURI uri) throws IOException, DriverNotInitializedException {
@@ -1206,6 +1398,27 @@ public class TransportManager extends AbstractManager<AbstractTransportDriver> {
             
             StargateEvent event = new StargateEvent(StargateEventType.STARGATE_EVENT_TYPE_TRANSPORT, nodeName, localNode.getName(), transferEvent.toJson());
             eventManager.raiseEvent(event);
+        } catch (ManagerNotInstantiatedException ex) {
+            LOG.error("Manager is not instantiated", ex);
+        }
+    }
+    
+    private void raiseEventForPrefetchTransfer(Collection<PrefetchTransferEvent> events) throws IOException, DriverNotInitializedException {
+        List<StargateEvent> stargateEvents = new ArrayList<StargateEvent>();
+        
+        try {
+            StargateService stargateService = getStargateService();
+            EventManager eventManager = stargateService.getEventManager();
+            ClusterManager clusterManager = stargateService.getClusterManager();
+            Node localNode = clusterManager.getLocalNode();
+            
+            for(PrefetchTransferEvent event : events) {
+                TransferEvent transferEvent = new TransferEvent(TransferEventType.TRANSFER_EVENT_TYPE_PREFETCH, event.getURI(), event.getHash());
+                StargateEvent stargateEvent = new StargateEvent(StargateEventType.STARGATE_EVENT_TYPE_TRANSPORT, event.getNodeName(), localNode.getName(), transferEvent.toJson());
+                stargateEvents.add(stargateEvent);
+            }
+            
+            eventManager.raiseEvents(stargateEvents);
         } catch (ManagerNotInstantiatedException ex) {
             LOG.error("Manager is not instantiated", ex);
         }

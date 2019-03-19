@@ -127,6 +127,11 @@ public class EventManager extends AbstractManager<AbstractEventDriver> {
         driver.raiseEvent(event);
     }
     
+    public void raiseEvents(Collection<StargateEvent> events) throws IOException, DriverNotInitializedException {
+        AbstractEventDriver driver = getDriver();
+        driver.raiseEvents(events);
+    }
+    
     public void addEventHandler(AbstractEventHandler eventHandler) {
         if(eventHandler == null) {
             throw new IllegalArgumentException("eventHandler is null");
