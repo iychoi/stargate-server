@@ -527,23 +527,9 @@ public class VolumeManager extends AbstractManager<NullDriver> {
                     }
                 });
                 
-                // process pending prefetch schedules in the background
+                // process pending prefetch schedules
                 if(!pendingPrefetchSchedules.isEmpty()) {
-                    Runnable r = new Runnable() {
-                        @Override
-                        public void run() {
-                            try {
-                                transportManager.processPendingPrefetchSchedules(pendingPrefetchSchedules);
-                            } catch (IOException ex) {
-                                LOG.error("IOException", ex);
-                            } catch (DriverNotInitializedException ex) {
-                                LOG.error("Driver is not initialized", ex);
-                            }
-                        }
-                    };
-                    
-                    Thread processorThread = new Thread(r);
-                    processorThread.run();
+                    transportManager.processPendingPrefetchSchedulesAsync(pendingPrefetchSchedules);
                 }
                 
                 if(!streamExMap.isEmpty()) {

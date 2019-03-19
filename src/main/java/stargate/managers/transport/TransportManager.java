@@ -79,7 +79,8 @@ public class TransportManager extends AbstractManager<AbstractTransportDriver> {
 
     private static final Log LOG = LogFactory.getLog(TransportManager.class);
     
-    private static final int DEFAULT_PREFETCH_THREAD_NUM = 5;
+    private static final int DEFAULT_PREFETCH_THREAD_NUM = 3;
+    private static final int DEFAULT_PENDING_PREFETCH_THREAD_NUM = 1;
     
     private static TransportManager instance;
     
@@ -96,7 +97,9 @@ public class TransportManager extends AbstractManager<AbstractTransportDriver> {
     private AbstractTransferLayoutAlgorithm transferLayoutAlgorithm;
     
     private int prefetchThreadNum = DEFAULT_PREFETCH_THREAD_NUM;
+    private int pendingPrefetchThreadNum = DEFAULT_PENDING_PREFETCH_THREAD_NUM;
     private ExecutorService prefetchThreadPool;
+    private ExecutorService pendingPrefetchThreadPool;
     
     protected long lastUpdateTime;
     
@@ -159,8 +162,6 @@ public class TransportManager extends AbstractManager<AbstractTransportDriver> {
             throw new IllegalArgumentException("drivers is null or empty");
         }
         
-        this.prefetchThreadPool = Executors.newFixedThreadPool(this.prefetchThreadNum);
-        
         this.setService(service);
         this.setConfig(config);
         
@@ -184,6 +185,9 @@ public class TransportManager extends AbstractManager<AbstractTransportDriver> {
     public synchronized void start() throws IOException {
         super.start();
         
+        this.prefetchThreadPool = Executors.newFixedThreadPool(this.prefetchThreadNum);
+        this.pendingPrefetchThreadPool = Executors.newFixedThreadPool(this.pendingPrefetchThreadNum);
+        
         for(AbstractTransportDriver driver : drivers) {
             try {
                 driver.startServer();
@@ -198,6 +202,9 @@ public class TransportManager extends AbstractManager<AbstractTransportDriver> {
     @Override
     public synchronized void stop() throws IOException {
         this.prefetchThreadPool.shutdownNow();
+        this.prefetchThreadPool = null;
+        this.pendingPrefetchThreadPool.shutdownNow();
+        this.pendingPrefetchThreadPool = null;
         
         for(AbstractTransportDriver driver : drivers) {
             try {
@@ -1205,6 +1212,26 @@ public class TransportManager extends AbstractManager<AbstractTransportDriver> {
         // send to remote
         LOG.debug("Sending a prefetching request");
         raiseEventForPrefetchTransfer(events);
+    }
+    
+    public void processPendingPrefetchSchedulesAsync(Collection<PendingPrefetchSchedule> pendingPrefetchSchedules) throws IOException, DriverNotInitializedException {
+        if(pendingPrefetchSchedules == null) {
+            throw new IllegalArgumentException("pendingPrefetchSchedules is null");
+        }
+        
+        Runnable r = new Runnable() {
+            @Override
+            public void run() {
+                try {
+                    processPendingPrefetchSchedules(pendingPrefetchSchedules);
+                } catch (IOException ex) {
+                    LOG.error("IOException", ex);
+                } catch (DriverNotInitializedException ex) {
+                    LOG.error("Driver is not initialized", ex);
+                }
+            }
+        };
+        this.pendingPrefetchThreadPool.execute(r);
     }
     
     public Directory getDirectory(DataObjectURI uri) throws IOException, DriverNotInitializedException {

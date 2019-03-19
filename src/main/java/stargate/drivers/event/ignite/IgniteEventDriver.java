@@ -59,8 +59,8 @@ public class IgniteEventDriver extends AbstractEventDriver {
     private boolean listenEvent = true;
     private Map<StargateEventType, Set<AbstractEventHandler>> eventHandlers = new HashMap<StargateEventType, Set<AbstractEventHandler>>();
     private final Object eventHandlersSyncObj = new Object();
-    private ExecutorService eventHandlerThreadPool = Executors.newFixedThreadPool(this.eventHandlerThreadNum);
-    private ExecutorService eventSenderThreadPool = Executors.newFixedThreadPool(this.eventSenderThreadNum);
+    private ExecutorService eventHandlerThreadPool;
+    private ExecutorService eventSenderThreadPool;
     
     private final String STARGATE_TOPIC = "STARGATE_TOPIC";
     private final String STARGATE_BULK_TOPIC = "STARGATE_BULK_TOPIC";
@@ -103,6 +103,9 @@ public class IgniteEventDriver extends AbstractEventDriver {
         
         LOG.debug("Initializing Ignite Event Driver");
         
+        this.eventHandlerThreadPool = Executors.newFixedThreadPool(this.eventHandlerThreadNum);
+        this.eventSenderThreadPool = Executors.newFixedThreadPool(this.eventSenderThreadNum);
+        
         this.igniteDriver = IgniteDriver.getInstance();
         this.igniteDriver.init();
         
@@ -114,7 +117,9 @@ public class IgniteEventDriver extends AbstractEventDriver {
         this.listenEvent = false;
         this.eventHandlers.clear();
         this.eventHandlerThreadPool.shutdownNow();
+        this.eventHandlerThreadPool = null;
         this.eventSenderThreadPool.shutdownNow();
+        this.eventSenderThreadPool = null;
         
         if(this.igniteDriver != null && this.igniteDriver.isStarted()) {
             this.igniteDriver.uninit();
