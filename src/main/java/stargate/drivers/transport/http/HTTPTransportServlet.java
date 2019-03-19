@@ -417,7 +417,7 @@ public class HTTPTransportServlet extends AbstractTransportServer {
     
     @GET
     @Path(HTTPTransportRestfulConstants.API_PATH + "/" + HTTPTransportRestfulConstants.API_GET_DATA_CHUNK_PATH + "/{hash:.*}")
-    @Produces(MediaType.APPLICATION_OCTET_STREAM)
+    @Produces({MediaType.APPLICATION_OCTET_STREAM, MediaType.APPLICATION_JSON})
     public Response getDataChunkRestful(
             @DefaultValue("") @PathParam("hash") String hash) throws Exception {
         if(hash == null || hash.isEmpty()) {

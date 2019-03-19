@@ -1111,7 +1111,7 @@ public class HTTPUserInterfaceServlet extends AbstractUserInterfaceServer {
     
     @GET
     @Path(HTTPUserInterfaceRestfulConstants.API_PATH + "/" + HTTPUserInterfaceRestfulConstants.API_GET_DATA_CHUNK_PATH + "/{path:.*}/{hash:.*}")
-    @Produces(MediaType.APPLICATION_OCTET_STREAM)
+    @Produces({MediaType.APPLICATION_OCTET_STREAM, MediaType.APPLICATION_JSON})
     public Response getDataChunkRestful(
             @DefaultValue("") @PathParam("path") String path,
             @DefaultValue("") @PathParam("hash") String hash) throws IOException {
