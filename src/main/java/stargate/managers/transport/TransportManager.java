@@ -81,6 +81,7 @@ public class TransportManager extends AbstractManager<AbstractTransportDriver> {
     
     private static final int DEFAULT_PREFETCH_THREAD_NUM = 3;
     private static final int DEFAULT_PENDING_PREFETCH_THREAD_NUM = 1;
+    private static final int DEFAULT_DATATRANSFER_TIMEOUT_SEC = 60*5; // 5min
     
     private static TransportManager instance;
     
@@ -98,7 +99,8 @@ public class TransportManager extends AbstractManager<AbstractTransportDriver> {
     
     private int prefetchThreadNum = DEFAULT_PREFETCH_THREAD_NUM;
     private int pendingPrefetchThreadNum = DEFAULT_PENDING_PREFETCH_THREAD_NUM;
-    private ExecutorService prefetchThreadPool;
+    private int dataTransferTimeout = DEFAULT_DATATRANSFER_TIMEOUT_SEC;
+    private PriorityTransferScheduler transferThreadScheduler;
     private ExecutorService pendingPrefetchThreadPool;
     
     protected long lastUpdateTime;
@@ -185,7 +187,8 @@ public class TransportManager extends AbstractManager<AbstractTransportDriver> {
     public synchronized void start() throws IOException {
         super.start();
         
-        this.prefetchThreadPool = Executors.newFixedThreadPool(this.prefetchThreadNum);
+        this.transferThreadScheduler = new PriorityTransferScheduler(this.prefetchThreadNum, 100);
+        this.transferThreadScheduler.start();
         this.pendingPrefetchThreadPool = Executors.newFixedThreadPool(this.pendingPrefetchThreadNum);
         
         for(AbstractTransportDriver driver : drivers) {
@@ -201,8 +204,8 @@ public class TransportManager extends AbstractManager<AbstractTransportDriver> {
     
     @Override
     public synchronized void stop() throws IOException {
-        this.prefetchThreadPool.shutdownNow();
-        this.prefetchThreadPool = null;
+        this.transferThreadScheduler.stop();
+        this.transferThreadScheduler = null;
         this.pendingPrefetchThreadPool.shutdownNow();
         this.pendingPrefetchThreadPool = null;
         
@@ -437,11 +440,6 @@ public class TransportManager extends AbstractManager<AbstractTransportDriver> {
             ClusterManager clusterManager = stargateService.getClusterManager();
             Node localNode = clusterManager.getLocalNode();
             
-            // check local recipes
-            RecipeManager recipeManager = stargateService.getRecipeManager();
-            DataExportManager dataExportManager = stargateService.getDataExportManager();
-            DataSourceManager dataSourceManager = stargateService.getDataSourceManager();
-            
             // put to the cache
             boolean putPendingChunkCache = false;
             DataChunkCache pendingDataChunkCache = new DataChunkCache(DataChunkCacheType.DATA_CHUNK_CACHE_PENDING, hash, 1, localNode.getName(), null);
@@ -454,146 +452,103 @@ public class TransportManager extends AbstractManager<AbstractTransportDriver> {
             this.waitObjects.putIfAbsent(hash, new TransferReference());
             TransferReference reference = this.waitObjects.get(hash);
             reference.increaseReference();
-            synchronized(reference) {
-                Recipe localRecipe = recipeManager.getRecipeByHash(hash);
-                if(localRecipe != null) {
-                    DataObjectMetadata metadata = localRecipe.getMetadata();
-                    DataExportEntry dataExportEntry = dataExportManager.getDataExportEntry(metadata.getURI().getPath());
-                    if(dataExportEntry != null) {
-                        URI sourceURI = dataExportEntry.getSourceURI();
-                        AbstractDataSourceDriver driver = dataSourceManager.getDriver(sourceURI);
-
-                        RecipeChunk chunk = localRecipe.getChunk(hash);
-                        Collection<Integer> nodeIDs = chunk.getNodeIDs();
-                        Collection<String> nodeNames = localRecipe.getNodeNames(nodeIDs);
-                        
-                        // just do it because it works for HDFS
-                        //if(nodeNames.contains(localNode.getName())) {
-                            InputStream inputStream = driver.openFile(sourceURI, chunk.getOffset(), chunk.getLength());
-                            byte[] cacheDataBytes = IOUtils.toByteArray(inputStream);
-                            inputStream.close();
-
-                            // put to the cache
-                            DataChunkCache dataChunkCache = new DataChunkCache(DataChunkCacheType.DATA_CHUNK_CACHE_PRESENT, hash, Integer.MAX_VALUE, cacheDataBytes);
-                            this.dataChunkCacheStore.put(hash, dataChunkCache.toBytes());
-                            this.lastUpdateTime = DateTimeUtils.getTimestamp();
-
-                            reference.finishTransfer();
-                            reference.decreaseReference();
-                            if(reference.getReferenceCount() <= 0) {
-                                this.waitObjects.remove(hash);
-                            }
-                            
-                            //notify
-                            raiseEventForTransferCompletion(uri, hash);
-                            
-                            LOG.debug(String.format("Found a local chunk for - %s, %s", uri.toUri().toASCIIString(), hash));
-                            return;
-                        //} else {
-                        //    // data is found in the local cluster but remote node
-                        //    LOG.debug(String.format("Found a local chunk in the local cluster for - %s, %s, but in a remote node", uri.toUri().toASCIIString(), hash));  
-                        //}
-                    }
-                }
-            
-                // get from remote
-                Cluster remoteCluster = clusterManager.getRemoteCluster(uri.getClusterName());
-                if(remoteCluster == null) {
-                    reference.decreaseReference();
-                    if(reference.getReferenceCount() <= 0) {
-                        this.waitObjects.remove(hash);
-                    }
-                    throw new IOException(String.format("remote cluster %s does not exist", uri.getClusterName()));
-                }
-
-                // double-check cache
-                if(!putPendingChunkCache) {
-                    byte[] existingData = (byte[]) this.dataChunkCacheStore.get(hash);
-                    if(existingData != null) {
-                        DataChunkCache existingCache = DataChunkCache.fromBytes(existingData);
-                        if(existingCache.getType() == DataChunkCacheType.DATA_CHUNK_CACHE_PRESENT) {
-                            // existing
-                            reference.finishTransfer();
-                            reference.decreaseReference();
-                            if(reference.getReferenceCount() <= 0) {
-                                this.waitObjects.remove(hash);
-                            }
-
-                            LOG.debug(String.format("Found a chunk cache for - %s, %s", uri.toUri().toASCIIString(), hash));
-                            return;
+            // double-check cache
+            if(!putPendingChunkCache) {
+                byte[] existingData = (byte[]) this.dataChunkCacheStore.get(hash);
+                if(existingData != null) {
+                    DataChunkCache existingCache = DataChunkCache.fromBytes(existingData);
+                    if(existingCache.getType().equals(DataChunkCacheType.DATA_CHUNK_CACHE_PRESENT)) {
+                        // existing
+                        reference.finishTransfer();
+                        reference.decreaseReference();
+                        if(reference.getReferenceCount() <= 0) {
+                            this.waitObjects.remove(hash);
                         }
 
-                        String transferNode = existingCache.getTransferNode();
-                        if(!localNode.getName().equals(transferNode)) {
-                            // it's not my task
-                            reference.decreaseReference();
-                            if(reference.getReferenceCount() <= 0) {
-                                this.waitObjects.remove(hash);
-                            }
-                            LOG.debug(String.format("Transfer schedule is found but pending (not the task of this node) for %s, %s", uri.toUri().toASCIIString(), hash));
-                            return;
+                        LOG.debug(String.format("Found a chunk cache for - %s, %s", uri.toUri().toASCIIString(), hash));
+                        return;
+                    }
+
+                    String transferNode = existingCache.getTransferNode();
+                    if(!localNode.getName().equals(transferNode)) {
+                        // it's not my task
+                        reference.decreaseReference();
+                        if(reference.getReferenceCount() <= 0) {
+                            this.waitObjects.remove(hash);
                         }
+                        LOG.debug(String.format("Transfer schedule is found but pending (not the task of this node) for %s, %s", uri.toUri().toASCIIString(), hash));
+                        return;
                     }
                 }
-                
-                Recipe recipe = getRecipe(uri);
-                Node remoteNode = this.transferLayoutAlgorithm.determineRemoteNode(remoteCluster, recipe, hash);
-                if(remoteNode == null) {
-                    reference.decreaseReference();
-                    if(reference.getReferenceCount() <= 0) {
-                        this.waitObjects.remove(hash);
-                    }
-                    throw new IOException(String.format("cannot determine a remote node for a remote cluster %s", uri.getClusterName()));
-                }
-            
-                // go remote
-                AbstractTransportDriver driver = getDriver();
-                AbstractTransportClient client = driver.getClient(remoteNode);
+            }
 
-                // increase workload
-                //Cluster localCluster = clusterManager.getLocalCluster();
-
-                //this.transferLayoutAlgorithm.increaseNodeWorkload(localCluster, localNode);
-                this.transferLayoutAlgorithm.increaseNodeWorkload(remoteCluster, remoteNode);
-                
-                StatisticsManager statisticsManager = stargateService.getStatisticsManager();
-                statisticsManager.addDataChunkTransferReceiveStartStatistics(uri.toUri().toASCIIString(), hash);
-
-                InputStream dataChunkInputStream = client.getDataChunk(hash);
-                if (dataChunkInputStream == null) {
-                    reference.decreaseReference();
-                    if(reference.getReferenceCount() <= 0) {
-                        this.waitObjects.remove(hash);
-                    }
-                    throw new IOException("dataChunkInputStream is null");
-                }
-
-                // fully download the chunk and cache and return
-                byte[] cacheDataBytes = IOUtils.toByteArray(dataChunkInputStream);
-                dataChunkInputStream.close();
-                
-                statisticsManager.addDataChunkTransferReceiveEndStatistics(uri.toUri().toASCIIString(), hash);
-
-                // decrease workload
-                //this.transferLayoutAlgorithm.decreaseNodeWorkload(localCluster, localNode);
-                this.transferLayoutAlgorithm.decreaseNodeWorkload(remoteCluster, remoteNode);
-
-                // put to the cache
-                DataChunkCache dataChunkCache = new DataChunkCache(DataChunkCacheType.DATA_CHUNK_CACHE_PRESENT, hash, Integer.MAX_VALUE, cacheDataBytes);
-                this.dataChunkCacheStore.put(hash, dataChunkCache.toBytes());
-                this.lastUpdateTime = DateTimeUtils.getTimestamp();
-                
-                reference.finishTransfer();
+            // get from remote
+            Cluster remoteCluster = clusterManager.getRemoteCluster(uri.getClusterName());
+            if(remoteCluster == null) {
                 reference.decreaseReference();
                 if(reference.getReferenceCount() <= 0) {
                     this.waitObjects.remove(hash);
                 }
-                
-                //notify
-                raiseEventForTransferCompletion(uri, hash);
-                
-                LOG.debug(String.format("Cached a chunk for - %s, %s at %s", uri.toUri().toASCIIString(), hash, localNode.getName()));
+                throw new IOException(String.format("remote cluster %s does not exist", uri.getClusterName()));
             }
+
+            Recipe recipe = getRecipe(uri);
+            Node remoteNode = this.transferLayoutAlgorithm.determineRemoteNode(remoteCluster, recipe, hash);
+            if(remoteNode == null) {
+                reference.decreaseReference();
+                if(reference.getReferenceCount() <= 0) {
+                    this.waitObjects.remove(hash);
+                }
+                throw new IOException(String.format("cannot determine a remote node for a remote cluster %s", uri.getClusterName()));
+            }
+
+            // go remote
+            AbstractTransportDriver driver = getDriver();
+            AbstractTransportClient client = driver.getClient(remoteNode);
+
+            // increase workload
+            //Cluster localCluster = clusterManager.getLocalCluster();
+
+            //this.transferLayoutAlgorithm.increaseNodeWorkload(localCluster, localNode);
+            this.transferLayoutAlgorithm.increaseNodeWorkload(remoteCluster, remoteNode);
+
+            StatisticsManager statisticsManager = stargateService.getStatisticsManager();
+            statisticsManager.addDataChunkTransferReceiveStartStatistics(uri.toUri().toASCIIString(), hash);
+
+            InputStream dataChunkInputStream = client.getDataChunk(hash);
+            if (dataChunkInputStream == null) {
+                reference.decreaseReference();
+                if(reference.getReferenceCount() <= 0) {
+                    this.waitObjects.remove(hash);
+                }
+                throw new IOException("dataChunkInputStream is null");
+            }
+
+            // fully download the chunk and cache and return
+            byte[] cacheDataBytes = IOUtils.toByteArray(dataChunkInputStream);
+            dataChunkInputStream.close();
+
+            statisticsManager.addDataChunkTransferReceiveEndStatistics(uri.toUri().toASCIIString(), hash);
+
+            // decrease workload
+            //this.transferLayoutAlgorithm.decreaseNodeWorkload(localCluster, localNode);
+            this.transferLayoutAlgorithm.decreaseNodeWorkload(remoteCluster, remoteNode);
+
+            // put to the cache
+            DataChunkCache dataChunkCache = new DataChunkCache(DataChunkCacheType.DATA_CHUNK_CACHE_PRESENT, hash, Integer.MAX_VALUE, cacheDataBytes);
+            this.dataChunkCacheStore.put(hash, dataChunkCache.toBytes());
+            this.lastUpdateTime = DateTimeUtils.getTimestamp();
+
+            reference.finishTransfer();
+            reference.decreaseReference();
+            if(reference.getReferenceCount() <= 0) {
+                this.waitObjects.remove(hash);
+            }
+
+            //notify
+            raiseEventForTransferCompletion(uri, hash);
+
+            LOG.debug(String.format("Cached a chunk for - %s, %s at %s", uri.toUri().toASCIIString(), hash, localNode.getName()));
         } catch (ManagerNotInstantiatedException ex) {
             LOG.error("Manager is not instantiated", ex);
             throw new IOException(ex);
@@ -642,73 +597,74 @@ public class TransportManager extends AbstractManager<AbstractTransportDriver> {
             this.waitObjects.putIfAbsent(hash, new TransferReference());
             TransferReference reference = this.waitObjects.get(hash);
             reference.increaseReference();
-            synchronized(reference) {
-                Recipe localRecipe = recipeManager.getRecipeByHash(hash);
-                if(localRecipe != null) {
-                    DataExportManager dataExportManager = stargateService.getDataExportManager();
-                    DataObjectMetadata metadata = localRecipe.getMetadata();
-                    
-                    DataExportEntry dataExportEntry = dataExportManager.getDataExportEntry(metadata.getURI().getPath());
-                    if(dataExportEntry != null) {
-                        DataSourceManager dataSourceManager = stargateService.getDataSourceManager();
+            
+            Recipe localRecipe = recipeManager.getRecipeByHash(hash);
+            if(localRecipe != null) {
+                DataExportManager dataExportManager = stargateService.getDataExportManager();
+                DataObjectMetadata metadata = localRecipe.getMetadata();
 
-                        URI sourceURI = dataExportEntry.getSourceURI();
-                        AbstractDataSourceDriver driver = dataSourceManager.getDriver(sourceURI);
+                DataExportEntry dataExportEntry = dataExportManager.getDataExportEntry(metadata.getURI().getPath());
+                if(dataExportEntry != null) {
+                    DataSourceManager dataSourceManager = stargateService.getDataSourceManager();
 
-                        RecipeChunk chunk = localRecipe.getChunk(hash);
-                        Collection<Integer> nodeIDs = chunk.getNodeIDs();
-                        Collection<String> nodeNames = localRecipe.getNodeNames(nodeIDs);
-                        
-                        // just do it because it works for HDFS
-                        //if(nodeNames.contains(localNode.getName())) {
-                            InputStream inputStream = driver.openFile(sourceURI, chunk.getOffset(), chunk.getLength());
-                            byte[] cacheDataBytes = IOUtils.toByteArray(inputStream);
-                            inputStream.close();
+                    URI sourceURI = dataExportEntry.getSourceURI();
+                    AbstractDataSourceDriver driver = dataSourceManager.getDriver(sourceURI);
 
-                            // put to the cache
-                            DataChunkCache dataChunkCache = new DataChunkCache(DataChunkCacheType.DATA_CHUNK_CACHE_PRESENT, hash, Integer.MAX_VALUE, cacheDataBytes);
-                            this.dataChunkCacheStore.put(hash, dataChunkCache.toBytes());
-                            this.lastUpdateTime = DateTimeUtils.getTimestamp();
+                    RecipeChunk chunk = localRecipe.getChunk(hash);
+                    Collection<Integer> nodeIDs = chunk.getNodeIDs();
+                    Collection<String> nodeNames = localRecipe.getNodeNames(nodeIDs);
 
-                            reference.finishTransfer();
-                            reference.decreaseReference();
-                            if(reference.getReferenceCount() <= 0) {
-                                this.waitObjects.remove(hash);
-                            }
-                            
-                            //notify
-                            raiseEventForTransferCompletion(uri, hash);
-                            
-                            ByteArrayInputStream bais = new ByteArrayInputStream(cacheDataBytes);
-                            
-                            LOG.debug(String.format("Found a local chunk for - %s, %s", uri.toUri().toASCIIString(), hash));
-                            
-                            return bais;
-                        //} else {
-                        //}
-                    }
+                    // just do it because it works for HDFS
+                    //if(nodeNames.contains(localNode.getName())) {
+                        InputStream inputStream = driver.openFile(sourceURI, chunk.getOffset(), chunk.getLength());
+                        byte[] cacheDataBytes = IOUtils.toByteArray(inputStream);
+                        inputStream.close();
+
+                        // put to the cache
+                        DataChunkCache dataChunkCache = new DataChunkCache(DataChunkCacheType.DATA_CHUNK_CACHE_PRESENT, hash, Integer.MAX_VALUE, cacheDataBytes);
+                        this.dataChunkCacheStore.put(hash, dataChunkCache.toBytes());
+                        this.lastUpdateTime = DateTimeUtils.getTimestamp();
+
+                        reference.finishTransfer();
+                        reference.decreaseReference();
+                        if(reference.getReferenceCount() <= 0) {
+                            this.waitObjects.remove(hash);
+                        }
+
+                        //notify
+                        raiseEventForTransferCompletion(uri, hash);
+
+                        ByteArrayInputStream bais = new ByteArrayInputStream(cacheDataBytes);
+
+                        LOG.debug(String.format("Found a local chunk for - %s, %s", uri.toUri().toASCIIString(), hash));
+
+                        return bais;
+                    //} else {
+                    //}
                 }
+            }
 
-                // double-check cache
-                if(!putPendingChunkCache) {
-                    byte[] existingData = (byte[]) this.dataChunkCacheStore.get(hash);
-                    if(existingData != null) {
-                        DataChunkCache existingCache = DataChunkCache.fromBytes(existingData);
-                        if(existingCache.getType() == DataChunkCacheType.DATA_CHUNK_CACHE_PRESENT) {
-                            // existing
-                            byte[] data = existingCache.getData();
-                            ByteArrayInputStream bais = new ByteArrayInputStream(data);
+            // double-check cache
+            if(!putPendingChunkCache) {
+                byte[] existingData = (byte[]) this.dataChunkCacheStore.get(hash);
+                if(existingData != null) {
+                    DataChunkCache existingCache = DataChunkCache.fromBytes(existingData);
+                    if(existingCache.getType().equals(DataChunkCacheType.DATA_CHUNK_CACHE_PRESENT)) {
+                        // existing
+                        byte[] data = existingCache.getData();
+                        ByteArrayInputStream bais = new ByteArrayInputStream(data);
 
-                            reference.finishTransfer();
-                            reference.decreaseReference();
-                            if(reference.getReferenceCount() <= 0) {
-                                this.waitObjects.remove(hash);
-                            }
+                        reference.finishTransfer();
+                        reference.decreaseReference();
+                        if(reference.getReferenceCount() <= 0) {
+                            this.waitObjects.remove(hash);
+                        }
 
-                            LOG.debug(String.format("Found a chunk cache for - %s, %s", uri.toUri().toASCIIString(), hash));
-                            return bais;
-                        } else {
-                            // wait until the data transfer is complete
+                        LOG.debug(String.format("Found a chunk cache for - %s, %s", uri.toUri().toASCIIString(), hash));
+                        return bais;
+                    } else {
+                        // wait until the data transfer is complete
+                        if(!existingCache.getWaitingNodes().contains(localNode.getName())) {
                             while(true) {
                                 byte[] bytes = (byte[]) this.dataChunkCacheStore.get(hash);
                                 DataChunkCache dataChunkCache = DataChunkCache.fromBytes(bytes);
@@ -725,24 +681,20 @@ public class TransportManager extends AbstractManager<AbstractTransportDriver> {
                                     LOG.warn("Could not replaced chunk cache entry - try it again");
                                 }
                             }
+                        }
+                        
+                        // increase priority by adding a new one
+                        raiseEventForOnDemandTransfer(uri, hash, existingCache.getTransferNode());
 
-                            try {
-                                LOG.debug(String.format("Waiting to finish data transfer for %s", hash));
-                                reference.await(5, TimeUnit.MINUTES);
-                            } catch (InterruptedException ex) {
-                                LOG.error("InterruptedException", ex);
-                                reference.decreaseReference();
-                                if(reference.getReferenceCount() <= 0) {
-                                    this.waitObjects.remove(hash);
-                                }
-                                throw new IOException(ex);
-                            }
+                        try {
+                            LOG.debug(String.format("Waiting to finish data transfer for %s", hash));
+                            reference.await(this.dataTransferTimeout, TimeUnit.SECONDS);
 
                             // re-check
                             existingData = (byte[]) this.dataChunkCacheStore.get(hash);
                             existingCache = DataChunkCache.fromBytes(existingData);
 
-                            if(existingCache.getType() == DataChunkCacheType.DATA_CHUNK_CACHE_PRESENT) {
+                            if(existingCache.getType().equals(DataChunkCacheType.DATA_CHUNK_CACHE_PRESENT)) {
                                 byte[] data = existingCache.getData();
                                 ByteArrayInputStream bais = new ByteArrayInputStream(data);
 
@@ -755,66 +707,73 @@ public class TransportManager extends AbstractManager<AbstractTransportDriver> {
                                 LOG.debug(String.format("Found a chunk cache for - %s, %s", uri.toUri().toASCIIString(), hash));
                                 return bais;
                             } else {
-                                // something caused the waiting thread to wake up
+                                // Timeout
                                 reference.decreaseReference();
                                 if(reference.getReferenceCount() <= 0) {
                                     this.waitObjects.remove(hash);
                                 }
-                                throw new IOException(String.format("Something caused the thread waiting for the data %s to wake up", hash));
+                                throw new IOException(String.format("Timeout for waiting to finish data transfer for %s", hash));
                             }
+                        } catch (InterruptedException ex) {
+                            LOG.error("InterruptedException", ex);
+                            reference.decreaseReference();
+                            if(reference.getReferenceCount() <= 0) {
+                                this.waitObjects.remove(hash);
+                            }
+                            throw new IOException(ex);
                         }
                     }
                 }
-                
-                Recipe recipe = getRecipe(uri);
-                Node remoteNode = this.transferLayoutAlgorithm.determineRemoteNode(remoteCluster, recipe, hash);
-                if(remoteNode == null) {
-                    throw new IOException(String.format("cannot determine a remote node for a remote cluster %s", uri.getClusterName()));
-                }
-                
-                // go remote
-                AbstractTransportDriver driver = getDriver();
-                AbstractTransportClient client = driver.getClient(remoteNode);
-
-                // increase workload
-                //Cluster localCluster = clusterManager.getLocalCluster();
-                
-                //this.transferLayoutAlgorithm.increaseNodeWorkload(localCluster, localNode);
-                this.transferLayoutAlgorithm.increaseNodeWorkload(remoteCluster, remoteNode);
-
-                StatisticsManager statisticsManager = stargateService.getStatisticsManager();
-                statisticsManager.addDataChunkTransferReceiveStartStatistics(uri.toUri().toASCIIString(), hash);
-                
-                InputStream dataChunkInputStream = client.getDataChunk(hash);
-                
-                // fully download the chunk and cache and return
-                byte[] cacheDataBytes = IOUtils.toByteArray(dataChunkInputStream);
-                dataChunkInputStream.close();
-                
-                statisticsManager.addDataChunkTransferReceiveEndStatistics(uri.toUri().toASCIIString(), hash);
-                
-                // decrease workload
-                //this.transferLayoutAlgorithm.decreaseNodeWorkload(localCluster, localNode);
-                this.transferLayoutAlgorithm.decreaseNodeWorkload(remoteCluster, remoteNode);
-                
-                // put to the cache
-                DataChunkCache dataChunkCache = new DataChunkCache(DataChunkCacheType.DATA_CHUNK_CACHE_PRESENT, hash, Integer.MAX_VALUE, cacheDataBytes);
-                this.dataChunkCacheStore.put(hash, dataChunkCache.toBytes());
-                this.lastUpdateTime = DateTimeUtils.getTimestamp();
-                
-                reference.finishTransfer();
-                reference.decreaseReference();
-                if(reference.getReferenceCount() <= 0) {
-                    this.waitObjects.remove(hash);
-                }
-                
-                //notify
-                raiseEventForTransferCompletion(uri, hash);
-                
-                LOG.debug(String.format("Get a chunk for - %s, %s", uri.toUri().toASCIIString(), hash));
-                
-                return new ByteArrayInputStream(cacheDataBytes);
             }
+
+            Recipe recipe = getRecipe(uri);
+            Node remoteNode = this.transferLayoutAlgorithm.determineRemoteNode(remoteCluster, recipe, hash);
+            if(remoteNode == null) {
+                throw new IOException(String.format("cannot determine a remote node for a remote cluster %s", uri.getClusterName()));
+            }
+
+            // go remote
+            AbstractTransportDriver driver = getDriver();
+            AbstractTransportClient client = driver.getClient(remoteNode);
+
+            // increase workload
+            //Cluster localCluster = clusterManager.getLocalCluster();
+
+            //this.transferLayoutAlgorithm.increaseNodeWorkload(localCluster, localNode);
+            this.transferLayoutAlgorithm.increaseNodeWorkload(remoteCluster, remoteNode);
+
+            StatisticsManager statisticsManager = stargateService.getStatisticsManager();
+            statisticsManager.addDataChunkTransferReceiveStartStatistics(uri.toUri().toASCIIString(), hash);
+
+            InputStream dataChunkInputStream = client.getDataChunk(hash);
+
+            // fully download the chunk and cache and return
+            byte[] cacheDataBytes = IOUtils.toByteArray(dataChunkInputStream);
+            dataChunkInputStream.close();
+
+            statisticsManager.addDataChunkTransferReceiveEndStatistics(uri.toUri().toASCIIString(), hash);
+
+            // decrease workload
+            //this.transferLayoutAlgorithm.decreaseNodeWorkload(localCluster, localNode);
+            this.transferLayoutAlgorithm.decreaseNodeWorkload(remoteCluster, remoteNode);
+
+            // put to the cache
+            DataChunkCache dataChunkCache = new DataChunkCache(DataChunkCacheType.DATA_CHUNK_CACHE_PRESENT, hash, Integer.MAX_VALUE, cacheDataBytes);
+            this.dataChunkCacheStore.put(hash, dataChunkCache.toBytes());
+            this.lastUpdateTime = DateTimeUtils.getTimestamp();
+
+            reference.finishTransfer();
+            reference.decreaseReference();
+            if(reference.getReferenceCount() <= 0) {
+                this.waitObjects.remove(hash);
+            }
+
+            //notify
+            raiseEventForTransferCompletion(uri, hash);
+
+            LOG.debug(String.format("Get a chunk for - %s, %s", uri.toUri().toASCIIString(), hash));
+
+            return new ByteArrayInputStream(cacheDataBytes);
         } catch (ManagerNotInstantiatedException ex) {
             LOG.error("Manager is not instantiated", ex);
             throw new IOException(ex);
@@ -982,12 +941,12 @@ public class TransportManager extends AbstractManager<AbstractTransportDriver> {
             byte[] existingData = (byte[]) this.dataChunkCacheStore.get(hash);
             if(existingData != null) {
                 DataChunkCache existingCache = DataChunkCache.fromBytes(existingData);
-                if(existingCache.getType() == DataChunkCacheType.DATA_CHUNK_CACHE_PENDING) {
+                if(existingCache.getType().equals(DataChunkCacheType.DATA_CHUNK_CACHE_PENDING)) {
                     Collection<String> primaryAndBackupNodesForData = this.dataChunkCacheStore.getPrimaryAndBackupNodesForData(hash);
                     TransferAssignment assignment = new TransferAssignment(metadata.getURI(), hash, existingCache.getTransferNode(), primaryAndBackupNodesForData);
                     LOG.debug(String.format("Found a pending prefetch schedule for - %s, %s at %s", metadata.getURI().toUri().toASCIIString(), hash, existingCache.getTransferNode()));
                     return assignment;
-                } else if(existingCache.getType() == DataChunkCacheType.DATA_CHUNK_CACHE_PRESENT) {
+                } else if(existingCache.getType().equals(DataChunkCacheType.DATA_CHUNK_CACHE_PRESENT)) {
                     Collection<String> primaryAndBackupNodesForData = this.dataChunkCacheStore.getPrimaryAndBackupNodesForData(hash);
                     String primaryNodeForData = primaryAndBackupNodesForData.iterator().next();
                     TransferAssignment assignment = new TransferAssignment(metadata.getURI(), hash, primaryNodeForData, primaryAndBackupNodesForData);
@@ -1000,6 +959,9 @@ public class TransportManager extends AbstractManager<AbstractTransportDriver> {
             
             // determine where to copy 
             Node determinedLocalNode = this.transferLayoutAlgorithm.determineLocalNode(localCluster, recipe, hash);
+            if(determinedLocalNode == null) {
+                throw new IOException(String.format("Could not determine local node for hash %s", hash));
+            }
 
             // put to the pending chunk cache
             DataChunkCache newDataChunkCache = new DataChunkCache(DataChunkCacheType.DATA_CHUNK_CACHE_PENDING, hash, 1, determinedLocalNode.getName(), null);
@@ -1156,12 +1118,12 @@ public class TransportManager extends AbstractManager<AbstractTransportDriver> {
             byte[] existingData = (byte[]) this.dataChunkCacheStore.get(hash);
             if(existingData != null) {
                 DataChunkCache existingCache = DataChunkCache.fromBytes(existingData);
-                if(existingCache.getType() == DataChunkCacheType.DATA_CHUNK_CACHE_PENDING) {
+                if(existingCache.getType().equals(DataChunkCacheType.DATA_CHUNK_CACHE_PENDING)) {
                     Collection<String> primaryAndBackupNodesForData = this.dataChunkCacheStore.getPrimaryAndBackupNodesForData(hash);
                     TransferAssignment assignment = new TransferAssignment(metadata.getURI(), hash, existingCache.getTransferNode(), primaryAndBackupNodesForData);
                     LOG.debug(String.format("Found a pending prefetch schedule for - %s, %s at %s", metadata.getURI().toUri().toASCIIString(), hash, existingCache.getTransferNode()));
                     return new PendingPrefetchSchedule(assignment);
-                } else if(existingCache.getType() == DataChunkCacheType.DATA_CHUNK_CACHE_PRESENT) {
+                } else if(existingCache.getType().equals(DataChunkCacheType.DATA_CHUNK_CACHE_PRESENT)) {
                     Collection<String> primaryAndBackupNodesForData = this.dataChunkCacheStore.getPrimaryAndBackupNodesForData(hash);
                     String primaryNodeForData = primaryAndBackupNodesForData.iterator().next();
                     TransferAssignment assignment = new TransferAssignment(metadata.getURI(), hash, primaryNodeForData, primaryAndBackupNodesForData);
@@ -1174,6 +1136,9 @@ public class TransportManager extends AbstractManager<AbstractTransportDriver> {
             
             // determine where to copy 
             Node determinedLocalNode = this.transferLayoutAlgorithm.determineLocalNode(localCluster, recipe, hash);
+            if(determinedLocalNode == null) {
+                throw new IOException(String.format("Could not determine local node for hash %s", hash));
+            }
 
             // make the pending chunk cache
             DataChunkCache newDataChunkCache = new DataChunkCache(DataChunkCacheType.DATA_CHUNK_CACHE_PENDING, hash, 1, determinedLocalNode.getName(), null);
@@ -1414,6 +1379,22 @@ public class TransportManager extends AbstractManager<AbstractTransportDriver> {
         }
     }
     
+    private void raiseEventForOnDemandTransfer(DataObjectURI uri, String hash, String nodeName) throws IOException, DriverNotInitializedException {
+        TransferEvent transferEvent = new TransferEvent(TransferEventType.TRANSFER_EVENT_TYPE_ONDEMAND, uri, hash);
+        
+        try {
+            StargateService stargateService = getStargateService();
+            EventManager eventManager = stargateService.getEventManager();
+            ClusterManager clusterManager = stargateService.getClusterManager();
+            Node localNode = clusterManager.getLocalNode();
+            
+            StargateEvent event = new StargateEvent(StargateEventType.STARGATE_EVENT_TYPE_TRANSPORT, nodeName, localNode.getName(), transferEvent.toJson());
+            eventManager.raiseEvent(event);
+        } catch (ManagerNotInstantiatedException ex) {
+            LOG.error("Manager is not instantiated", ex);
+        }
+    }
+    
     private void raiseEventForPrefetchTransfer(DataObjectURI uri, String hash, String nodeName) throws IOException, DriverNotInitializedException {
         TransferEvent transferEvent = new TransferEvent(TransferEventType.TRANSFER_EVENT_TYPE_PREFETCH, uri, hash);
         
@@ -1469,19 +1450,17 @@ public class TransportManager extends AbstractManager<AbstractTransportDriver> {
         }
     }
     
-    private void processPrefetchEvent(DataObjectURI uri, String hash) {
-        PrefetchTask task = new PrefetchTask(this, uri, hash);
-        this.prefetchThreadPool.execute(task);
-    }
-    
     private void processTransferEvent(TransferEvent event) throws IOException, DriverNotInitializedException {
         switch(event.getEventType()) {
             case TRANSFER_EVENT_TYPE_ONDEMAND:
                 LOG.debug(String.format("On-demand transfser is requested : %s - %s", event.getURI().toUri().toASCIIString(), event.getHash()));
+                OnDemandTransferTask onDemandTask = new OnDemandTransferTask(event.getHash(), this, event.getURI(), event.getHash());
+                this.transferThreadScheduler.schedule(onDemandTask);
                 break;
             case TRANSFER_EVENT_TYPE_PREFETCH:
                 LOG.debug(String.format("A prefetching is requested : %s - %s", event.getURI().toUri().toASCIIString(), event.getHash()));
-                processPrefetchEvent(event.getURI(), event.getHash());
+                PrefetchTask prefetchTask = new PrefetchTask(event.getHash(), this, event.getURI(), event.getHash());
+                this.transferThreadScheduler.schedule(prefetchTask);
                 break;
             case TRANSFER_EVENT_TYPE_COMPLETE:
                 LOG.debug(String.format("Transfser is finished : %s - %s", event.getURI().toUri().toASCIIString(), event.getHash()));

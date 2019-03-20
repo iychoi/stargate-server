@@ -25,11 +25,11 @@ import stargate.commons.driver.DriverNotInitializedException;
  *
  * @author iychoi
  */
-public class PrefetchTask extends AbstractTransferTask {
+public class OnDemandTransferTask extends AbstractTransferTask {
     
-    private static final Log LOG = LogFactory.getLog(PrefetchTask.class);
+    private static final Log LOG = LogFactory.getLog(OnDemandTransferTask.class);
 
-    public PrefetchTask(String name, TransportManager manager, DataObjectURI uri, String hash) {
+    public OnDemandTransferTask(String name, TransportManager manager, DataObjectURI uri, String hash) {
         if(name == null || name.isEmpty()) {
             throw new IllegalArgumentException("name is null");
         }
@@ -50,13 +50,13 @@ public class PrefetchTask extends AbstractTransferTask {
         this.manager = manager;
         this.uri = uri;
         this.hash = hash;
-        this.priority = TransferTaskPriority.PREFETCH_TASK_PRIORITY_LOW;
+        this.priority = TransferTaskPriority.PREFETCH_TASK_PRIORITY_HIGH;
     }
     
     @Override
     public void run() {
         try {
-            LOG.debug(String.format("Prefetch task (name: %s, priority: %s) %s - %s", this.name, this.priority.name(), this.uri.toUri().toASCIIString(), this.hash));
+            LOG.debug(String.format("On-demand data transfer task (name: %s, priority: %s) %s - %s", this.name, this.priority.name(), this.uri.toUri().toASCIIString(), this.hash));
             manager.cacheRemoteDataChunk(this.uri, this.hash);
         } catch (IOException ex) {
             LOG.error("IOException", ex);

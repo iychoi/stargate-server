@@ -48,7 +48,7 @@ public class TransferReference {
         }
     }
     
-    public int getReferenceCount() {
+    public synchronized int getReferenceCount() {
         return this.referenceCount;
     }
 
