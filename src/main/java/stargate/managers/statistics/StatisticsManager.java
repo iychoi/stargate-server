@@ -41,10 +41,14 @@ public class StatisticsManager extends AbstractManager<NullDriver> {
     
     private static final Log LOG = LogFactory.getLog(StatisticsManager.class);
     
+    private static final int DEFAULT_STATISTICS_ENTRY_CAPACITY = 1000;
+    
     private static StatisticsManager instance;
     
     private Map<StatisticsType, Statistics> statistics = new ConcurrentHashMap<StatisticsType, Statistics>();
+    private int statisticsEntryCapacity = DEFAULT_STATISTICS_ENTRY_CAPACITY;
     protected long lastUpdateTime;
+    
     
     public static StatisticsManager getInstance(StargateService service) throws ManagerNotInstantiatedException {
         synchronized (StatisticsManager.class) {
@@ -129,7 +133,7 @@ public class StatisticsManager extends AbstractManager<NullDriver> {
         
         Statistics stat = this.statistics.get(type);
         if(stat == null) {
-            stat = new Statistics(type);
+            stat = new Statistics(type, this.statisticsEntryCapacity);
             this.statistics.put(type, stat);
         }
         
@@ -154,7 +158,7 @@ public class StatisticsManager extends AbstractManager<NullDriver> {
         
         Statistics stat = this.statistics.get(type);
         if(stat == null) {
-            stat = new Statistics(type);
+            stat = new Statistics(type, this.statisticsEntryCapacity);
             this.statistics.put(type, stat);
         }
         
