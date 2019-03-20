@@ -10,7 +10,15 @@ work() {
     echo "Done ${node}"
 }
 
+PIDS=()
 while read node; do
     echo "connecting to ${node}"
     work ${node} &
+    PIDS+=($!)
 done <cs_demo_cluster.txt
+
+for pid in ${PIDS[*]}; do
+    wait $pid
+done
+
+echo "All jobs completed"
