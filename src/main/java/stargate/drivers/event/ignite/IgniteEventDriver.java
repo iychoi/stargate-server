@@ -47,8 +47,8 @@ public class IgniteEventDriver extends AbstractEventDriver {
 
     private static final Log LOG = LogFactory.getLog(IgniteEventDriver.class);
     
-    private static final int DEFAULT_EVENT_HANDLER_THREAD_NUM = 5;
-    private static final int DEFAULT_EVENT_SENDER_THREAD_NUM = 5;
+    private static final int DEFAULT_EVENT_HANDLER_THREAD_NUM = 3;
+    private static final int DEFAULT_EVENT_SENDER_THREAD_NUM = 3;
     
     private int eventHandlerThreadNum = DEFAULT_EVENT_HANDLER_THREAD_NUM;
     private int eventSenderThreadNum = DEFAULT_EVENT_SENDER_THREAD_NUM;
@@ -264,13 +264,17 @@ public class IgniteEventDriver extends AbstractEventDriver {
         Collection<String> receiverNodeNames = event.getReceiverNodeNames();
         String localNodeName = this.igniteDriver.getLocalNodeName();
         if(receiverNodeNames.contains(localNodeName)) {
+            Set<AbstractEventHandler> handlers = null;
+            
             synchronized(this.eventHandlersSyncObj) {
                 StargateEventType eventType = event.getEventType();
-                Set<AbstractEventHandler> handlers = this.eventHandlers.get(eventType);
-                if(handlers != null) {
-                    for(AbstractEventHandler handler : handlers) {
-                        handler.raised(event);
-                    }
+                handlers = this.eventHandlers.get(eventType);
+            }
+            
+            // for parallel
+            if(handlers != null) {
+                for(AbstractEventHandler handler : handlers) {
+                    handler.raised(event);
                 }
             }
         }
@@ -281,8 +285,25 @@ public class IgniteEventDriver extends AbstractEventDriver {
             throw new IllegalArgumentException("event is null");
         }
         
+        String localNodeName = this.igniteDriver.getLocalNodeName();
+        
         for(StargateEvent sevent : event.getEvents()) {
-            processEvent(sevent);
+            Collection<String> receiverNodeNames = sevent.getReceiverNodeNames();
+            if(receiverNodeNames.contains(localNodeName)) {
+                Set<AbstractEventHandler> handlers = null;
+                
+                synchronized(this.eventHandlersSyncObj) {
+                    StargateEventType eventType = sevent.getEventType();
+                    handlers = this.eventHandlers.get(eventType);
+                }
+
+                // for parallel
+                if(handlers != null) {
+                    for(AbstractEventHandler handler : handlers) {
+                        handler.raised(sevent);
+                    }
+                }
+            }
         }
     }
     
@@ -301,9 +322,7 @@ public class IgniteEventDriver extends AbstractEventDriver {
             public void run() {
                 try {
                     LOG.debug(String.format("Raise an event : %s", event.getEventType().toString()));
-                    synchronized(msg) {
-                        msg.send(STARGATE_TOPIC, event.toJson());
-                    }
+                    msg.send(STARGATE_TOPIC, event.toJson());
                 } catch (IOException ex) {
                     LOG.error("IOException", ex);
                 }
@@ -328,10 +347,8 @@ public class IgniteEventDriver extends AbstractEventDriver {
             public void run() {
                 try {
                     LOG.debug("Raise a bulk event");
-                    synchronized(msg) {
-                        BulkStargateEvent event = new BulkStargateEvent(events);
-                        msg.send(STARGATE_BULK_TOPIC, event.toJson());
-                    }
+                    BulkStargateEvent event = new BulkStargateEvent(events);
+                    msg.send(STARGATE_BULK_TOPIC, event.toJson());
                 } catch (IOException ex) {
                     LOG.error("IOException", ex);
                 }

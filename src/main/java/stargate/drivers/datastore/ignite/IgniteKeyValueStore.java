@@ -22,6 +22,7 @@ import java.util.Iterator;
 import java.util.List;
 import java.util.ArrayList;
 import java.util.Map;
+import java.util.concurrent.Future;
 import java.util.concurrent.TimeUnit;
 import javax.cache.Cache;
 import javax.cache.expiry.CreatedExpiryPolicy;
@@ -191,6 +192,20 @@ public class IgniteKeyValueStore extends AbstractKeyValueStore {
         byte[] valueBytes = ObjectSerializer.toByteArray(value);
         this.store.put(key, new ByteArray(valueBytes));
     }
+    
+    @Override
+    public Future<Void> putAsync(String key, Object value) throws IOException {
+        if(key == null || key.isEmpty()) {
+            throw new IllegalArgumentException("key is null or empty");
+        }
+        
+        if(value == null) {
+            throw new IllegalArgumentException("value is null");
+        }
+        
+        byte[] valueBytes = ObjectSerializer.toByteArray(value);
+        return new IgniteFutureWrapper<Void>(this.store.putAsync(key, new ByteArray(valueBytes)));
+    }
 
     @Override
     public boolean putIfAbsent(String key, Object value) throws IOException {
@@ -281,10 +296,24 @@ public class IgniteKeyValueStore extends AbstractKeyValueStore {
         
         this.store.remove(key);
     }
+    
+    @Override
+    public Future<Boolean> removeAsync(String key) throws IOException {
+        if(key == null || key.isEmpty()) {
+            throw new IllegalArgumentException("key is null or empty");
+        }
+        
+        return new IgniteFutureWrapper<Boolean>(this.store.removeAsync(key));
+    }
 
     @Override
     public void clear() {
         this.store.clear();
+    }
+    
+    @Override
+    public Future<Void> clearAsync() throws IOException {
+        return new IgniteFutureWrapper<Void>(this.store.clearAsync());
     }
 
     @Override

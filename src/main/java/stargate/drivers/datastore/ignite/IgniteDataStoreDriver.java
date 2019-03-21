@@ -18,12 +18,15 @@ package stargate.drivers.datastore.ignite;
 import java.io.IOException;
 import java.util.HashMap;
 import java.util.Map;
+import java.util.concurrent.TimeUnit;
+import org.apache.commons.collections4.map.PassiveExpiringMap;
 import org.apache.commons.logging.Log;
 import org.apache.commons.logging.LogFactory;
 import stargate.commons.driver.AbstractDriverConfig;
 import stargate.commons.datastore.AbstractKeyValueStore;
 import stargate.commons.datastore.AbstractDataStoreDriver;
 import stargate.commons.datastore.AbstractDataStoreDriverConfig;
+import stargate.commons.datastore.AbstractLock;
 import stargate.commons.datastore.AbstractQueue;
 import stargate.commons.datastore.DataStoreProperties;
 import stargate.commons.driver.DriverNotInitializedException;
@@ -41,6 +44,7 @@ public class IgniteDataStoreDriver extends AbstractDataStoreDriver {
     private IgniteDriver igniteDriver;
     private Map<String, IgniteKeyValueStore> kvStores = new HashMap<String, IgniteKeyValueStore>();
     private Map<String, IgniteQueue> queueStores = new HashMap<String, IgniteQueue>();
+    private Map<String, IgniteLock> lockStores = new PassiveExpiringMap<String, IgniteLock>(1, TimeUnit.HOURS);
     
     public IgniteDataStoreDriver(AbstractDriverConfig config) {
         if(config == null) {
@@ -141,5 +145,23 @@ public class IgniteDataStoreDriver extends AbstractDataStoreDriver {
         }
         
         return queue;
+    }
+
+    @Override
+    public AbstractLock getLock(String name) throws IOException, DriverNotInitializedException {
+        if(name == null || name.isEmpty()) {
+            throw new IllegalArgumentException("name is null or empty");
+        }
+        
+        IgniteLock lock = this.lockStores.get(name);
+        if(lock == null) {
+            lock = new IgniteLock(this, this.igniteDriver, name);
+            this.lockStores.put(name, lock);
+        } else {
+            // put again to renew expiration time
+            this.lockStores.put(name, lock);
+        }
+        
+        return lock;
     }
 }

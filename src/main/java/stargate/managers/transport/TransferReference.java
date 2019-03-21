@@ -52,7 +52,7 @@ public class TransferReference {
         return this.referenceCount;
     }
 
-    public void await(int timeout, TimeUnit timeUnit) throws InterruptedException {
-        this.latch.await(timeout, timeUnit);
+    public boolean await(int timeout, TimeUnit timeUnit) throws InterruptedException {
+        return this.latch.await(timeout, timeUnit);
     }
 }
