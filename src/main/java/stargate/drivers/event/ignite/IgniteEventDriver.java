@@ -48,7 +48,7 @@ public class IgniteEventDriver extends AbstractEventDriver {
     private static final Log LOG = LogFactory.getLog(IgniteEventDriver.class);
     
     private static final int DEFAULT_EVENT_HANDLER_THREAD_NUM = 3;
-    private static final int DEFAULT_EVENT_SENDER_THREAD_NUM = 3;
+    private static final int DEFAULT_EVENT_SENDER_THREAD_NUM = 1;
     
     private int eventHandlerThreadNum = DEFAULT_EVENT_HANDLER_THREAD_NUM;
     private int eventSenderThreadNum = DEFAULT_EVENT_SENDER_THREAD_NUM;

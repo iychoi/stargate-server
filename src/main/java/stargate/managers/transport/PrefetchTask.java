@@ -20,6 +20,7 @@ import org.apache.commons.logging.Log;
 import org.apache.commons.logging.LogFactory;
 import stargate.commons.dataobject.DataObjectURI;
 import stargate.commons.driver.DriverNotInitializedException;
+import stargate.commons.utils.DateTimeUtils;
 
 /**
  *
@@ -51,6 +52,7 @@ public class PrefetchTask extends AbstractTransferTask {
         this.uri = uri;
         this.hash = hash;
         this.priority = TransferTaskPriority.PREFETCH_TASK_PRIORITY_LOW;
+        this.creationTime = DateTimeUtils.getTimestamp();
     }
     
     @Override

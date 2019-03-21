@@ -28,6 +28,7 @@ public abstract class AbstractTransferTask implements Runnable {
     protected DataObjectURI uri;
     protected String hash;
     protected TransferTaskPriority priority;
+    protected long creationTime;
     
     public void setName(String name) {
         this.name = name;
@@ -55,5 +56,13 @@ public abstract class AbstractTransferTask implements Runnable {
     
     public TransferTaskPriority getPriority() {
         return this.priority;
+    }
+    
+    public long getCreationTime() {
+        return this.creationTime;
+    }
+    
+    public void setCreationTime(long creationTime) {
+        this.creationTime = creationTime;
     }
 }
