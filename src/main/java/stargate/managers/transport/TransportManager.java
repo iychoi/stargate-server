@@ -30,8 +30,8 @@ import java.util.Collection;
 import java.util.List;
 import java.util.Map;
 import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
-import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.TimeUnit;
 import org.apache.commons.logging.Log;
 import org.apache.commons.logging.LogFactory;
@@ -42,11 +42,9 @@ import stargate.commons.dataobject.DataObjectURI;
 import stargate.commons.dataobject.Directory;
 import stargate.commons.datasource.AbstractDataSourceDriver;
 import stargate.commons.datasource.DataExportEntry;
-import stargate.commons.datastore.AbstractDataStoreDriver;
 import stargate.commons.driver.AbstractDriver;
 import stargate.commons.driver.DriverFailedToLoadException;
 import stargate.commons.datastore.AbstractKeyValueStore;
-import stargate.commons.datastore.AbstractLock;
 import stargate.commons.datastore.DataStoreProperties;
 import stargate.commons.driver.DriverNotInitializedException;
 import stargate.commons.event.AbstractEventHandler;
@@ -83,7 +81,6 @@ public class TransportManager extends AbstractManager<AbstractTransportDriver> {
     
     private static final int DEFAULT_PREFETCH_THREAD_NUM = 3;
     private static final int DEFAULT_PENDING_PREFETCH_THREAD_NUM = 1;
-    private static final int DEFAULT_PREFETCH_DELAY_SEC = 60; // 60 sec
     private static final int DEFAULT_DATA_TRANSFER_TIMEOUT_SEC = 60*5; // 5min
     
     private static TransportManager instance;
@@ -102,10 +99,9 @@ public class TransportManager extends AbstractManager<AbstractTransportDriver> {
     
     private int prefetchThreadNum = DEFAULT_PREFETCH_THREAD_NUM;
     private int pendingPrefetchThreadNum = DEFAULT_PENDING_PREFETCH_THREAD_NUM;
-    private int prefetchDelaySec = DEFAULT_PREFETCH_DELAY_SEC;
     private int dataTransferTimeout = DEFAULT_DATA_TRANSFER_TIMEOUT_SEC;
     private PriorityTransferScheduler transferThreadScheduler;
-    private ScheduledExecutorService pendingPrefetchThreadPool;
+    private ExecutorService pendingPrefetchThreadPool;
     
     protected long lastUpdateTime;
     
@@ -193,7 +189,7 @@ public class TransportManager extends AbstractManager<AbstractTransportDriver> {
         
         this.transferThreadScheduler = new PriorityTransferScheduler(this.prefetchThreadNum, 100);
         this.transferThreadScheduler.start();
-        this.pendingPrefetchThreadPool = Executors.newScheduledThreadPool(this.pendingPrefetchThreadNum);
+        this.pendingPrefetchThreadPool = Executors.newFixedThreadPool(this.pendingPrefetchThreadNum);
         
         for(AbstractTransportDriver driver : drivers) {
             try {
@@ -817,6 +813,8 @@ public class TransportManager extends AbstractManager<AbstractTransportDriver> {
             //if(lock != null) {
             //    lock.unlock();
             //}
+            
+            raiseEventForPrefetchStart(uri);
         }
     }
     
@@ -996,7 +994,7 @@ public class TransportManager extends AbstractManager<AbstractTransportDriver> {
                 
                 // send to remote
                 LOG.debug(String.format("prefetchDataChunk: Sending a prefetching request for - %s, %s", metadata.getURI().toUri().toASCIIString(), hash));
-                raiseEventForPrefetchTransfer(metadata.getURI(), hash, determinedLocalNode.getName());
+                raiseEventForPrefetch(metadata.getURI(), hash, determinedLocalNode.getName());
             }
             
 
@@ -1200,6 +1198,10 @@ public class TransportManager extends AbstractManager<AbstractTransportDriver> {
             throw new IllegalArgumentException("pendingPrefetchSchedules is null");
         }
         
+        if(!this.started) {
+            throw new IllegalStateException("Manager is not started");
+        }
+        
         LOG.debug("processPendingPrefetchSchedules: Processing pending prefetching schedules");
         List<PrefetchTransferEvent> events = new ArrayList<PrefetchTransferEvent>();
         
@@ -1220,13 +1222,17 @@ public class TransportManager extends AbstractManager<AbstractTransportDriver> {
         if(!events.isEmpty()) {
             // send to remote
             LOG.debug("processPendingPrefetchSchedules: Sending a prefetching request");
-            raiseEventForPrefetchTransfer(events);
+            raiseEventForPrefetch(events);
         }
     }
     
     public void processPendingPrefetchSchedulesAsync(Collection<PendingPrefetchSchedule> pendingPrefetchSchedules) throws IOException, DriverNotInitializedException {
         if(pendingPrefetchSchedules == null) {
             throw new IllegalArgumentException("pendingPrefetchSchedules is null");
+        }
+        
+        if(!this.started) {
+            throw new IllegalStateException("Manager is not started");
         }
         
         Runnable r = new Runnable() {
@@ -1241,7 +1247,7 @@ public class TransportManager extends AbstractManager<AbstractTransportDriver> {
                 }
             }
         };
-        this.pendingPrefetchThreadPool.schedule(r, this.prefetchDelaySec, TimeUnit.SECONDS);
+        this.pendingPrefetchThreadPool.execute(r);
     }
     
     public Directory getDirectory(DataObjectURI uri) throws IOException, DriverNotInitializedException {
@@ -1440,7 +1446,24 @@ public class TransportManager extends AbstractManager<AbstractTransportDriver> {
         }
     }
     
-    private void raiseEventForPrefetchTransfer(DataObjectURI uri, String hash, String nodeName) throws IOException, DriverNotInitializedException {
+    private void raiseEventForPrefetchStart(DataObjectURI uri) throws IOException, DriverNotInitializedException {
+        TransferEvent transferEvent = new TransferEvent(TransferEventType.TRANSFER_EVENT_TYPE_PREFETCH_START, uri, null);
+        
+        try {
+            StargateService stargateService = getStargateService();
+            EventManager eventManager = stargateService.getEventManager();
+            ClusterManager clusterManager = stargateService.getClusterManager();
+            Cluster localCluster = clusterManager.getLocalCluster();
+            Node localNode = clusterManager.getLocalNode();
+            
+            StargateEvent event = new StargateEvent(StargateEventType.STARGATE_EVENT_TYPE_TRANSPORT, localCluster.getNodeNames(), localNode.getName(), transferEvent.toJson());
+            eventManager.raiseEvent(event);
+        } catch (ManagerNotInstantiatedException ex) {
+            LOG.error("Manager is not instantiated", ex);
+        }
+    }
+    
+    private void raiseEventForPrefetch(DataObjectURI uri, String hash, String nodeName) throws IOException, DriverNotInitializedException {
         TransferEvent transferEvent = new TransferEvent(TransferEventType.TRANSFER_EVENT_TYPE_PREFETCH, uri, hash);
         
         try {
@@ -1456,7 +1479,7 @@ public class TransportManager extends AbstractManager<AbstractTransportDriver> {
         }
     }
     
-    private void raiseEventForPrefetchTransfer(Collection<PrefetchTransferEvent> events) throws IOException, DriverNotInitializedException {
+    private void raiseEventForPrefetch(Collection<PrefetchTransferEvent> events) throws IOException, DriverNotInitializedException {
         List<StargateEvent> stargateEvents = new ArrayList<StargateEvent>();
         
         try {
@@ -1503,11 +1526,17 @@ public class TransportManager extends AbstractManager<AbstractTransportDriver> {
                 LOG.debug(String.format("processTransferEvent: On-demand transfer is requested : %s - %s", event.getURI().toUri().toASCIIString(), event.getHash()));
                 OnDemandTransferTask onDemandTask = new OnDemandTransferTask(event.getHash(), this, event.getURI(), event.getHash());
                 this.transferThreadScheduler.schedule(onDemandTask);
+                // start if there're prefetch schedules pending
+                this.transferThreadScheduler.startPrefetch(event.getURI());
                 break;
             case TRANSFER_EVENT_TYPE_PREFETCH:
                 LOG.debug(String.format("processTransferEvent: A prefetching is requested : %s - %s", event.getURI().toUri().toASCIIString(), event.getHash()));
                 PrefetchTask prefetchTask = new PrefetchTask(event.getHash(), this, event.getURI(), event.getHash());
                 this.transferThreadScheduler.schedule(prefetchTask);
+                break;
+            case TRANSFER_EVENT_TYPE_PREFETCH_START:
+                LOG.debug(String.format("processTransferEvent: Start prefetching : %s", event.getURI().toUri().toASCIIString()));
+                this.transferThreadScheduler.startPrefetch(event.getURI());
                 break;
             case TRANSFER_EVENT_TYPE_COMPLETE:
                 LOG.debug(String.format("processTransferEvent: Transfer is finished : %s - %s", event.getURI().toUri().toASCIIString(), event.getHash()));

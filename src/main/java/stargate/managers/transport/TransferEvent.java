@@ -59,9 +59,9 @@ public class TransferEvent {
             throw new IllegalArgumentException("uri is null");
         }
         
-        if(hash == null || hash.isEmpty()) {
-            throw new IllegalArgumentException("hash is null or empty");
-        }
+        //if(hash == null || hash.isEmpty()) {
+        //    throw new IllegalArgumentException("hash is null or empty");
+        //}
         
         this.eventType = eventType;
         this.uri = uri;
@@ -103,9 +103,9 @@ public class TransferEvent {
     
     @JsonProperty("hash")
     public void setHash(String hash) {
-        if(hash == null || hash.isEmpty()) {
-            throw new IllegalArgumentException("hash is null or empty");
-        }
+        //if(hash == null || hash.isEmpty()) {
+        //    throw new IllegalArgumentException("hash is null or empty");
+        //}
         
         this.hash = hash;
     }

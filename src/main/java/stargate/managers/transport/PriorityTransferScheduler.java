@@ -15,6 +15,9 @@
 */
 package stargate.managers.transport;
 
+import java.io.IOException;
+import java.util.ArrayList;
+import java.util.List;
 import java.util.Map;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ExecutorService;
@@ -25,6 +28,7 @@ import java.util.concurrent.ThreadPoolExecutor;
 import java.util.concurrent.TimeUnit;
 import org.apache.commons.logging.Log;
 import org.apache.commons.logging.LogFactory;
+import stargate.commons.dataobject.DataObjectURI;
 
 /**
  *
@@ -38,8 +42,9 @@ public class PriorityTransferScheduler {
     private Thread priorityTransferSchedulerThread;
     private boolean schedulerRun = true;
     private PriorityBlockingQueue<AbstractTransferTask> priorityQueue;
-    private Map<String, AbstractTransferTask> inTransfer = new ConcurrentHashMap<String, AbstractTransferTask>();
+    private Map<String, AbstractTransferTask> inTransferTasks = new ConcurrentHashMap<String, AbstractTransferTask>();
     private Semaphore lock;
+    private Map<String, List<PrefetchTask>> requestedPrefetchTasks = new ConcurrentHashMap<String, List<PrefetchTask>>();
     
     public PriorityTransferScheduler(int executorPoolSize, int initialQueueCapacity) {
         if(executorPoolSize <= 0) {
@@ -65,7 +70,7 @@ public class PriorityTransferScheduler {
                         LOG.debug("Fetching a transfer from a queue");
                         AbstractTransferTask task = priorityQueue.take();
                         
-                        if(inTransfer.containsKey(task.getHash())) {
+                        if(inTransferTasks.containsKey(task.getHash())) {
                             LOG.debug(String.format("Ignoring a transfer for %s - already in transfer", task.getHash()));
                         } else {
                             Runnable r = new Runnable() {
@@ -75,7 +80,7 @@ public class PriorityTransferScheduler {
                                         LOG.debug(String.format("Running a transfer task for %s (%s)", task.getHash(), task.getPriority().getStrVal()));
                                         task.run();
                                     } finally {
-                                        inTransfer.remove(task.getHash());
+                                        inTransferTasks.remove(task.getHash());
                                         lock.release();
                                     }
                                 }
@@ -84,7 +89,7 @@ public class PriorityTransferScheduler {
                             LOG.debug(String.format("Scheduling a transfer for %s (%s)", task.getHash(), task.getPriority().getStrVal()));
                             // register to inTransfer set
                             lock.acquire();
-                            inTransfer.put(task.getHash(), task);
+                            inTransferTasks.put(task.getHash(), task);
                             // go
                             priorityTransferPoolExecutor.execute(r);
                         }
@@ -109,11 +114,58 @@ public class PriorityTransferScheduler {
         
         this.priorityTransferPoolExecutor.shutdownNow();
         this.priorityQueue.clear();
-        this.inTransfer.clear();
+        this.inTransferTasks.clear();
     }
     
-    public void schedule(AbstractTransferTask task) {
-        LOG.debug("Putting a transfer in a queue");
+    public void schedule(AbstractTransferTask task) throws IOException {
+        if(task instanceof OnDemandTransferTask) {
+            schedule((OnDemandTransferTask) task);
+        } else if(task instanceof PrefetchTask) {
+            schedule((PrefetchTask) task);
+        } else {
+            throw new IOException("Unknown task");
+        }
+    }
+    
+    public void schedule(OnDemandTransferTask task) {
+        LOG.debug("Putting an on-demand transfer into a queue");
         this.priorityQueue.add(task);
+        
+        // remove prefetch tasks scheduled
+        String uriString = task.getURI().toUri().toASCIIString();
+        List<PrefetchTask> prefetchTasks = this.requestedPrefetchTasks.get(uriString);
+        if(prefetchTasks != null) {
+            List<PrefetchTask> toBeRemoved = new ArrayList<PrefetchTask>();
+        
+            for(PrefetchTask prefetchTask : prefetchTasks) {
+                if(prefetchTask.getHash().equals(task.getHash())) {
+                    toBeRemoved.add(prefetchTask);
+                }
+            }
+        
+            if(!toBeRemoved.isEmpty()) {
+                prefetchTasks.removeAll(toBeRemoved);
+            }
+        }
+    }
+    
+    public void schedule(PrefetchTask task) {
+        String uriString = task.getURI().toUri().toASCIIString();
+        List<PrefetchTask> prefetchTasks = this.requestedPrefetchTasks.get(uriString);
+        if(prefetchTasks == null) {
+            prefetchTasks = new ArrayList<PrefetchTask>();
+            this.requestedPrefetchTasks.put(uriString, prefetchTasks);
+        }
+        
+        prefetchTasks.add(task);
+    }
+    
+    public void startPrefetch(DataObjectURI uri) {
+        String uriString = uri.toUri().toASCIIString();
+        List<PrefetchTask> prefetchTasks = this.requestedPrefetchTasks.remove(uriString);
+        if(prefetchTasks != null) {
+            LOG.debug(String.format("Putting all prefetching transfer into a queue for %s", uriString));
+            this.priorityQueue.addAll(prefetchTasks);
+        }
     }
 }
