@@ -16,11 +16,15 @@
 package stargate.service;
 
 import java.io.File;
+import java.io.FileInputStream;
 import java.io.IOException;
+import java.io.InputStream;
+import java.net.URL;
 import org.apache.commons.logging.Log;
 import org.apache.commons.logging.LogFactory;
 import org.apache.log4j.LogManager;
 import org.apache.log4j.xml.DOMConfigurator;
+import stargate.commons.utils.IOUtils;
 import stargate.commons.utils.ResourceUtils;
 
 /**
@@ -39,12 +43,41 @@ public class ServiceMain {
             
             StargateServiceConfig serviceConfig = null;
             if(args.length != 0) {
-                File serviceConfigFile = new File(args[0]).getAbsoluteFile();
-                if (!serviceConfigFile.exists()) {
-                    throw new IOException(String.format("Config file %s does not exist", args[0]));
+                String configPath = args[0];
+                String configJson = null;
+                
+                // URL
+                if(configPath.length() >= 7) {
+                    if(configPath.substring(0, 7).equalsIgnoreCase("http://")) {
+                        InputStream httpFileInputStream = ResourceUtils.openHTTPFile(new URL(configPath));
+                        configJson = IOUtils.readString(httpFileInputStream);
+                    } else if(configPath.substring(0, 7).equalsIgnoreCase("file://")) {
+                        InputStream httpFileInputStream = ResourceUtils.openHTTPFile(new URL(configPath));
+                        configJson = IOUtils.readString(httpFileInputStream);
+                    }
+                } else if(configPath.length() >= 8) {
+                    if(configPath.substring(0, 8).equalsIgnoreCase("https://")) {
+                        InputStream httpFileInputStream = ResourceUtils.openHTTPFile(new URL(configPath));
+                        configJson = IOUtils.readString(httpFileInputStream);
+                    }
                 }
                 
-                serviceConfig = StargateServiceConfig.createInstance(serviceConfigFile);
+                // FILE
+                if(configJson == null) {
+                    File serviceConfigFile = new File(configPath).getAbsoluteFile();
+                    if (!serviceConfigFile.exists()) {
+                        throw new IOException(String.format("Config file %s does not exist", configPath));
+                    }
+                    
+                    FileInputStream fileInputStream = new FileInputStream(serviceConfigFile);
+                    configJson = IOUtils.readString(fileInputStream);
+                }
+                
+                if(configJson == null) {
+                    throw new IOException(String.format("Cannot access %s (must be a HTTP/HTTPS resource or FILE)", configPath));
+                }
+                
+                serviceConfig = StargateServiceConfig.createInstance(configJson);
             }
             
             if(serviceConfig == null) {
