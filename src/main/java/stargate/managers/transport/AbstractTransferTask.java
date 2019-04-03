@@ -27,6 +27,7 @@ public abstract class AbstractTransferTask implements Runnable {
     protected TransportManager manager;
     protected DataObjectURI uri;
     protected String hash;
+    protected long offset;
     protected TransferTaskPriority priority;
     protected long creationTime;
     
@@ -48,6 +49,10 @@ public abstract class AbstractTransferTask implements Runnable {
     
     public String getHash() {
         return this.hash;
+    }
+    
+    public long getOffset() {
+        return this.offset;
     }
     
     public void setPriority(TransferTaskPriority priority) {

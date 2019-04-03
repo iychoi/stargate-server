@@ -20,6 +20,7 @@ import org.apache.commons.logging.Log;
 import org.apache.commons.logging.LogFactory;
 import stargate.commons.dataobject.DataObjectURI;
 import stargate.commons.driver.DriverNotInitializedException;
+import stargate.commons.recipe.RecipeChunk;
 import stargate.commons.utils.DateTimeUtils;
 
 /**
@@ -29,8 +30,10 @@ import stargate.commons.utils.DateTimeUtils;
 public class PrefetchTask extends AbstractTransferTask {
     
     private static final Log LOG = LogFactory.getLog(PrefetchTask.class);
+    
+    protected RecipeChunk recipeChunk;
 
-    public PrefetchTask(String name, TransportManager manager, DataObjectURI uri, String hash) {
+    public PrefetchTask(String name, TransportManager manager, DataObjectURI uri, String hash, long offset) {
         if(name == null || name.isEmpty()) {
             throw new IllegalArgumentException("name is null");
         }
@@ -44,13 +47,18 @@ public class PrefetchTask extends AbstractTransferTask {
         }
         
         if(hash == null || hash.isEmpty()) {
-            throw new IllegalArgumentException("hash is null");
+            throw new IllegalArgumentException("hash is null or empty");
+        }
+        
+        if(offset < 0) {
+            throw new IllegalArgumentException("offset is negative");
         }
         
         this.name = name;
         this.manager = manager;
         this.uri = uri;
         this.hash = hash;
+        this.offset = offset;
         this.priority = TransferTaskPriority.PREFETCH_TASK_PRIORITY_LOW;
         this.creationTime = DateTimeUtils.getTimestamp();
     }
@@ -58,7 +66,7 @@ public class PrefetchTask extends AbstractTransferTask {
     @Override
     public void run() {
         try {
-            LOG.debug(String.format("Prefetch task (name: %s, priority: %s) %s - %s", this.name, this.priority.name(), this.uri.toUri().toASCIIString(), this.hash));
+            LOG.debug(String.format("Prefetch task (name: %s, priority: %s) %s - %s (%d)", this.name, this.priority.name(), this.uri.toUri().toASCIIString(), this.hash, this.offset));
             manager.cacheRemoteDataChunk(this.uri, this.hash);
         } catch (IOException ex) {
             LOG.error("IOException", ex);

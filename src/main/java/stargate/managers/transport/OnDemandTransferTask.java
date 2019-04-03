@@ -30,7 +30,7 @@ public class OnDemandTransferTask extends AbstractTransferTask {
     
     private static final Log LOG = LogFactory.getLog(OnDemandTransferTask.class);
 
-    public OnDemandTransferTask(String name, TransportManager manager, DataObjectURI uri, String hash) {
+    public OnDemandTransferTask(String name, TransportManager manager, DataObjectURI uri, String hash, long offset) {
         if(name == null || name.isEmpty()) {
             throw new IllegalArgumentException("name is null");
         }
@@ -44,13 +44,18 @@ public class OnDemandTransferTask extends AbstractTransferTask {
         }
         
         if(hash == null || hash.isEmpty()) {
-            throw new IllegalArgumentException("hash is null");
+            throw new IllegalArgumentException("hash is null or empty");
+        }
+        
+        if(offset < 0) {
+            throw new IllegalArgumentException("offset is negative");
         }
         
         this.name = name;
         this.manager = manager;
         this.uri = uri;
         this.hash = hash;
+        this.offset = offset;
         this.priority = TransferTaskPriority.PREFETCH_TASK_PRIORITY_HIGH;
         this.creationTime = DateTimeUtils.getTimestamp();
     }
@@ -58,7 +63,7 @@ public class OnDemandTransferTask extends AbstractTransferTask {
     @Override
     public void run() {
         try {
-            LOG.debug(String.format("On-demand data transfer task (name: %s, priority: %s) %s - %s", this.name, this.priority.name(), this.uri.toUri().toASCIIString(), this.hash));
+            LOG.debug(String.format("On-demand data transfer task (name: %s, priority: %s) %s - %s (%d)", this.name, this.priority.name(), this.uri.toUri().toASCIIString(), this.hash, this.offset));
             manager.cacheRemoteDataChunk(this.uri, this.hash);
         } catch (IOException ex) {
             LOG.error("IOException", ex);

@@ -30,6 +30,7 @@ public class TransferEvent {
     private TransferEventType eventType;
     private DataObjectURI uri;
     private String hash;
+    private long offset; // just a hint, negative when not used
     
     public static TransferEvent createInstance(File file) throws IOException {
         if(file == null) {
@@ -50,7 +51,7 @@ public class TransferEvent {
     TransferEvent() {
     }
     
-    public TransferEvent(TransferEventType eventType, DataObjectURI uri, String hash) {
+    public TransferEvent(TransferEventType eventType, DataObjectURI uri, String hash, long offset) {
         if(eventType == null) {
             throw new IllegalArgumentException("eventType is null");
         }
@@ -59,13 +60,37 @@ public class TransferEvent {
             throw new IllegalArgumentException("uri is null");
         }
         
-        //if(hash == null || hash.isEmpty()) {
-        //    throw new IllegalArgumentException("hash is null or empty");
-        //}
+        if(hash == null || hash.isEmpty()) {
+            throw new IllegalArgumentException("hash is null or empty");
+        }
+        
+        if(offset < 0) {
+            throw new IllegalArgumentException("offset is negative");
+        }
         
         this.eventType = eventType;
         this.uri = uri;
         this.hash = hash;
+        this.offset = offset;
+    }
+    
+    public TransferEvent(TransferEventType eventType, DataObjectURI uri, long offset) {
+        if(eventType == null) {
+            throw new IllegalArgumentException("eventType is null");
+        }
+        
+        if(uri == null) {
+            throw new IllegalArgumentException("uri is null");
+        }
+        
+        if(offset < 0) {
+            throw new IllegalArgumentException("offset is negative");
+        }
+        
+        this.eventType = eventType;
+        this.uri = uri;
+        this.hash = null;
+        this.offset = offset;
     }
     
     @JsonProperty("event_type")
@@ -103,11 +128,25 @@ public class TransferEvent {
     
     @JsonProperty("hash")
     public void setHash(String hash) {
-        //if(hash == null || hash.isEmpty()) {
-        //    throw new IllegalArgumentException("hash is null or empty");
-        //}
+        if(hash == null || hash.isEmpty()) {
+            throw new IllegalArgumentException("hash is null or empty");
+        }
         
         this.hash = hash;
+    }
+    
+    @JsonProperty("offset")
+    public long getOffset() {
+        return this.offset;
+    }
+    
+    @JsonProperty("offset")
+    public void setOffset(long offset) {
+        if(offset < 0) {
+            throw new IllegalArgumentException("offset is negative");
+        }
+        
+        this.offset = offset;
     }
     
     @JsonIgnore

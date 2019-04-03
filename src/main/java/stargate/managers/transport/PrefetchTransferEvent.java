@@ -30,6 +30,7 @@ public class PrefetchTransferEvent {
 
     private DataObjectURI uri;
     private String hash;
+    private long offset;
     private String nodeName;
     
     public static PrefetchTransferEvent createInstance(File file) throws IOException {
@@ -51,7 +52,7 @@ public class PrefetchTransferEvent {
     public PrefetchTransferEvent() {
     }
     
-    public PrefetchTransferEvent(DataObjectURI uri, String hash, String nodeName) {
+    public PrefetchTransferEvent(DataObjectURI uri, String hash, long offset, String nodeName) {
         if(uri == null) {
             throw new IllegalArgumentException("uri is null");
         }
@@ -60,12 +61,17 @@ public class PrefetchTransferEvent {
             throw new IllegalArgumentException("hash is null or empty");
         }
         
+        if(offset < 0) {
+            throw new IllegalArgumentException("offset is negative");
+        }
+        
         if(nodeName == null || nodeName.isEmpty()) {
             throw new IllegalArgumentException("nodeName is null or empty");
         }
         
         this.uri = uri;
         this.hash = hash;
+        this.offset = offset;
         this.nodeName = nodeName;
     }
     
@@ -95,6 +101,20 @@ public class PrefetchTransferEvent {
     @JsonProperty("hash")    
     public String getHash() {
         return this.hash;
+    }
+    
+    @JsonProperty("offset")
+    public void setOffset(long offset) {
+        if(offset < 0) {
+            throw new IllegalArgumentException("offset is negative");
+        }
+        
+        this.offset = offset;
+    }
+
+    @JsonProperty("offset")
+    public long getOffset() {
+        return this.offset;
     }
     
     @JsonProperty("node_name")
