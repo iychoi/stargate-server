@@ -17,6 +17,7 @@ package stargate.drivers.event.ignite;
 
 import java.io.File;
 import java.io.IOException;
+import org.codehaus.jackson.annotate.JsonProperty;
 import stargate.commons.event.AbstractEventDriverConfig;
 import stargate.commons.utils.JsonSerializer;
 
@@ -25,6 +26,13 @@ import stargate.commons.utils.JsonSerializer;
  * @author iychoi
  */
 public class IgniteEventDriverConfig extends AbstractEventDriverConfig {
+    
+    private static final int DEFAULT_EVENT_HANDLER_THREADS = 3;
+    private static final int DEFAULT_EVENT_SENDER_THREADS = 1;
+    
+    private int eventHandlerThreads = DEFAULT_EVENT_HANDLER_THREADS;
+    private int eventSenderThreads = DEFAULT_EVENT_SENDER_THREADS;
+    
     
     public static IgniteEventDriverConfig createInstance(File file) throws IOException {
         if(file == null) {
@@ -43,5 +51,37 @@ public class IgniteEventDriverConfig extends AbstractEventDriverConfig {
     }
     
     public IgniteEventDriverConfig() {
+    }
+    
+    @JsonProperty("event_handler_threads")
+    public void setEventHandlerThreads(int threads) {
+        super.checkMutableAndRaiseException();
+        
+        if(threads <= 0) {
+            this.eventHandlerThreads = DEFAULT_EVENT_HANDLER_THREADS;
+        } else {
+            this.eventHandlerThreads = threads;
+        }
+    }
+    
+    @JsonProperty("event_handler_threads")
+    public int getEventHandlerThreads() {
+        return this.eventHandlerThreads;
+    }
+    
+    @JsonProperty("event_sender_threads")
+    public void setEventSenderThreads(int threads) {
+        super.checkMutableAndRaiseException();
+        
+        if(threads <= 0) {
+            this.eventSenderThreads = DEFAULT_EVENT_SENDER_THREADS;
+        } else {
+            this.eventSenderThreads = threads;
+        }
+    }
+    
+    @JsonProperty("event_sender_threads")
+    public int getEventSenderThreads() {
+        return this.eventSenderThreads;
     }
 }

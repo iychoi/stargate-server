@@ -27,32 +27,32 @@ import stargate.commons.utils.JsonSerializer;
  *
  * @author iychoi
  */
-public class RecipeChunkGenerateTaskParameter {
+public class RecipeChunkGenerationTaskParameter {
     private DataExportEntry dataExportEntry;
     private SourceFileMetadata sourceMetadata;
     private long offset;
     private int length;
     
-    public static RecipeChunkGenerateTaskParameter createInstance(File file) throws IOException {
+    public static RecipeChunkGenerationTaskParameter createInstance(File file) throws IOException {
         if(file == null) {
             throw new IllegalArgumentException("file is null");
         }
 
-        return (RecipeChunkGenerateTaskParameter) JsonSerializer.fromJsonFile(file, RecipeChunkGenerateTaskParameter.class);
+        return (RecipeChunkGenerationTaskParameter) JsonSerializer.fromJsonFile(file, RecipeChunkGenerationTaskParameter.class);
     }
     
-    public static RecipeChunkGenerateTaskParameter createInstance(String json) throws IOException {
+    public static RecipeChunkGenerationTaskParameter createInstance(String json) throws IOException {
         if(json == null || json.isEmpty()) {
             throw new IllegalArgumentException("json is null or empty");
         }
         
-        return (RecipeChunkGenerateTaskParameter) JsonSerializer.fromJson(json, RecipeChunkGenerateTaskParameter.class);
+        return (RecipeChunkGenerationTaskParameter) JsonSerializer.fromJson(json, RecipeChunkGenerationTaskParameter.class);
     }
     
-    RecipeChunkGenerateTaskParameter() {
+    RecipeChunkGenerationTaskParameter() {
     }
     
-    public RecipeChunkGenerateTaskParameter(DataExportEntry dataExportEntry, SourceFileMetadata sourceMetadata, long offset, int length) {
+    public RecipeChunkGenerationTaskParameter(DataExportEntry dataExportEntry, SourceFileMetadata sourceMetadata, long offset, int length) {
         if(dataExportEntry == null) {
             throw new IllegalArgumentException("dataExportEntry is null");
         }

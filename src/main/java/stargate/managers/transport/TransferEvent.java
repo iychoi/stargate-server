@@ -108,12 +108,12 @@ public class TransferEvent {
     }
     
     @JsonProperty("uri")
-    public DataObjectURI getURI() {
+    public DataObjectURI getDataObjectURI() {
         return this.uri;
     }
     
     @JsonProperty("uri")
-    public void setURI(DataObjectURI uri) {
+    public void setDataObjectURI(DataObjectURI uri) {
         if(uri == null) {
             throw new IllegalArgumentException("uri is null");
         }

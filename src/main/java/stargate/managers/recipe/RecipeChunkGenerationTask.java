@@ -34,15 +34,15 @@ import stargate.service.StargateService;
  *
  * @author iychoi
  */
-public class RecipeChunkGenerateTask extends DistributedTask {
+public class RecipeChunkGenerationTask extends DistributedTask {
     
-    private static final Log LOG = LogFactory.getLog(RecipeChunkGenerateTask.class);
+    private static final Log LOG = LogFactory.getLog(RecipeChunkGenerationTask.class);
     
     class RecipeChunkGenerateTaskCallable implements Callable<Collection<RecipeChunk>> {
 
-        private Collection<RecipeChunkGenerateTaskParameter> parameters;
+        private Collection<RecipeChunkGenerationTaskParameter> parameters;
                 
-        RecipeChunkGenerateTaskCallable(Collection<RecipeChunkGenerateTaskParameter> parameters) {
+        RecipeChunkGenerateTaskCallable(Collection<RecipeChunkGenerationTaskParameter> parameters) {
             if(parameters == null) {
                 throw new IllegalArgumentException("parameters is null");
             }
@@ -54,7 +54,7 @@ public class RecipeChunkGenerateTask extends DistributedTask {
         public Collection<RecipeChunk> call() {
             List<RecipeChunk> generatedChunks = new ArrayList<RecipeChunk>();
             
-            for(RecipeChunkGenerateTaskParameter parameter : this.parameters) {
+            for(RecipeChunkGenerationTaskParameter parameter : this.parameters) {
                 LOG.debug(String.format("Processing chunk generation request for - %s", parameter.toString()));
                 try {
                     StargateService stargateInstance = StargateService.getInstance();
@@ -76,8 +76,8 @@ public class RecipeChunkGenerateTask extends DistributedTask {
         }
     }
     
-    public RecipeChunkGenerateTask(Collection<String> nodeNames, Collection<RecipeChunkGenerateTaskParameter> parameters) {
-        super("RecipeChunkGenerateTask", parameters, nodeNames);
+    public RecipeChunkGenerationTask(Collection<String> nodeNames, Collection<RecipeChunkGenerationTaskParameter> parameters) {
+        super("RecipeChunkGenerationTask", parameters, nodeNames);
         
         RecipeChunkGenerateTaskCallable runnable = new RecipeChunkGenerateTaskCallable(parameters);
         super.setCallable(runnable);

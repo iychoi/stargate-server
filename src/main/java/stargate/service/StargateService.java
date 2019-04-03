@@ -110,7 +110,7 @@ public class StargateService extends AbstractService {
         // init managers
         LOG.debug("Initializing managers");
         try {
-            this.statisticsManager = StatisticsManager.getInstance(this);
+            this.statisticsManager = StatisticsManager.getInstance(this, this.config.getStatisticsConfig());
             this.clusterManager = ClusterManager.getInstance(this, this.config.getClusterConfig());
             this.eventManager = EventManager.getInstance(this, this.config.getEventConfig());
             this.dataSourceManager = DataSourceManager.getInstance(this, this.config.getDataSourceConfig());

@@ -47,12 +47,6 @@ public class IgniteEventDriver extends AbstractEventDriver {
 
     private static final Log LOG = LogFactory.getLog(IgniteEventDriver.class);
     
-    private static final int DEFAULT_EVENT_HANDLER_THREAD_NUM = 3;
-    private static final int DEFAULT_EVENT_SENDER_THREAD_NUM = 1;
-    
-    private int eventHandlerThreadNum = DEFAULT_EVENT_HANDLER_THREAD_NUM;
-    private int eventSenderThreadNum = DEFAULT_EVENT_SENDER_THREAD_NUM;
-    
     private IgniteEventDriverConfig config;
     private IgniteDriver igniteDriver;
     private IgniteMessaging msg;
@@ -103,8 +97,8 @@ public class IgniteEventDriver extends AbstractEventDriver {
         
         LOG.debug("Initializing Ignite Event Driver");
         
-        this.eventHandlerThreadPool = Executors.newFixedThreadPool(this.eventHandlerThreadNum);
-        this.eventSenderThreadPool = Executors.newFixedThreadPool(this.eventSenderThreadNum);
+        this.eventHandlerThreadPool = Executors.newFixedThreadPool(this.config.getEventHandlerThreads());
+        this.eventSenderThreadPool = Executors.newFixedThreadPool(this.config.getEventSenderThreads());
         
         this.igniteDriver = IgniteDriver.getInstance();
         this.igniteDriver.init();

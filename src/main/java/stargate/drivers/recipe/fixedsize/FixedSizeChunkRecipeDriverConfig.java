@@ -29,9 +29,11 @@ public class FixedSizeChunkRecipeDriverConfig extends AbstractRecipeDriverConfig
     
     private static final int DEFAULT_CHUNK_SIZE = 1024*1024; // 1MB
     private static final String DEFAULT_HASH_ALGORITHM = "SHA-1";
+    private static final int DEFAULT_BUFFER_SIZE = 64*1024; // 64KB
     
     private int chunkSize = DEFAULT_CHUNK_SIZE;
     private String hashAlgorithm = DEFAULT_HASH_ALGORITHM;
+    private int bufferSize = DEFAULT_BUFFER_SIZE;
     
     public static FixedSizeChunkRecipeDriverConfig createInstance(File file) throws IOException {
         if(file == null) {
@@ -82,5 +84,23 @@ public class FixedSizeChunkRecipeDriverConfig extends AbstractRecipeDriverConfig
     @JsonProperty("hash_algorithm")
     public String getHashAlgorithm() {
         return this.hashAlgorithm;
+    }
+    
+    @JsonProperty("buffer_size")
+    public void setBufferSize(int bufferSize) {
+        super.checkMutableAndRaiseException();
+        
+        if(bufferSize <= 0) {
+            this.bufferSize = DEFAULT_BUFFER_SIZE;
+        } else {
+            this.bufferSize = bufferSize;
+        }
+        
+        this.bufferSize = bufferSize;
+    }
+    
+    @JsonProperty("buffer_size")
+    public int getBufferSize() {
+        return this.bufferSize;
     }
 }

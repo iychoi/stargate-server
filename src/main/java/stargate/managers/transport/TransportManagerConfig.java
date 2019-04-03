@@ -30,9 +30,27 @@ import stargate.managers.transport.layout.TransferLayoutAlgorithms;
  */
 public class TransportManagerConfig extends ManagerConfig {
     
+    private static final int DEFAULT_PREFETCH_THREADS = 3;
+    private static final int DEFAULT_PENDING_PREFETCH_THREADS = 1;
+    private static final int DEFAULT_DATA_TRANSFER_TIMEOUT_SEC = 60*5; // 5min
+    private static final int DEFAULT_PENDING_PREFETCH_TIMEOUT_SEC = 24*60*60; // 1day
+    private static final long DEFAULT_PREFETCH_LENGTH = 10*1024*1024; // 10MB
+    private static final int DEFAULT_DIRECTORY_CACHE_TIMEOUT_SEC = 60*5; // 5min
+    private static final int DEFAULT_RECIPE_CACHE_TIMEOUT_SEC = 24*60*60; // 1day
+    private static final int DEFAULT_DATACHUNK_CACHE_TIMEOUT_SEC = 7*24*60*60; // 7day
+    
     private TransferLayoutAlgorithms layoutAlgorithm = TransferLayoutAlgorithms.TRANSFER_LAYOUT_ALGORITHM_STATIC;
     private ContactNodeSelectionAlgorithms nodeSelectionAlgorithm = ContactNodeSelectionAlgorithms.CONTACT_NODE_SELECTION_ALGORITHM_ROUNDROBIN;
     
+    private int prefetchThreads = DEFAULT_PREFETCH_THREADS;
+    private int pendingPrefetchThreads = DEFAULT_PENDING_PREFETCH_THREADS;
+    private int pendingPrefetchTimeout = DEFAULT_PENDING_PREFETCH_TIMEOUT_SEC;
+    private int dataTransferTimeout = DEFAULT_DATA_TRANSFER_TIMEOUT_SEC;
+    private long prefetchLength = DEFAULT_PREFETCH_LENGTH;
+    private int directoryCacheTimeout = DEFAULT_DIRECTORY_CACHE_TIMEOUT_SEC;
+    private int recipeCacheTimeout = DEFAULT_RECIPE_CACHE_TIMEOUT_SEC;
+    private int dataChunkCacheTimeout = DEFAULT_DATACHUNK_CACHE_TIMEOUT_SEC;
+        
     public static TransportManagerConfig createInstance(File file) throws IOException {
         if(file == null) {
             throw new IllegalArgumentException("file is null");
@@ -120,5 +138,133 @@ public class TransportManagerConfig extends ManagerConfig {
             return this.nodeSelectionAlgorithm.getStringVal();
         }
         return null;
+    }
+    
+    @JsonProperty("prefetch_threads")
+    public void setPrefetchThreads(int threads) {
+        super.checkMutableAndRaiseException();
+        
+        if(threads <= 0) {
+            this.prefetchThreads = DEFAULT_PREFETCH_THREADS;
+        } else {
+            this.prefetchThreads = threads;
+        }
+    }
+    
+    @JsonProperty("prefetch_threads")
+    public int getPrefetchThreads() {
+        return this.prefetchThreads;
+    }
+    
+    @JsonProperty("pending_prefetch_threads")
+    public void setPendingPrefetchThreads(int threads) {
+        super.checkMutableAndRaiseException();
+        
+        if(threads <= 0) {
+            this.pendingPrefetchThreads = DEFAULT_PENDING_PREFETCH_THREADS;
+        } else {
+            this.pendingPrefetchThreads = threads;
+        }
+    }
+    
+    @JsonProperty("pending_prefetch_threads")
+    public int getPendingPrefetchThreads() {
+        return this.pendingPrefetchThreads;
+    }
+        
+    @JsonProperty("pending_prefetch_timeout")
+    public void setPendingPrefetchTimeoutSec(int sec) {
+        super.checkMutableAndRaiseException();
+        
+        if(sec < 0) {
+            this.pendingPrefetchTimeout = DEFAULT_PENDING_PREFETCH_TIMEOUT_SEC;
+        } else {
+            this.pendingPrefetchTimeout = sec;
+        }
+    }
+    
+    @JsonProperty("pending_prefetch_timeout")
+    public int getPendingPrefetchTimeoutSec() {
+        return this.pendingPrefetchTimeout;
+    }
+    
+    @JsonProperty("data_transfer_timeout")
+    public void setDataTransferTimeoutSec(int sec) {
+        super.checkMutableAndRaiseException();
+        
+        if(sec < 0) {
+            this.dataTransferTimeout = DEFAULT_DATA_TRANSFER_TIMEOUT_SEC;
+        } else {
+            this.dataTransferTimeout = sec;
+        }
+    }
+    
+    @JsonProperty("data_transfer_timeout")
+    public int getDataTransferTimeoutSec() {
+        return this.dataTransferTimeout;
+    }
+    
+    @JsonProperty("prefetch_length")
+    public void setPrefetchLength(long length) {
+        super.checkMutableAndRaiseException();
+        
+        if(length < 0) {
+            this.prefetchLength = DEFAULT_PREFETCH_LENGTH;
+        } else {
+            this.prefetchLength = length;
+        }
+    }
+    
+    @JsonProperty("prefetch_length")
+    public long getPrefetchLength() {
+        return this.prefetchLength;
+    }
+    
+    @JsonProperty("directory_cache_timeout")
+    public void setDirectoryCacheTimeoutSec(int sec) {
+        super.checkMutableAndRaiseException();
+        
+        if(sec <= 0) {
+            this.directoryCacheTimeout = DEFAULT_DIRECTORY_CACHE_TIMEOUT_SEC;
+        } else {
+            this.directoryCacheTimeout = sec;
+        }
+    }
+    
+    @JsonProperty("directory_cache_timeout")
+    public int getDirectoryCacheTimeoutSec() {
+        return this.directoryCacheTimeout;
+    }
+    
+    @JsonProperty("recipe_cache_timeout")
+    public void setRecipeCacheTimeoutSec(int sec) {
+        super.checkMutableAndRaiseException();
+        
+        if(sec <= 0) {
+            this.recipeCacheTimeout = DEFAULT_RECIPE_CACHE_TIMEOUT_SEC;
+        } else {
+            this.recipeCacheTimeout = sec;
+        }
+    }
+    
+    @JsonProperty("recipe_cache_timeout")
+    public int getRecipeCacheTimeoutSec() {
+        return this.recipeCacheTimeout;
+    }
+    
+    @JsonProperty("data_chunk_cache_timeout")
+    public void setDataChunkCacheTimeoutSec(int sec) {
+        super.checkMutableAndRaiseException();
+        
+        if(sec < 0) {
+            this.dataChunkCacheTimeout = DEFAULT_DATACHUNK_CACHE_TIMEOUT_SEC;
+        } else {
+            this.dataChunkCacheTimeout = sec;
+        }
+    }
+    
+    @JsonProperty("data_chunk_cache_timeout")
+    public int getDataChunkCacheTimeoutSec() {
+        return this.dataChunkCacheTimeout;
     }
 }

@@ -40,27 +40,26 @@ public class TransferScheduler {
     
     private static final Log LOG = LogFactory.getLog(TransferScheduler.class);
 
+    private static final int INITIAL_QUEUE_CAPACITY = 1000;
+    
     private ExecutorService transferPoolExecutor;
     private Thread transferSchedulerThread;
     private boolean schedulerRun = true;
     private PriorityBlockingQueue<AbstractTransferTask> priorityTaskQueue;
     private Map<String, AbstractTransferTask> inTransferTasks = new ConcurrentHashMap<String, AbstractTransferTask>();
     private Semaphore taskIngestLock;
-    private Map<String, List<PrefetchTask>> pendingPrefetchTasks = new PassiveExpiringMap<String, List<PrefetchTask>>(1, TimeUnit.DAYS);
+    private Map<String, List<PrefetchTask>> pendingPrefetchTasks;
     private Object pendingPrefetchTasksSyncObj = new Object();
     
-    public TransferScheduler(int executorPoolSize, int initialQueueCapacity) {
+    public TransferScheduler(int executorPoolSize, long pendingPrefetchTimeoutSec) {
         if(executorPoolSize <= 0) {
             throw new IllegalArgumentException("executorPoolSize is negative");
         }
         
-        if(initialQueueCapacity <= 0) {
-            throw new IllegalArgumentException("initialQueueCapacity is negative");
-        }
-        
         this.transferPoolExecutor = new ThreadPoolExecutor(executorPoolSize, executorPoolSize, 0L, TimeUnit.MILLISECONDS, new LinkedBlockingQueue<Runnable>(executorPoolSize));
-        this.priorityTaskQueue = new PriorityBlockingQueue<AbstractTransferTask>(initialQueueCapacity, new TransferTaskComparator());
+        this.priorityTaskQueue = new PriorityBlockingQueue<AbstractTransferTask>(INITIAL_QUEUE_CAPACITY, new TransferTaskComparator());
         this.taskIngestLock = new Semaphore(executorPoolSize);
+        this.pendingPrefetchTasks = new PassiveExpiringMap<String, List<PrefetchTask>>(pendingPrefetchTimeoutSec, TimeUnit.SECONDS);
     }
     
     public void start() {
@@ -136,7 +135,7 @@ public class TransferScheduler {
         this.priorityTaskQueue.add(task);
         
         // remove prefetch tasks scheduled
-        String uriString = task.getURI().toUri().toASCIIString();
+        String uriString = task.getDataObjectURI().toUri().toASCIIString();
         synchronized(this.pendingPrefetchTasksSyncObj) {
             List<PrefetchTask> prefetchTasks = this.pendingPrefetchTasks.get(uriString);
             if(prefetchTasks != null) {
@@ -156,7 +155,7 @@ public class TransferScheduler {
     }
     
     public void schedule(PrefetchTask task) {
-        String uriString = task.getURI().toUri().toASCIIString();
+        String uriString = task.getDataObjectURI().toUri().toASCIIString();
         synchronized(this.pendingPrefetchTasksSyncObj) {
             List<PrefetchTask> prefetchTasks = this.pendingPrefetchTasks.get(uriString);
             if(prefetchTasks == null) {

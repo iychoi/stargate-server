@@ -43,7 +43,7 @@ public abstract class AbstractTransferTask implements Runnable {
         return this.manager;
     }
     
-    public DataObjectURI getURI() {
+    public DataObjectURI getDataObjectURI() {
         return this.uri;
     }
     

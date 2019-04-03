@@ -15,6 +15,7 @@
 */
 package stargate.managers.transport;
 
+import stargate.commons.utils.Reference;
 import stargate.managers.transport.layout.AbstractContactNodeSelectionAlgorithm;
 import stargate.managers.transport.layout.AbstractTransferLayoutAlgorithm;
 import stargate.managers.transport.layout.RoundRobinContactNodeSelectionAlgorithm;
@@ -79,11 +80,6 @@ public class TransportManager extends AbstractManager<AbstractTransportDriver> {
 
     private static final Log LOG = LogFactory.getLog(TransportManager.class);
     
-    private static final int DEFAULT_PREFETCH_THREAD_NUM = 3;
-    private static final int DEFAULT_PENDING_PREFETCH_THREAD_NUM = 1;
-    private static final int DEFAULT_DATA_TRANSFER_TIMEOUT_SEC = 60*5; // 5min
-    private static final long DEFAULT_PREFETCH_LENGTH = 10*1024*1024; // 10MB
-    
     private static TransportManager instance;
     
     private AbstractKeyValueStore remoteDirectoryCacheStore; // <DataObjectURI, Directory>
@@ -93,15 +89,11 @@ public class TransportManager extends AbstractManager<AbstractTransportDriver> {
     
     private AbstractKeyValueStore dataChunkCacheStore; // <String, byte[]> key = hashstring
     private final Object dataChunkSyncObj = new Object();
-    private Map<String, TransferReference> waitObjects = new ConcurrentHashMap<String, TransferReference>();
+    private Map<String, Reference> waitObjects = new ConcurrentHashMap<String, Reference>();
     
     private AbstractContactNodeSelectionAlgorithm contactNodeSelectionAlgorithm;
     private AbstractTransferLayoutAlgorithm transferLayoutAlgorithm;
     
-    private int prefetchThreadNum = DEFAULT_PREFETCH_THREAD_NUM;
-    private int pendingPrefetchThreadNum = DEFAULT_PENDING_PREFETCH_THREAD_NUM;
-    private int dataTransferTimeout = DEFAULT_DATA_TRANSFER_TIMEOUT_SEC;
-    private long prefetchLength = DEFAULT_PREFETCH_LENGTH;
     private TransferScheduler transferScheduler;
     private ExecutorService pendingPrefetchThreadPool;
     
@@ -189,9 +181,11 @@ public class TransportManager extends AbstractManager<AbstractTransportDriver> {
     public synchronized void start() throws IOException {
         super.start();
         
-        this.transferScheduler = new TransferScheduler(this.prefetchThreadNum, 100);
+        TransportManagerConfig managerConfig = (TransportManagerConfig) this.config;
+        
+        this.transferScheduler = new TransferScheduler(managerConfig.getPrefetchThreads(), managerConfig.getPendingPrefetchTimeoutSec());
         this.transferScheduler.start();
-        this.pendingPrefetchThreadPool = Executors.newFixedThreadPool(this.pendingPrefetchThreadNum);
+        this.pendingPrefetchThreadPool = Executors.newFixedThreadPool(managerConfig.getPendingPrefetchThreads());
         
         for(AbstractTransportDriver driver : drivers) {
             try {
@@ -262,12 +256,14 @@ public class TransportManager extends AbstractManager<AbstractTransportDriver> {
                     StargateService stargateService = getStargateService();
                     DataStoreManager keyValueStoreManager = stargateService.getDataStoreManager();
                     
+                    TransportManagerConfig managerConfig = (TransportManagerConfig) this.config;
+                    
                     DataStoreProperties properties = new DataStoreProperties();
                     properties.setReplicated(true);
                     properties.setPersistent(false);
                     properties.setExpirable(true);
-                    properties.setExpireTimeUnit(TimeUnit.MINUTES);
-                    properties.setExpireTimeVal(5);
+                    properties.setExpireTimeUnit(TimeUnit.SECONDS);
+                    properties.setExpireTimeVal(managerConfig.getDirectoryCacheTimeoutSec());
                     this.remoteDirectoryCacheStore = keyValueStoreManager.getDriver().getKeyValueStore(REMOTE_DIRECTORY_CACHE_STORE, Directory.class, properties);
                 } catch (ManagerNotInstantiatedException ex) {
                     LOG.error("Manager is not instantiated", ex);
@@ -287,12 +283,14 @@ public class TransportManager extends AbstractManager<AbstractTransportDriver> {
                     StargateService stargateService = getStargateService();
                     DataStoreManager keyValueStoreManager = stargateService.getDataStoreManager();
                     
+                    TransportManagerConfig managerConfig = (TransportManagerConfig) this.config;
+                    
                     DataStoreProperties properties = new DataStoreProperties();
                     properties.setReplicated(true);
                     properties.setPersistent(false);
                     properties.setExpirable(true);
-                    properties.setExpireTimeUnit(TimeUnit.DAYS);
-                    properties.setExpireTimeVal(1);
+                    properties.setExpireTimeUnit(TimeUnit.SECONDS);
+                    properties.setExpireTimeVal(managerConfig.getRecipeCacheTimeoutSec());
                     this.remoteRecipeCacheStore = keyValueStoreManager.getDriver().getKeyValueStore(REMOTE_RECIPE_CACHE_STORE, Recipe.class, properties);
                 } catch (ManagerNotInstantiatedException ex) {
                     LOG.error("Manager is not instantiated", ex);
@@ -312,13 +310,20 @@ public class TransportManager extends AbstractManager<AbstractTransportDriver> {
                     StargateService stargateService = getStargateService();
                     DataStoreManager keyValueStoreManager = stargateService.getDataStoreManager();
                     
+                    TransportManagerConfig managerConfig = (TransportManagerConfig) this.config;
+                    
                     DataStoreProperties properties = new DataStoreProperties();
                     properties.setSharded(true);
                     properties.setReplicaNum(1);
                     properties.setPersistent(true);
-                    properties.setExpirable(true);
-                    properties.setExpireTimeUnit(TimeUnit.DAYS);
-                    properties.setExpireTimeVal(7);
+                    
+                    if(managerConfig.getDataChunkCacheTimeoutSec() > 0) {
+                        properties.setExpirable(true);
+                        properties.setExpireTimeUnit(TimeUnit.SECONDS);
+                        properties.setExpireTimeVal(managerConfig.getDataChunkCacheTimeoutSec());
+                    } else {
+                        properties.setExpirable(false);
+                    }
                     this.dataChunkCacheStore = keyValueStoreManager.getDriver().getKeyValueStore(DATA_CHUNK_CACHE_STORE, byte[].class, properties);
                 } catch (ManagerNotInstantiatedException ex) {
                     LOG.error("Manager is not instantiated", ex);
@@ -336,7 +341,7 @@ public class TransportManager extends AbstractManager<AbstractTransportDriver> {
         safeInitDataChunkCacheStore(); //  chunk cache store must be called before next line is executed
         if(this.transferLayoutAlgorithm == null) {
             StargateService stargateService = getStargateService();
-            TransportManagerConfig managerConfig = (TransportManagerConfig) this.getConfig();
+            TransportManagerConfig managerConfig = (TransportManagerConfig) this.config;
             TransferLayoutAlgorithms transferAlg = managerConfig.getLayoutAlgorithm();
             if(transferAlg == null) {
                 transferAlg = TransferLayoutAlgorithms.TRANSFER_LAYOUT_ALGORITHM_STATIC;
@@ -358,7 +363,7 @@ public class TransportManager extends AbstractManager<AbstractTransportDriver> {
         
         if(this.contactNodeSelectionAlgorithm == null) {
             StargateService stargateService = getStargateService();
-            TransportManagerConfig managerConfig = (TransportManagerConfig) this.getConfig();
+            TransportManagerConfig managerConfig = (TransportManagerConfig) this.config;
             ContactNodeSelectionAlgorithms selectionAlg = managerConfig.getContactNodeSelectionAlgorithm();
             if(selectionAlg == null) {
                 selectionAlg = ContactNodeSelectionAlgorithms.CONTACT_NODE_SELECTION_ALGORITHM_ROUNDROBIN;
@@ -460,8 +465,8 @@ public class TransportManager extends AbstractManager<AbstractTransportDriver> {
                 putPendingChunkCache = true;
             }
 
-            this.waitObjects.putIfAbsent(hash, new TransferReference());
-            TransferReference reference = this.waitObjects.get(hash);
+            this.waitObjects.putIfAbsent(hash, new Reference());
+            Reference reference = this.waitObjects.get(hash);
             reference.increaseReference();
             // double-check cache
             if(!putPendingChunkCache) {
@@ -470,7 +475,7 @@ public class TransportManager extends AbstractManager<AbstractTransportDriver> {
                     DataChunkCache existingCache = DataChunkCache.fromBytes(existingData);
                     if(existingCache.getType().equals(DataChunkCacheType.DATA_CHUNK_CACHE_PRESENT)) {
                         // existing
-                        reference.finishTransfer();
+                        reference.wakeup();
                         reference.decreaseReference();
                         if(reference.getReferenceCount() <= 0) {
                             this.waitObjects.remove(hash);
@@ -554,7 +559,7 @@ public class TransportManager extends AbstractManager<AbstractTransportDriver> {
             this.dataChunkCacheStore.put(hash, dataChunkCache.toBytes());
             this.lastUpdateTime = DateTimeUtils.getTimestamp();
 
-            reference.finishTransfer();
+            reference.wakeup();
             reference.decreaseReference();
             if(reference.getReferenceCount() <= 0) {
                 this.waitObjects.remove(hash);
@@ -588,6 +593,8 @@ public class TransportManager extends AbstractManager<AbstractTransportDriver> {
         }
         
         safeInitLayoutAlgorithm();
+        
+        TransportManagerConfig managerConfig = (TransportManagerConfig) this.config;
         
         Recipe recipe = getRecipe(uri);
         RecipeChunk recipeChunk = recipe.getChunk(hash);
@@ -659,8 +666,8 @@ public class TransportManager extends AbstractManager<AbstractTransportDriver> {
                 putPendingChunkCache = true;
             }
             
-            this.waitObjects.putIfAbsent(hash, new TransferReference());
-            TransferReference reference = this.waitObjects.get(hash);
+            this.waitObjects.putIfAbsent(hash, new Reference());
+            Reference reference = this.waitObjects.get(hash);
             reference.increaseReference();
             
             // double-check cache
@@ -674,7 +681,7 @@ public class TransportManager extends AbstractManager<AbstractTransportDriver> {
                             byte[] data = existingCache.getData();
                             ByteArrayInputStream bais = new ByteArrayInputStream(data);
 
-                            reference.finishTransfer();
+                            reference.wakeup();
                             reference.decreaseReference();
                             if(reference.getReferenceCount() <= 0) {
                                 this.waitObjects.remove(hash);
@@ -705,7 +712,7 @@ public class TransportManager extends AbstractManager<AbstractTransportDriver> {
                             
                             try {
                                 LOG.debug(String.format("getDataChunk: Waiting for finishing data transfer for %s", hash));
-                                if(reference.await(this.dataTransferTimeout, TimeUnit.SECONDS)) {
+                                if(reference.await(managerConfig.getDataTransferTimeoutSec(), TimeUnit.SECONDS)) {
                                     // done
                                     // re-check
                                     while(true) {
@@ -719,7 +726,7 @@ public class TransportManager extends AbstractManager<AbstractTransportDriver> {
                                             byte[] data = dataChunkCache.getData();
                                             ByteArrayInputStream bais = new ByteArrayInputStream(data);
 
-                                            reference.finishTransfer();
+                                            reference.wakeup();
                                             reference.decreaseReference();
                                             if(reference.getReferenceCount() <= 0) {
                                                 this.waitObjects.remove(hash);
@@ -800,7 +807,7 @@ public class TransportManager extends AbstractManager<AbstractTransportDriver> {
             this.dataChunkCacheStore.put(hash, dataChunkCache.toBytes());
             this.lastUpdateTime = DateTimeUtils.getTimestamp();
 
-            reference.finishTransfer();
+            reference.wakeup();
             reference.decreaseReference();
             if(reference.getReferenceCount() <= 0) {
                 this.waitObjects.remove(hash);
@@ -1134,7 +1141,7 @@ public class TransportManager extends AbstractManager<AbstractTransportDriver> {
         }
         
         LOG.debug("processPendingPrefetchSchedules: Processing pending prefetching schedules");
-        List<PrefetchTransferEvent> events = new ArrayList<PrefetchTransferEvent>();
+        List<TransferAssignment> assignments = new ArrayList<TransferAssignment>();
         
         for(PendingPrefetchSchedule schedule : pendingPrefetchSchedules) {
             TransferAssignment transferAssignment = schedule.getTransferAssignment();
@@ -1143,17 +1150,16 @@ public class TransportManager extends AbstractManager<AbstractTransportDriver> {
             LOG.debug(String.format("processPendingPrefetchSchedules: Putting a pending request for a prefetching for - %s, %s", transferAssignment.getDataObjectURI().toUri().toASCIIString(), dataChunkCache.getHash()));
             boolean inserted = this.dataChunkCacheStore.putIfAbsent(dataChunkCache.getHash(), dataChunkCache.toBytes());
             if(inserted) {
-                PrefetchTransferEvent event = new PrefetchTransferEvent(transferAssignment.getDataObjectURI(), transferAssignment.getHash(), transferAssignment.getOffset(), transferAssignment.getTransferNode());
-                events.add(event);
+                assignments.add(transferAssignment);
             }
         }
         
         this.lastUpdateTime = DateTimeUtils.getTimestamp();
         
-        if(!events.isEmpty()) {
+        if(!assignments.isEmpty()) {
             // send to remote
             LOG.debug("processPendingPrefetchSchedules: Sending a prefetching request");
-            raiseEventForPrefetch(events);
+            raiseEventForPrefetch(assignments);
         }
     }
     
@@ -1410,7 +1416,7 @@ public class TransportManager extends AbstractManager<AbstractTransportDriver> {
         }
     }
     
-    private void raiseEventForPrefetch(Collection<PrefetchTransferEvent> events) throws IOException, DriverNotInitializedException {
+    private void raiseEventForPrefetch(Collection<TransferAssignment> assignments) throws IOException, DriverNotInitializedException {
         List<StargateEvent> stargateEvents = new ArrayList<StargateEvent>();
         
         try {
@@ -1419,9 +1425,9 @@ public class TransportManager extends AbstractManager<AbstractTransportDriver> {
             ClusterManager clusterManager = stargateService.getClusterManager();
             Node localNode = clusterManager.getLocalNode();
             
-            for(PrefetchTransferEvent event : events) {
-                TransferEvent transferEvent = new TransferEvent(TransferEventType.TRANSFER_EVENT_TYPE_PREFETCH, event.getURI(), event.getHash(), event.getOffset());
-                StargateEvent stargateEvent = new StargateEvent(StargateEventType.STARGATE_EVENT_TYPE_TRANSPORT, event.getNodeName(), localNode.getName(), transferEvent.toJson());
+            for(TransferAssignment assignment : assignments) {
+                TransferEvent transferEvent = new TransferEvent(TransferEventType.TRANSFER_EVENT_TYPE_PREFETCH, assignment.getDataObjectURI(), assignment.getHash(), assignment.getOffset());
+                StargateEvent stargateEvent = new StargateEvent(StargateEventType.STARGATE_EVENT_TYPE_TRANSPORT, assignment.getTransferNode(), localNode.getName(), transferEvent.toJson());
                 stargateEvents.add(stargateEvent);
             }
             
@@ -1452,28 +1458,30 @@ public class TransportManager extends AbstractManager<AbstractTransportDriver> {
     }
     
     private void processTransferEvent(TransferEvent event) throws IOException, DriverNotInitializedException {
+        TransportManagerConfig managerConfig = (TransportManagerConfig) this.config;
+        
         switch(event.getEventType()) {
             case TRANSFER_EVENT_TYPE_ONDEMAND:
-                LOG.debug(String.format("processTransferEvent: On-demand transfer is requested : %s - %s (%d)", event.getURI().toUri().toASCIIString(), event.getHash(), event.getOffset()));
-                OnDemandTransferTask onDemandTask = new OnDemandTransferTask(event.getHash(), this, event.getURI(), event.getHash(), event.getOffset());
+                LOG.debug(String.format("processTransferEvent: On-demand transfer is requested : %s - %s (%d)", event.getDataObjectURI().toUri().toASCIIString(), event.getHash(), event.getOffset()));
+                OnDemandTransferTask onDemandTask = new OnDemandTransferTask(event.getHash(), this, event.getDataObjectURI(), event.getHash(), event.getOffset());
                 this.transferScheduler.schedule(onDemandTask);
                 // start if there're prefetch schedules pending
-                this.transferScheduler.startPrefetch(event.getURI(), event.getOffset(), event.getOffset() + this.prefetchLength);
+                this.transferScheduler.startPrefetch(event.getDataObjectURI(), event.getOffset(), event.getOffset() + managerConfig.getPrefetchLength());
                 break;
             case TRANSFER_EVENT_TYPE_PREFETCH:
-                LOG.debug(String.format("processTransferEvent: A prefetching is requested : %s - %s (%d)", event.getURI().toUri().toASCIIString(), event.getHash(), event.getOffset()));
-                PrefetchTask prefetchTask = new PrefetchTask(event.getHash(), this, event.getURI(), event.getHash(), event.getOffset());
+                LOG.debug(String.format("processTransferEvent: A prefetching is requested : %s - %s (%d)", event.getDataObjectURI().toUri().toASCIIString(), event.getHash(), event.getOffset()));
+                PrefetchTask prefetchTask = new PrefetchTask(event.getHash(), this, event.getDataObjectURI(), event.getHash(), event.getOffset());
                 this.transferScheduler.schedule(prefetchTask);
                 break;
             case TRANSFER_EVENT_TYPE_PREFETCH_START:
-                LOG.debug(String.format("processTransferEvent: Start prefetching : %s (%d)", event.getURI().toUri().toASCIIString(), event.getOffset()));
-                this.transferScheduler.startPrefetch(event.getURI(), event.getOffset(), event.getOffset() + this.prefetchLength);
+                LOG.debug(String.format("processTransferEvent: Start prefetching : %s (%d)", event.getDataObjectURI().toUri().toASCIIString(), event.getOffset()));
+                this.transferScheduler.startPrefetch(event.getDataObjectURI(), event.getOffset(), event.getOffset() + managerConfig.getPrefetchLength());
                 break;
             case TRANSFER_EVENT_TYPE_COMPLETE:
-                LOG.debug(String.format("processTransferEvent: Transfer is finished : %s - %s (%d)", event.getURI().toUri().toASCIIString(), event.getHash(), event.getOffset()));
-                TransferReference reference = this.waitObjects.get(event.getHash());
+                LOG.debug(String.format("processTransferEvent: Transfer is finished : %s - %s (%d)", event.getDataObjectURI().toUri().toASCIIString(), event.getHash(), event.getOffset()));
+                Reference reference = this.waitObjects.get(event.getHash());
                 if(reference != null) {
-                    reference.finishTransfer();
+                    reference.wakeup();
                 }
                 break;
             default:

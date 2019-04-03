@@ -21,7 +21,6 @@ import java.security.DigestInputStream;
 import java.security.MessageDigest;
 import java.security.NoSuchAlgorithmException;
 import java.util.ArrayList;
-import java.util.Arrays;
 import java.util.Collection;
 import java.util.Collections;
 import java.util.List;
@@ -41,8 +40,6 @@ public class OverlappedFixedSizeChunkRecipeDriver extends AbstractRecipeDriver {
     private int chunkSize;
     private int overlapSize;
     private String hashAlgorithm;
-    private static final int BUFFER_SIZE = 64*1024; // 64KB
-    private int bufferSize = BUFFER_SIZE;
     private byte[] buffer;
     
     public OverlappedFixedSizeChunkRecipeDriver(AbstractDriverConfig config) {
@@ -58,8 +55,8 @@ public class OverlappedFixedSizeChunkRecipeDriver extends AbstractRecipeDriver {
         this.chunkSize = this.config.getChunkSize();
         this.overlapSize = this.config.getOverlapSize();
         this.hashAlgorithm = this.config.getHashAlgorithm();
-        this.bufferSize = Math.min(this.chunkSize, BUFFER_SIZE);
-        this.buffer = new byte[this.bufferSize];
+        int bufferSize = Math.min(this.chunkSize, this.config.getBufferSize());
+        this.buffer = new byte[bufferSize];
     }
     
     public OverlappedFixedSizeChunkRecipeDriver(AbstractRecipeDriverConfig config) {
@@ -75,8 +72,8 @@ public class OverlappedFixedSizeChunkRecipeDriver extends AbstractRecipeDriver {
         this.chunkSize = this.config.getChunkSize();
         this.overlapSize = this.config.getOverlapSize();
         this.hashAlgorithm = this.config.getHashAlgorithm();
-        this.bufferSize = Math.min(this.chunkSize, BUFFER_SIZE);
-        this.buffer = new byte[this.bufferSize];
+        int bufferSize = Math.min(this.chunkSize, this.config.getBufferSize());
+        this.buffer = new byte[bufferSize];
     }
     
     public OverlappedFixedSizeChunkRecipeDriver(OverlappedFixedSizeChunkRecipeDriverConfig config) {
@@ -88,8 +85,8 @@ public class OverlappedFixedSizeChunkRecipeDriver extends AbstractRecipeDriver {
         this.chunkSize = this.config.getChunkSize();
         this.overlapSize = this.config.getOverlapSize();
         this.hashAlgorithm = this.config.getHashAlgorithm();
-        this.bufferSize = Math.min(this.chunkSize, BUFFER_SIZE);
-        this.buffer = new byte[this.bufferSize];
+        int bufferSize = Math.min(this.chunkSize, this.config.getBufferSize());
+        this.buffer = new byte[bufferSize];
     }
     
     @Override
@@ -153,7 +150,7 @@ public class OverlappedFixedSizeChunkRecipeDriver extends AbstractRecipeDriver {
                 
                 DigestInputStream dis = new DigestInputStream(is, messageDigest);
 
-                while((nread = dis.read(this.buffer, 0, Math.min(toread, this.bufferSize))) > 0) {
+                while((nread = dis.read(this.buffer, 0, Math.min(toread, this.buffer.length))) > 0) {
                     chunkLength += nread;
                     toread -= nread;
                     if(toread <= 0) {
@@ -205,7 +202,7 @@ public class OverlappedFixedSizeChunkRecipeDriver extends AbstractRecipeDriver {
             int toread = this.chunkSize + this.overlapSize;
             int chunkLength = 0;
             
-            while((nread = dis.read(this.buffer, 0, Math.min(toread, this.bufferSize))) > 0) {
+            while((nread = dis.read(this.buffer, 0, Math.min(toread, this.buffer.length))) > 0) {
                 chunkLength += nread;
                 toread -= nread;
                 if(toread <= 0) {

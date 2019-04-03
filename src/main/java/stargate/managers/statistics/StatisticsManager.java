@@ -41,19 +41,16 @@ public class StatisticsManager extends AbstractManager<NullDriver> {
     
     private static final Log LOG = LogFactory.getLog(StatisticsManager.class);
     
-    private static final int DEFAULT_STATISTICS_ENTRY_CAPACITY = 1000;
-    
     private static StatisticsManager instance;
     
     private Map<StatisticsType, Statistics> statistics = new ConcurrentHashMap<StatisticsType, Statistics>();
-    private int statisticsEntryCapacity = DEFAULT_STATISTICS_ENTRY_CAPACITY;
     protected long lastUpdateTime;
     
     
-    public static StatisticsManager getInstance(StargateService service) throws ManagerNotInstantiatedException {
+    public static StatisticsManager getInstance(StargateService service, StatisticsManagerConfig config) throws ManagerNotInstantiatedException {
         synchronized (StatisticsManager.class) {
             if(instance == null) {
-                instance = new StatisticsManager(service);
+                instance = new StatisticsManager(service, config);
             }
             return instance;
         }
@@ -68,12 +65,17 @@ public class StatisticsManager extends AbstractManager<NullDriver> {
         }
     }
     
-    StatisticsManager(StargateService service) throws ManagerNotInstantiatedException {
+    StatisticsManager(StargateService service, StatisticsManagerConfig config) throws ManagerNotInstantiatedException {
         if(service == null) {
             throw new IllegalArgumentException("service is null");
         }
         
+        if(config == null) {
+            throw new IllegalArgumentException("config is null");
+        }
+        
         this.setService(service);
+        this.setConfig(config);
     }
     
     @Override
@@ -133,7 +135,9 @@ public class StatisticsManager extends AbstractManager<NullDriver> {
         
         Statistics stat = this.statistics.get(type);
         if(stat == null) {
-            stat = new Statistics(type, this.statisticsEntryCapacity);
+            StatisticsManagerConfig managerConfig = (StatisticsManagerConfig) this.config;
+            
+            stat = new Statistics(type, managerConfig.getStatisticsEntryCapacity());
             this.statistics.put(type, stat);
         }
         
@@ -158,7 +162,9 @@ public class StatisticsManager extends AbstractManager<NullDriver> {
         
         Statistics stat = this.statistics.get(type);
         if(stat == null) {
-            stat = new Statistics(type, this.statisticsEntryCapacity);
+            StatisticsManagerConfig managerConfig = (StatisticsManagerConfig) this.config;
+            
+            stat = new Statistics(type, managerConfig.getStatisticsEntryCapacity());
             this.statistics.put(type, stat);
         }
         

@@ -30,10 +30,12 @@ public class OverlappedFixedSizeChunkRecipeDriverConfig extends AbstractRecipeDr
     private static final int DEFAULT_CHUNK_SIZE = 1024*1024; // 1MB
     private static final int DEFAULT_OVERLAP_SIZE = 4*1024; // 4K
     private static final String DEFAULT_HASH_ALGORITHM = "SHA-1";
+    private static final int DEFAULT_BUFFER_SIZE = 64*1024; // 64KB
     
     private int chunkSize = DEFAULT_CHUNK_SIZE;
     private int overlapSize = DEFAULT_OVERLAP_SIZE;
     private String hashAlgorithm = DEFAULT_HASH_ALGORITHM;
+    private int bufferSize = DEFAULT_BUFFER_SIZE;
     
     public static OverlappedFixedSizeChunkRecipeDriverConfig createInstance(File file) throws IOException {
         if(file == null) {
@@ -100,5 +102,23 @@ public class OverlappedFixedSizeChunkRecipeDriverConfig extends AbstractRecipeDr
     @JsonProperty("hash_algorithm")
     public String getHashAlgorithm() {
         return this.hashAlgorithm;
+    }
+    
+    @JsonProperty("buffer_size")
+    public void setBufferSize(int bufferSize) {
+        super.checkMutableAndRaiseException();
+        
+        if(bufferSize <= 0) {
+            this.bufferSize = DEFAULT_BUFFER_SIZE;
+        } else {
+            this.bufferSize = bufferSize;
+}
+        
+        this.bufferSize = bufferSize;
+    }
+    
+    @JsonProperty("buffer_size")
+    public int getBufferSize() {
+        return this.bufferSize;
     }
 }

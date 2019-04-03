@@ -40,6 +40,9 @@ import stargate.drivers.transport.http.HTTPTransportDriver;
 import stargate.drivers.transport.http.HTTPTransportDriverConfig;
 import stargate.drivers.userinterface.http.HTTPUserInterfaceDriver;
 import stargate.drivers.userinterface.http.HTTPUserInterfaceDriverConfig;
+import stargate.managers.cluster.ClusterManagerConfig;
+import stargate.managers.recipe.RecipeManagerConfig;
+import stargate.managers.statistics.StatisticsManagerConfig;
 import stargate.managers.transport.TransportManagerConfig;
 
 
@@ -49,14 +52,15 @@ import stargate.managers.transport.TransportManagerConfig;
  */
 public class StargateServiceConfig extends AbstractImmutableConfig {
     
-    protected ManagerConfig clusterManagerConfig;
+    protected ClusterManagerConfig clusterManagerConfig;
     protected ManagerConfig eventManagerConfig;
     protected ManagerConfig dataSourceManagerConfig;
     protected ManagerConfig dataStoreManagerConfig;
-    protected ManagerConfig recipeManagerConfig;
+    protected RecipeManagerConfig recipeManagerConfig;
     protected TransportManagerConfig transportManagerConfig;
     protected ManagerConfig userInterfaceManagerConfig;
     protected ManagerConfig scheduleManagerConfig;
+    protected StatisticsManagerConfig statisticsManagerConfig;
     
     private UserConfig userConfig;
     
@@ -90,6 +94,7 @@ public class StargateServiceConfig extends AbstractImmutableConfig {
         this.transportManagerConfig = getDefaultTransportConfig();
         this.userInterfaceManagerConfig = getDefaultUserInterfaceConfig();
         this.scheduleManagerConfig = getDefaultScheduleConfig();
+        this.statisticsManagerConfig = getDefaultStatisticsConfig();
         this.userConfig = new UserConfig();
     }
     
@@ -129,13 +134,17 @@ public class StargateServiceConfig extends AbstractImmutableConfig {
             this.scheduleManagerConfig.setImmutable();
         }
         
+        if(this.statisticsManagerConfig != null) {
+            this.statisticsManagerConfig.setImmutable();
+        }
+        
         if(this.userConfig != null) {
             this.userConfig.setImmutable();
         }
     }
     
     @JsonProperty("cluster")
-    public void setClusterConfig(ManagerConfig clusterConfig) {
+    public void setClusterConfig(ClusterManagerConfig clusterConfig) {
         if(clusterConfig == null) {
             throw new IllegalArgumentException("clusterConfig is null");
         }
@@ -146,7 +155,7 @@ public class StargateServiceConfig extends AbstractImmutableConfig {
     }
     
     @JsonProperty("cluster")
-    public ManagerConfig getClusterConfig() {
+    public ClusterManagerConfig getClusterConfig() {
         return this.clusterManagerConfig;
     }
     
@@ -199,7 +208,7 @@ public class StargateServiceConfig extends AbstractImmutableConfig {
     }
     
     @JsonProperty("recipe")
-    public void setRecipeConfig(ManagerConfig recipeConfig) {
+    public void setRecipeConfig(RecipeManagerConfig recipeConfig) {
         if(recipeConfig == null) {
             throw new IllegalArgumentException("recipeConfig is null");
         }
@@ -210,7 +219,7 @@ public class StargateServiceConfig extends AbstractImmutableConfig {
     }
     
     @JsonProperty("recipe")
-    public ManagerConfig getRecipeConfig() {
+    public RecipeManagerConfig getRecipeConfig() {
         return this.recipeManagerConfig;
     }
     
@@ -262,6 +271,22 @@ public class StargateServiceConfig extends AbstractImmutableConfig {
         return this.scheduleManagerConfig;
     }
     
+    @JsonProperty("statistics")
+    public void setStatisticsConfig(StatisticsManagerConfig statisticsConfig) {
+        if(statisticsConfig == null) {
+            throw new IllegalArgumentException("statisticsConfig is null");
+        }
+        
+        super.checkMutableAndRaiseException();
+        
+        this.statisticsManagerConfig = statisticsConfig;
+    }
+    
+    @JsonProperty("statistics")
+    public StatisticsManagerConfig getStatisticsConfig() {
+        return this.statisticsManagerConfig;
+    }
+    
     @JsonProperty("user_config")
     public void setUserConfig(UserConfig userConfig) {
         if(userConfig == null) {
@@ -279,14 +304,14 @@ public class StargateServiceConfig extends AbstractImmutableConfig {
     }
     
     @JsonIgnore
-    public ManagerConfig getDefaultClusterConfig() {
+    public ClusterManagerConfig getDefaultClusterConfig() {
         DriverInjection driverInjection = new DriverInjection();
         driverInjection.setDriverClass(IgniteClusterDriver.class);
         
         IgniteClusterDriverConfig driverConfiguration = new IgniteClusterDriverConfig();
         driverInjection.setDriverConfig(driverConfiguration);
         
-        ManagerConfig managerConfig = new ManagerConfig();
+        ClusterManagerConfig managerConfig = new ClusterManagerConfig();
         managerConfig.addDriverSetting(driverInjection);
         return managerConfig;
     }
@@ -337,14 +362,14 @@ public class StargateServiceConfig extends AbstractImmutableConfig {
     }
 
     @JsonIgnore
-    public ManagerConfig getDefaultRecipeConfig() {
+    public RecipeManagerConfig getDefaultRecipeConfig() {
         DriverInjection driverInjection = new DriverInjection();
         driverInjection.setDriverClass(FixedSizeChunkRecipeDriver.class);
         
         FixedSizeChunkRecipeDriverConfig driverConfiguration = new FixedSizeChunkRecipeDriverConfig();
         driverInjection.setDriverConfig(driverConfiguration);
         
-        ManagerConfig managerConfig = new ManagerConfig();
+        RecipeManagerConfig managerConfig = new RecipeManagerConfig();
         managerConfig.addDriverSetting(driverInjection);
         return managerConfig;
     }
@@ -385,6 +410,12 @@ public class StargateServiceConfig extends AbstractImmutableConfig {
         
         ManagerConfig managerConfig = new ManagerConfig();
         managerConfig.addDriverSetting(driverInjection);
+        return managerConfig;
+    }
+    
+    @JsonIgnore
+    public StatisticsManagerConfig getDefaultStatisticsConfig() {
+        StatisticsManagerConfig managerConfig = new StatisticsManagerConfig();
         return managerConfig;
     }
 }

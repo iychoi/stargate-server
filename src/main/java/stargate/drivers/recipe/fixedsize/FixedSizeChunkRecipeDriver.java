@@ -39,8 +39,6 @@ public class FixedSizeChunkRecipeDriver extends AbstractRecipeDriver {
     private FixedSizeChunkRecipeDriverConfig config;
     private int chunkSize;
     private String hashAlgorithm;
-    private static final int BUFFER_SIZE = 64*1024; // 64KB
-    private int bufferSize = BUFFER_SIZE;
     private byte[] buffer;
     
     public FixedSizeChunkRecipeDriver(AbstractDriverConfig config) {
@@ -55,8 +53,8 @@ public class FixedSizeChunkRecipeDriver extends AbstractRecipeDriver {
         this.config = (FixedSizeChunkRecipeDriverConfig) config;
         this.chunkSize = this.config.getChunkSize();
         this.hashAlgorithm = this.config.getHashAlgorithm();
-        this.bufferSize = Math.min(this.chunkSize, BUFFER_SIZE);
-        this.buffer = new byte[this.bufferSize];
+        int bufferSize = Math.min(this.chunkSize, this.config.getBufferSize());
+        this.buffer = new byte[bufferSize];
     }
     
     public FixedSizeChunkRecipeDriver(AbstractRecipeDriverConfig config) {
@@ -71,8 +69,8 @@ public class FixedSizeChunkRecipeDriver extends AbstractRecipeDriver {
         this.config = (FixedSizeChunkRecipeDriverConfig) config;
         this.chunkSize = this.config.getChunkSize();
         this.hashAlgorithm = this.config.getHashAlgorithm();
-        this.bufferSize = Math.min(this.chunkSize, BUFFER_SIZE);
-        this.buffer = new byte[this.bufferSize];
+        int bufferSize = Math.min(this.chunkSize, this.config.getBufferSize());
+        this.buffer = new byte[bufferSize];
     }
     
     public FixedSizeChunkRecipeDriver(FixedSizeChunkRecipeDriverConfig config) {
@@ -83,8 +81,8 @@ public class FixedSizeChunkRecipeDriver extends AbstractRecipeDriver {
         this.config = config;
         this.chunkSize = this.config.getChunkSize();
         this.hashAlgorithm = this.config.getHashAlgorithm();
-        this.bufferSize = Math.min(this.chunkSize, BUFFER_SIZE);
-        this.buffer = new byte[this.bufferSize];
+        int bufferSize = Math.min(this.chunkSize, this.config.getBufferSize());
+        this.buffer = new byte[bufferSize];
     }
     
     @Override
@@ -138,7 +136,7 @@ public class FixedSizeChunkRecipeDriver extends AbstractRecipeDriver {
             int toread = this.chunkSize;
             int chunkLength = 0;
             
-            while((nread = dis.read(this.buffer, 0, Math.min(toread, this.bufferSize))) > 0) {
+            while((nread = dis.read(this.buffer, 0, Math.min(toread, this.buffer.length))) > 0) {
                 chunkLength += nread;
                 toread -= nread;
                 if(toread <= 0) {
