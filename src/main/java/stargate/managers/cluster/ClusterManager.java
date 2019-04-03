@@ -35,7 +35,6 @@ import stargate.commons.datastore.AbstractKeyValueStore;
 import stargate.commons.datastore.DataStoreProperties;
 import stargate.commons.driver.DriverNotInitializedException;
 import stargate.commons.manager.AbstractManager;
-import stargate.commons.manager.ManagerConfig;
 import stargate.commons.manager.ManagerNotInstantiatedException;
 import stargate.commons.utils.DateTimeUtils;
 import stargate.managers.datastore.DataStoreManager;
@@ -53,13 +52,7 @@ public class ClusterManager extends AbstractManager<AbstractClusterDriver> {
     
     private static final Log LOG = LogFactory.getLog(ClusterManager.class);
     
-    private static final int DEFAULT_NODE_FAILURE_REPORT_INTERVAL_SEC = 60*5;
-    private static final int DEFAULT_NUM_FAILURES_TO_BE_BLACKLISTED = 5;
-    
     private static ClusterManager instance;
-    
-    private int nodeFailureReportIntervalSec = DEFAULT_NODE_FAILURE_REPORT_INTERVAL_SEC;
-    private int numFailuresToBeBlacklisted = DEFAULT_NUM_FAILURES_TO_BE_BLACKLISTED;
     
     // store cluster information
     private Node localNode;
@@ -72,7 +65,7 @@ public class ClusterManager extends AbstractManager<AbstractClusterDriver> {
     
     private static final String REMOTE_CLUSTER_STORE = "remote_cluster";
     
-    public static ClusterManager getInstance(StargateService service, ManagerConfig config, Collection<AbstractClusterDriver> drivers) throws ManagerNotInstantiatedException {
+    public static ClusterManager getInstance(StargateService service, ClusterManagerConfig config, Collection<AbstractClusterDriver> drivers) throws ManagerNotInstantiatedException {
         synchronized (ClusterManager.class) {
             if(instance == null) {
                 instance = new ClusterManager(service, config, drivers);
@@ -81,7 +74,7 @@ public class ClusterManager extends AbstractManager<AbstractClusterDriver> {
         }
     }
     
-    public static ClusterManager getInstance(StargateService service, ManagerConfig config) throws ManagerNotInstantiatedException {
+    public static ClusterManager getInstance(StargateService service, ClusterManagerConfig config) throws ManagerNotInstantiatedException {
         synchronized (ClusterManager.class) {
             if(instance == null) {
                 if(config == null) {
@@ -114,7 +107,7 @@ public class ClusterManager extends AbstractManager<AbstractClusterDriver> {
         }
     }
     
-    ClusterManager(StargateService service, ManagerConfig config, Collection<AbstractClusterDriver> drivers) throws ManagerNotInstantiatedException {
+    ClusterManager(StargateService service, ClusterManagerConfig config, Collection<AbstractClusterDriver> drivers) throws ManagerNotInstantiatedException {
         if(service == null) {
             throw new IllegalArgumentException("service is null");
         }
@@ -638,11 +631,13 @@ public class ClusterManager extends AbstractManager<AbstractClusterDriver> {
             long currentTime = DateTimeUtils.getTimestamp();
             NodeStatus status = node.getStatus();
 
-            if(DateTimeUtils.timeElapsedSec(status.getLastFailureTime(), currentTime, this.nodeFailureReportIntervalSec)) {
+            ClusterManagerConfig managerConfig = (ClusterManagerConfig) this.getConfig();
+            
+            if(DateTimeUtils.timeElapsedSec(status.getLastFailureTime(), currentTime, managerConfig.getNodeFailureReportIntervalSec())) {
                 status.increaseFailureCount(true);
 
                 if(!status.isBlacklisted()) {
-                    if(status.getFailureCount() >= this.numFailuresToBeBlacklisted) {
+                    if(status.getFailureCount() >= managerConfig.getNumFailuresForBlacklist()) {
                         status.setBlacklisted(true);
                     }
                 }
@@ -675,11 +670,13 @@ public class ClusterManager extends AbstractManager<AbstractClusterDriver> {
                     long currentTime = DateTimeUtils.getTimestamp();
                     NodeStatus status = node.getStatus();
 
-                    if(DateTimeUtils.timeElapsedSec(status.getLastFailureTime(), currentTime, this.nodeFailureReportIntervalSec)) {
+                    ClusterManagerConfig managerConfig = (ClusterManagerConfig) this.getConfig();
+                    
+                    if(DateTimeUtils.timeElapsedSec(status.getLastFailureTime(), currentTime, managerConfig.getNodeFailureReportIntervalSec())) {
                         status.increaseFailureCount(true);
 
                         if(!status.isBlacklisted()) {
-                            if(status.getFailureCount() >= this.numFailuresToBeBlacklisted) {
+                            if(status.getFailureCount() >= managerConfig.getNumFailuresForBlacklist()) {
                                 status.setBlacklisted(true);
                             }
                         }
