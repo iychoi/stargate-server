@@ -324,6 +324,13 @@ public class TransportManager extends AbstractManager<AbstractTransportDriver> {
                     } else {
                         properties.setExpirable(false);
                     }
+                    
+                    // exclude non-data-nodes
+                    ClusterManager clusterManager = stargateService.getClusterManager();
+                    Cluster localCluster = clusterManager.getLocalCluster();
+                    Collection<String> nonDataNodeNames = localCluster.getNonDataNodeNames();
+                    properties.addNonDataNodes(nonDataNodeNames);
+                    
                     this.dataChunkCacheStore = keyValueStoreManager.getDriver().getKeyValueStore(DATA_CHUNK_CACHE_STORE, byte[].class, properties);
                 } catch (ManagerNotInstantiatedException ex) {
                     LOG.error("Manager is not instantiated", ex);

@@ -1,12 +1,8 @@
 #! /bin/bash
-SCRIPTDIR=$(realpath $(test -L "${BASH_SOURCE}" && readlink -f "${BASH_SOURCE}" || echo "${BASH_SOURCE}"))
-BASEDIR=$(dirname $(dirname ${SCRIPTDIR}))
-
-DEFAULT_STARGATE_STORAGE="${BASEDIR}/storage"
-STARGATE_STORAGE="${STARGATE_STORAGE:-${DEFAULT_STARGATE_STORAGE}}"
-
-DEFAULT_STARGATE_WORK="${BASEDIR}/work"
-STARGATE_WORK="${STARGATE_WORK:-${DEFAULT_STARGATE_WORK}}"
-
-DEFAULT_STARGATE_LIBS="${BASEDIR}/libs/*:${BASEDIR}/target/stargate-server-1.0.jar:${BASEDIR}/target/dependency/*"
-STARGATE_LIBS="${STARGATE_LIBS:-${DEFAULT_STARGATE_LIBS}}"
+if [ -z "${STARGATE_CONF}" ];
+then
+    echo -e "ERROR: Environment variable STARGATE_CONF is not defined"
+    exit 1
+else
+    source ${STARGATE_CONF}/env.sh
+fi

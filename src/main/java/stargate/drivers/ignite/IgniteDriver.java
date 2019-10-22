@@ -62,9 +62,11 @@ public class IgniteDriver {
     public static final String STORAGE_PATH = "storage";
     public static final String WAL_PATH = "wal";
     public static final String WAL_ARCHIVE_PATH = "wal_archive";
+    public static final String WORK_PATH = "work";
     
     private static IgniteDriver instance;
     private static File storageRootPath;
+    private static File workPath;
     private static String clusterName;
     private static List<String> clusterNodes = new ArrayList<String>();
     
@@ -91,6 +93,14 @@ public class IgniteDriver {
         }
         
         storageRootPath = path;
+    }
+    
+    public static void setWorkPath(File path) {
+        if(path == null) {
+            throw new IllegalArgumentException("path is null");
+        }
+        
+        workPath = path;
     }
     
     public static void addClusterNodes(Collection<String> nodes) {
@@ -156,6 +166,14 @@ public class IgniteDriver {
             }
             
             igniteConfig.setDiscoverySpi(discoveryConfig);
+            
+            
+            // work dir
+            if(this.workPath == null) {
+                this.workPath = new File(ResourceUtils.getStargateRoot(), WORK_PATH);
+            }
+
+            igniteConfig.setWorkDirectory(this.workPath.getAbsolutePath());
             
             // datastore
             DataStorageConfiguration dataStoreConfig = getDataStoreConfig();
@@ -358,6 +376,11 @@ public class IgniteDriver {
         ClusterNode localNode = igniteCluster.localNode();
     
         return getNodeNameFromClusterNode(localNode);
+    }
+    
+    public ClusterNode getLocalNode() {
+        IgniteCluster igniteCluster = this.igniteInstance.cluster();
+        return igniteCluster.localNode();
     }
     
     public Collection<String> getLocalNodeHostNames() {

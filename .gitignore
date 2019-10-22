@@ -24,7 +24,7 @@ applog.txt
 hs_err_pid*
 
 # package build files
-target
-storage
-work
-release
+target/
+storage/
+work/
+release/

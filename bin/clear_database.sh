@@ -1,6 +1,24 @@
 #! /bin/bash
-CUR_DIR="$(dirname $(realpath $(test -L "${BASH_SOURCE}" && readlink -f "${BASH_SOURCE}" || echo "${BASH_SOURCE}")))"
-source ${CUR_DIR}/bootstrap.sh
+if [ -z "${STARGATE_BIN}" ];
+then
+    echo -e "ERROR: Environment variable STARGATE_BIN is not defined"
+    exit 1
+else
+    source ${STARGATE_BIN}/bootstrap.sh
+fi
 
-rm -rf ${STARGATE_STORAGE}/*
-rm -rf ${STARGATE_WORK}/*
+if [ -z "${STARGATE_STORAGE}" ];
+then
+    echo -e "ERROR: Environment variable STARGATE_STORAGE is not defined"
+    exit 1
+else
+    rm -rf ${STARGATE_STORAGE}/*
+fi
+
+if [ -z "${STARGATE_WORK}" ];
+then
+    echo -e "ERROR: Environment variable STARGATE_WORK is not defined"
+    exit 1
+else
+    rm -rf ${STARGATE_WORK}/*
+fi

@@ -1,0 +1,86 @@
+{
+  "user_config" : {
+    "remote_clusters" : [ ],
+    "data_exports" : [ ]
+  },
+  "cluster" : {
+    "driver_setting" : [ {
+      "driver_class" : "stargate.drivers.cluster.ignite.IgniteClusterDriver",
+      "driver_config" : {
+        "@class" : "stargate.drivers.cluster.ignite.IgniteClusterDriverConfig",
+        "cluster_name" : "STARGATE_TEST",
+        "storage_root_path" : "/tmp/stargate_storage",
+        "work_path" : "/tmp/stargate_work",
+        "cluster_nodes" : [ "localhost" ]
+      }
+    } ]
+  },
+  "data_source" : {
+    "driver_setting" : [ {
+      "driver_class" : "stargate.drivers.datasource.hdfs.HDFSDataSourceDriver",
+      "driver_config" : {
+        "@class" : "stargate.drivers.datasource.hdfs.HDFSDataSourceDriverConfig",
+        "scheme" : "hdfs",
+        "namenode_uri" : "hdfs://{{ groups['namenode'][0] }}:9000",
+        "root_path" : "/"
+      }
+    } ]
+  },
+  "data_store" : {
+    "driver_setting" : [ {
+      "driver_class" : "stargate.drivers.datastore.ignite.IgniteDataStoreDriver",
+      "driver_config" : {
+        "@class" : "stargate.drivers.datastore.ignite.IgniteDataStoreDriverConfig"
+      }
+    } ]
+  },
+  "recipe" : {
+    "driver_setting" : [ {
+      "driver_class" : "stargate.drivers.recipe.overlappedfixedsize.OverlappedFixedSizeChunkRecipeDriver",
+      "driver_config" : {
+        "@class" : "stargate.drivers.recipe.overlappedfixedsize.OverlappedFixedSizeChunkRecipeDriverConfig",
+        "chunk_size" : 8388608,
+        "overlap_size" : 4096,
+        "hash_algorithm" : "SHA-1"
+      }
+    } ]
+  },
+  "transport" : {
+    "driver_setting" : [ {
+      "driver_class" : "stargate.drivers.transport.http.HTTPTransportDriver",
+      "driver_config" : {
+        "@class" : "stargate.drivers.transport.http.HTTPTransportDriverConfig",
+        "service_host_name_pattern" : ".*",
+        "service_port" : 31010
+      }
+    } ],
+    "transfer_layout" : "fair",
+    "contact_node_selection" : "roundrobin"
+  },
+  "user_interface" : {
+    "driver_setting" : [ {
+      "driver_class" : "stargate.drivers.userinterface.http.HTTPUserInterfaceDriver",
+      "driver_config" : {
+        "@class" : "stargate.drivers.userinterface.http.HTTPUserInterfaceDriverConfig",
+        "service_host_name_pattern" : ".*",
+        "service_port" : 41010
+      }
+    } ]
+  },
+  "schedule" : {
+    "driver_setting" : [ {
+      "driver_class" : "stargate.drivers.schedule.ignite.IgniteScheduleDriver",
+      "driver_config" : {
+        "@class" : "stargate.drivers.schedule.ignite.IgniteScheduleDriverConfig"
+      }
+    } ]
+  },
+  "event" : {
+    "driver_setting" : [ {
+      "driver_class" : "stargate.drivers.event.ignite.IgniteEventDriver",
+      "driver_config" : {
+        "@class" : "stargate.drivers.event.ignite.IgniteEventDriverConfig"
+      }
+    } ]
+  }
+}

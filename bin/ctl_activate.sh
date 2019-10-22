@@ -1,5 +1,10 @@
 #! /bin/bash
-CUR_DIR="$(dirname $(realpath $(test -L "${BASH_SOURCE}" && readlink -f "${BASH_SOURCE}" || echo "${BASH_SOURCE}")))"
-source ${CUR_DIR}/bootstrap.sh
+if [ -z "${STARGATE_BIN}" ];
+then
+    echo -e "ERROR: Environment variable STARGATE_BIN is not defined"
+    exit 1
+else
+    source ${STARGATE_BIN}/bootstrap.sh
+fi
 
 java -cp "${STARGATE_LIBS}" stargate.admin.cli.Activation $@

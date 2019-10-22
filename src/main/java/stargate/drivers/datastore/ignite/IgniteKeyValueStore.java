@@ -22,6 +22,7 @@ import java.util.Iterator;
 import java.util.List;
 import java.util.ArrayList;
 import java.util.Map;
+import java.util.UUID;
 import java.util.concurrent.Future;
 import java.util.concurrent.TimeUnit;
 import javax.cache.Cache;
@@ -31,11 +32,13 @@ import org.apache.commons.logging.Log;
 import org.apache.commons.logging.LogFactory;
 import org.apache.ignite.Ignite;
 import org.apache.ignite.IgniteCache;
+import org.apache.ignite.IgniteCluster;
 import org.apache.ignite.cache.CacheAtomicityMode;
 import org.apache.ignite.cache.CacheMode;
 import org.apache.ignite.cache.CachePeekMode;
 import org.apache.ignite.cache.CacheWriteSynchronizationMode;
 import org.apache.ignite.cache.affinity.Affinity;
+import org.apache.ignite.cache.affinity.rendezvous.RendezvousAffinityFunction;
 import org.apache.ignite.cluster.ClusterNode;
 import org.apache.ignite.configuration.CacheConfiguration;
 import stargate.commons.datastore.AbstractKeyValueStore;
@@ -95,6 +98,24 @@ public class IgniteKeyValueStore extends AbstractKeyValueStore {
             
             int replicaNum = properties.getReplicaNum();
             cc.setBackups(replicaNum);
+            
+            RendezvousAffinityFunction affinityFunction = new RendezvousAffinityFunction();
+            affinityFunction.setExcludeNeighbors(true);
+            
+            // remove non-data node from affinity
+            IgniteCluster igniteCluster = this.ignite.cluster();
+            Collection<String> nonDataNodes = properties.getNonDataNodes();
+
+            for(ClusterNode node : igniteCluster.nodes()) {
+                UUID nodeId = node.id();
+
+                String nodeName = igniteDriver.getNodeNameFromNodeID(nodeId);
+                if(nonDataNodes.contains(nodeName)) {
+                    affinityFunction.removeNode(nodeId);
+                }
+            }
+            
+            cc.setAffinity(affinityFunction);
         } else {
             cc.setCacheMode(CacheMode.REPLICATED);
         }

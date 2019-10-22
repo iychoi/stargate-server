@@ -35,7 +35,6 @@ import stargate.commons.transport.AbstractTransportDriverConfig;
 import stargate.commons.transport.TransportServiceInfo;
 import stargate.commons.utils.DateTimeUtils;
 import stargate.commons.utils.IPUtils;
-import stargate.managers.transport.TransportManager;
 
 /**
  *

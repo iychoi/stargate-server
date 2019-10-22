@@ -109,6 +109,7 @@ public class IgniteClusterDriver extends AbstractClusterDriver {
     private void setIgniteDriver() {
         IgniteDriver.setClusterName(this.config.getClusterName());
         IgniteDriver.setStorageRootPath(this.config.getStorageRootPath());
+        IgniteDriver.setWorkPath(this.config.getWorkPath());
         IgniteDriver.addClusterNodes(this.config.getClusterNodes());
     }
     
@@ -227,6 +228,8 @@ public class IgniteClusterDriver extends AbstractClusterDriver {
         String clusterName = this.config.getClusterName();
         String nodeName = this.igniteDriver.getLocalNodeName();
         
+        Collection<String> nonDataNodes = this.config.getNonDataNodes();
+        
         Set<String> hostnames = new HashSet<String>();
         
         Collection<String> igniteHostNames = this.igniteDriver.getLocalNodeHostNames();
@@ -235,7 +238,15 @@ public class IgniteClusterDriver extends AbstractClusterDriver {
         hostnames.addAll(igniteHostNames);
         hostnames.addAll(localHostNames);
         
-        try {    
+        boolean dataNode = true;
+        for(String nonDataNode : nonDataNodes) {
+            if(hostnames.contains(nonDataNode)) {
+                dataNode = false;
+                break;
+            }
+        }
+        
+        try {
             StargateService stargateService = getStargateService();
             TransportManager transportManager = stargateService.getTransportManager();
             TransportServiceInfo transportServiceInfo = transportManager.getServiceInfo();
@@ -243,7 +254,7 @@ public class IgniteClusterDriver extends AbstractClusterDriver {
             UserInterfaceManager userInterfaceManager = stargateService.getUserInterfaceManager();
             UserInterfaceServiceInfo userInterfaceServiceInfo = userInterfaceManager.getServiceInfo();
             
-            Node stargateNode = new Node(nodeName, clusterName, new NodeStatus(), transportServiceInfo, userInterfaceServiceInfo, hostnames);
+            Node stargateNode = new Node(nodeName, clusterName, dataNode, new NodeStatus(), transportServiceInfo, userInterfaceServiceInfo, hostnames);
             LOG.debug(String.format("Local node - %s", stargateNode.toJson()));
             return stargateNode;
         } catch (ManagerNotInstantiatedException ex) {

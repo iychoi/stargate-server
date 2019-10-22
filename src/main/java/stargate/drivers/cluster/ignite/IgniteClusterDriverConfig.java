@@ -37,7 +37,9 @@ public class IgniteClusterDriverConfig extends AbstractClusterDriverConfig {
     
     private String clusterName = DEFAULT_CLUSTER_NAME;
     private File storageRootPath;
+    private File workPath;
     private List<String> clusterNodes = new ArrayList<String>();
+    private List<String> nonDataNodes = new ArrayList<String>();
     
     public static IgniteClusterDriverConfig createInstance(File file) throws IOException {
         if(file == null) {
@@ -107,6 +109,38 @@ public class IgniteClusterDriverConfig extends AbstractClusterDriverConfig {
         return this.storageRootPath;
     }
     
+    @JsonProperty("work_path")
+    public void setWorkPath(String workPath) {
+        if(workPath == null || workPath.isEmpty()) {
+            throw new IllegalArgumentException("workPath is null or empty");
+        }
+        
+        super.checkMutableAndRaiseException();
+        
+        this.workPath = new File(workPath);
+    }
+    
+    @JsonIgnore
+    public void setWorkPath(File workPath) {
+        if(workPath == null) {
+            throw new IllegalArgumentException("workPath is null");
+        }
+        
+        super.checkMutableAndRaiseException();
+        
+        this.workPath = workPath;
+    }
+    
+    @JsonProperty("work_path")
+    public String getWorkPathString() {
+        return this.workPath.getAbsolutePath();
+    }
+    
+    @JsonIgnore
+    public File getWorkPath() {
+        return this.workPath;
+    }
+    
     @JsonProperty("cluster_nodes")
     public void addClusterNodes(Collection<String> nodes) {
         if(nodes == null) {
@@ -134,5 +168,34 @@ public class IgniteClusterDriverConfig extends AbstractClusterDriverConfig {
     @JsonProperty("cluster_nodes")
     public Collection<String> getClusterNodes() {
         return Collections.unmodifiableCollection(this.clusterNodes);
+    }
+    
+    @JsonProperty("non_data_nodes")
+    public void addNonDataNodes(Collection<String> nodes) {
+        if(nodes == null) {
+            throw new IllegalArgumentException("nodes is null");
+        }
+        
+        super.checkMutableAndRaiseException();
+        
+        for(String node : nodes) {
+            addNonDataNode(node);
+        }
+    }
+    
+    @JsonIgnore
+    public void addNonDataNode(String node) {
+        if(node == null || node.isEmpty()) {
+            throw new IllegalArgumentException("node is null or empty");
+        }
+        
+        super.checkMutableAndRaiseException();
+        
+        this.nonDataNodes.add(node);
+    }
+    
+    @JsonProperty("non_data_nodes")
+    public Collection<String> getNonDataNodes() {
+        return Collections.unmodifiableCollection(this.nonDataNodes);
     }
 }
