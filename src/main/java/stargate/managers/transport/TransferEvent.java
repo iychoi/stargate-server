@@ -128,9 +128,10 @@ public class TransferEvent {
     
     @JsonProperty("hash")
     public void setHash(String hash) {
-        if(hash == null || hash.isEmpty()) {
-            throw new IllegalArgumentException("hash is null or empty");
-        }
+        // this can be null
+        //if(hash == null || hash.isEmpty()) {
+        //    throw new IllegalArgumentException("hash is null or empty");
+        //}
         
         this.hash = hash;
     }
