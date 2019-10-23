@@ -33,6 +33,7 @@ import org.apache.ignite.IgniteCluster;
 import org.apache.ignite.IgniteLogger;
 import org.apache.ignite.Ignition;
 import org.apache.ignite.cluster.ClusterNode;
+import org.apache.ignite.configuration.DataPageEvictionMode;
 import org.apache.ignite.configuration.DataRegionConfiguration;
 import org.apache.ignite.configuration.DataStorageConfiguration;
 import org.apache.ignite.configuration.IgniteConfiguration;
@@ -57,7 +58,11 @@ public class IgniteDriver {
     public static String LOG4J_PROPERTY_PATH = "config/java.util.logging.properties";
     
     public static final String PERSISTENT_REGION_NAME = "PERSISTENT_REGION";
+    public static final String PERSISTENT_BIG_REGION_NAME = "PERSISTENT_BIG_REGION";
     public static final String VOLATILE_REGION_NAME = "VOLATILE_REGION";
+    
+    public static final long MAX_DATA_REGION_SIZE = 100 * 1024 * 1024; // 100MB
+    public static final long MAX_BIG_DATA_REGION_SIZE = 1024 * 1024 * 1024; // 1G
     
     public static final String STORAGE_PATH = "storage";
     public static final String WAL_PATH = "wal";
@@ -294,13 +299,21 @@ public class IgniteDriver {
         DataRegionConfiguration persistentDataRegConf = new DataRegionConfiguration();
         persistentDataRegConf.setName(PERSISTENT_REGION_NAME);
         persistentDataRegConf.setPersistenceEnabled(true);
+        persistentDataRegConf.setMaxSize(MAX_DATA_REGION_SIZE);
+        
+        // persistent - big
+        DataRegionConfiguration persistentBigDataRegConf = new DataRegionConfiguration();
+        persistentBigDataRegConf.setName(PERSISTENT_BIG_REGION_NAME);
+        persistentBigDataRegConf.setPersistenceEnabled(true);
+        persistentBigDataRegConf.setMaxSize(MAX_BIG_DATA_REGION_SIZE);
         
         // volatile
         DataRegionConfiguration volatileDataRegConf = new DataRegionConfiguration();
         volatileDataRegConf.setName(VOLATILE_REGION_NAME);
         volatileDataRegConf.setPersistenceEnabled(false);
+        volatileDataRegConf.setMaxSize(MAX_DATA_REGION_SIZE);
         
-        dsCfg.setDataRegionConfigurations(volatileDataRegConf);
+        dsCfg.setDataRegionConfigurations(volatileDataRegConf, persistentDataRegConf, persistentBigDataRegConf);
         dsCfg.setDefaultDataRegionConfiguration(persistentDataRegConf);
         
         if(this.storageRootPath == null) {

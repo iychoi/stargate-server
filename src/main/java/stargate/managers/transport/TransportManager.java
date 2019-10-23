@@ -316,6 +316,7 @@ public class TransportManager extends AbstractManager<AbstractTransportDriver> {
                     properties.setSharded(true);
                     properties.setReplicaNum(1);
                     properties.setPersistent(true);
+                    properties.setBigStore(true);
                     
                     if(managerConfig.getDataChunkCacheTimeoutSec() > 0) {
                         properties.setExpirable(true);

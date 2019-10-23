@@ -26,4 +26,4 @@ else
     SERVICE_CONFIG="$1"
 fi
 
-java -cp "${STARGATE_LIBS}" stargate.service.ServiceMain ${SERVICE_CONFIG}
+java -cp "${STARGATE_LIBS}" ${STARGATE_MEMORY_PARAM} stargate.service.ServiceMain ${SERVICE_CONFIG}

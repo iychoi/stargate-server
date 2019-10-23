@@ -121,7 +121,11 @@ public class IgniteKeyValueStore extends AbstractKeyValueStore {
         }
         
         if(properties.isPersistent()) {
-            cc.setDataRegionName(IgniteDriver.PERSISTENT_REGION_NAME);
+            if(properties.isBigStore()) {
+                cc.setDataRegionName(IgniteDriver.PERSISTENT_BIG_REGION_NAME);
+            } else {
+                cc.setDataRegionName(IgniteDriver.PERSISTENT_REGION_NAME);
+            }
         } else {
             cc.setDataRegionName(IgniteDriver.VOLATILE_REGION_NAME);
         }
@@ -133,6 +137,7 @@ public class IgniteKeyValueStore extends AbstractKeyValueStore {
         cc.setOnheapCacheEnabled(true);
         cc.setReadFromBackup(true);
         cc.setName(name);
+        
         
         this.store = this.ignite.getOrCreateCache(cc);
         
