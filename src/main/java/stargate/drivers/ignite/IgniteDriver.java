@@ -61,7 +61,10 @@ public class IgniteDriver {
     public static final String PERSISTENT_BIG_REGION_NAME = "PERSISTENT_BIG_REGION";
     public static final String VOLATILE_REGION_NAME = "VOLATILE_REGION";
     
+    public static final long FAILURE_DETECTION_TIMEOUT = 30000; // 30 sec
+    public static final long INITIAL_DATA_REGION_SIZE = 10 * 1024 * 1024; // 10MB
     public static final long MAX_DATA_REGION_SIZE = 100 * 1024 * 1024; // 100MB
+    public static final long INITIAL_BIG_DATA_REGION_SIZE = 512 * 1024 * 1024; // 500MB
     public static final long MAX_BIG_DATA_REGION_SIZE = 1024 * 1024 * 1024; // 1G
     
     public static final String STORAGE_PATH = "storage";
@@ -171,7 +174,7 @@ public class IgniteDriver {
             }
             
             igniteConfig.setDiscoverySpi(discoveryConfig);
-            
+            igniteConfig.setFailureDetectionTimeout(FAILURE_DETECTION_TIMEOUT);
             
             // work dir
             if(this.workPath == null) {
@@ -299,21 +302,27 @@ public class IgniteDriver {
         DataRegionConfiguration persistentDataRegConf = new DataRegionConfiguration();
         persistentDataRegConf.setName(PERSISTENT_REGION_NAME);
         persistentDataRegConf.setPersistenceEnabled(true);
+        persistentDataRegConf.setPageEvictionMode(DataPageEvictionMode.RANDOM_2_LRU);
+        persistentDataRegConf.setInitialSize(INITIAL_DATA_REGION_SIZE);
         persistentDataRegConf.setMaxSize(MAX_DATA_REGION_SIZE);
         
         // persistent - big
         DataRegionConfiguration persistentBigDataRegConf = new DataRegionConfiguration();
         persistentBigDataRegConf.setName(PERSISTENT_BIG_REGION_NAME);
         persistentBigDataRegConf.setPersistenceEnabled(true);
+        persistentBigDataRegConf.setPageEvictionMode(DataPageEvictionMode.RANDOM_2_LRU);
+        persistentBigDataRegConf.setInitialSize(INITIAL_BIG_DATA_REGION_SIZE);
         persistentBigDataRegConf.setMaxSize(MAX_BIG_DATA_REGION_SIZE);
         
         // volatile
         DataRegionConfiguration volatileDataRegConf = new DataRegionConfiguration();
         volatileDataRegConf.setName(VOLATILE_REGION_NAME);
         volatileDataRegConf.setPersistenceEnabled(false);
+        volatileDataRegConf.setPageEvictionMode(DataPageEvictionMode.RANDOM_2_LRU);
+        volatileDataRegConf.setInitialSize(INITIAL_DATA_REGION_SIZE);
         volatileDataRegConf.setMaxSize(MAX_DATA_REGION_SIZE);
         
-        dsCfg.setDataRegionConfigurations(volatileDataRegConf, persistentDataRegConf, persistentBigDataRegConf);
+        dsCfg.setDataRegionConfigurations(volatileDataRegConf, persistentBigDataRegConf);
         dsCfg.setDefaultDataRegionConfiguration(persistentDataRegConf);
         
         if(this.storageRootPath == null) {

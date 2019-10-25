@@ -132,12 +132,9 @@ public class IgniteKeyValueStore extends AbstractKeyValueStore {
         
         cc.setWriteSynchronizationMode(CacheWriteSynchronizationMode.PRIMARY_SYNC);
         cc.setAtomicityMode(CacheAtomicityMode.ATOMIC);
-        cc.setEvictionPolicy(null);
         cc.setCopyOnRead(true);
-        cc.setOnheapCacheEnabled(true);
         cc.setReadFromBackup(true);
         cc.setName(name);
-        
         
         this.store = this.ignite.getOrCreateCache(cc);
         
