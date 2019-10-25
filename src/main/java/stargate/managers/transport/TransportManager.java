@@ -670,6 +670,7 @@ public class TransportManager extends AbstractManager<AbstractTransportDriver> {
             DataChunkCache pendingDataChunkCache = new DataChunkCache(DataChunkCacheType.DATA_CHUNK_CACHE_PENDING, hash, 1, localNode.getName(), null);
             boolean insert = this.dataChunkCacheStore.putIfAbsent(hash, pendingDataChunkCache.toBytes());
             if(insert) {
+                LOG.debug(String.format("getDataChunk: Put a pending request for a on-demand transfer for - %s, %s", uri.toUri().toASCIIString(), hash));
                 this.lastUpdateTime = DateTimeUtils.getTimestamp();
                 putPendingChunkCache = true;
             }
@@ -681,6 +682,8 @@ public class TransportManager extends AbstractManager<AbstractTransportDriver> {
             // double-check cache
             if(!putPendingChunkCache) {
                 while(true) {
+                    LOG.debug(String.format("getDataChunk: Checking a pending request for a on-demand transfer for - %s, %s", uri.toUri().toASCIIString(), hash));
+                    
                     byte[] existingData = (byte[]) this.dataChunkCacheStore.get(hash);
                     if(existingData != null) {
                         DataChunkCache existingCache = DataChunkCache.fromBytes(existingData);
@@ -698,6 +701,8 @@ public class TransportManager extends AbstractManager<AbstractTransportDriver> {
                             LOG.debug(String.format("getDataChunk: Found a chunk cache for - %s, %s", uri.toUri().toASCIIString(), hash));
                             return bais;
                         } else if(existingCache.getType().equals(DataChunkCacheType.DATA_CHUNK_CACHE_PENDING)) {
+                            LOG.debug(String.format("getDataChunk: A request for a on-demand transfer for - %s, %s is still pending", uri.toUri().toASCIIString(), hash));
+                            
                             // wait until the data transfer is complete
                             if(!existingCache.getWaitingNodes().contains(localNode.getName())) {
                                 DataChunkCache newDataChunkCache = new DataChunkCache(DataChunkCacheType.DATA_CHUNK_CACHE_PENDING, hash, existingCache.getVersion() + 1, existingCache.getTransferNode(), null);

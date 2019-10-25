@@ -255,6 +255,8 @@ public class IgniteEventDriver extends AbstractEventDriver {
             throw new IllegalArgumentException("event is null");
         }
         
+        LOG.debug(String.format("Process an event from %s - %s", event.getSenderNodeName(), event.toJson()));
+            
         Collection<String> receiverNodeNames = event.getReceiverNodeNames();
         String localNodeName = this.igniteDriver.getLocalNodeName();
         if(receiverNodeNames.contains(localNodeName)) {
@@ -282,6 +284,8 @@ public class IgniteEventDriver extends AbstractEventDriver {
         String localNodeName = this.igniteDriver.getLocalNodeName();
         
         for(StargateEvent sevent : event.getEvents()) {
+            
+            LOG.debug(String.format("Process an event from %s - %s", sevent.getSenderNodeName(), event.toJson()));
             Collection<String> receiverNodeNames = sevent.getReceiverNodeNames();
             if(receiverNodeNames.contains(localNodeName)) {
                 Set<AbstractEventHandler> handlers = null;

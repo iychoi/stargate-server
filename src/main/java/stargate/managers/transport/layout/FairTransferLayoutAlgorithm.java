@@ -365,14 +365,15 @@ public class FairTransferLayoutAlgorithm extends AbstractTransferLayoutAlgorithm
         switch(event.getEventType()) {
             case TRANSFER_WORKLOAD_EVENT_TYPE_SYNC_DELTA:
                 try {
+                    ClusterWorkload workload = event.getWorkload();
+                    
+                    LOG.debug(String.format("A workload sync is requested : %s", workload.toString()));
+                    
                     StargateService stargateService = getStargateService();
-
                     ClusterManager clusterManager = stargateService.getClusterManager();
                     
                     if(!clusterManager.isLocalNode(senderNodeName)) {
                         // local events are immediately processed
-                        ClusterWorkload workload = event.getWorkload();
-                        LOG.debug(String.format("A workload sync is requested : %s", workload.toString()));
                         applyWorkloadDelta(workload);
                     }
                 } catch (ManagerNotInstantiatedException ex) {
