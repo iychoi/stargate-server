@@ -20,9 +20,18 @@ then
     exit 1
 fi
 
+
+FIRST_NODE=true
 while read node; do
     echo "connecting to ${node}"
     work ${node}
+    if [ "${FIRST_NODE}" = true ];
+    then
+        echo "sleeping 3 seconds to let master node run"
+        sleep 3
+    fi
+
+    FIRST_NODE=false
 done <${STARGATE_CONF}/cluster
 
 echo "All jobs completed"
