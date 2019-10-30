@@ -37,6 +37,7 @@ import org.apache.ignite.configuration.DataPageEvictionMode;
 import org.apache.ignite.configuration.DataRegionConfiguration;
 import org.apache.ignite.configuration.DataStorageConfiguration;
 import org.apache.ignite.configuration.IgniteConfiguration;
+import org.apache.ignite.configuration.WALMode;
 import org.apache.ignite.internal.managers.discovery.IgniteDiscoverySpi;
 import org.apache.ignite.logger.log4j.Log4JLogger;
 import org.apache.ignite.spi.collision.CollisionSpi;
@@ -66,6 +67,8 @@ public class IgniteDriver {
     public static final long MAX_DATA_REGION_SIZE = 100 * 1024 * 1024; // 100MB
     public static final long INITIAL_BIG_DATA_REGION_SIZE = 512 * 1024 * 1024; // 500MB
     public static final long MAX_BIG_DATA_REGION_SIZE = 1024 * 1024 * 1024; // 1G
+    public static final int WAL_BUFFER_SIZE = 65 * 1024 * 1024; // 65 MB
+    public static final int WAL_SEGMENT_SIZE = 1024 * 1024 * 1024; // 1G
     
     public static final String STORAGE_PATH = "storage";
     public static final String WAL_PATH = "wal";
@@ -335,7 +338,10 @@ public class IgniteDriver {
         dsCfg.setStoragePath(storagePath.getAbsolutePath());
         dsCfg.setWalPath(walPath.getAbsolutePath());
         dsCfg.setWalArchivePath(walArchivePath.getAbsolutePath());
-        
+        dsCfg.setWalBufferSize(WAL_BUFFER_SIZE);
+        dsCfg.setWalSegmentSize(WAL_SEGMENT_SIZE);
+        dsCfg.setWalMode(WALMode.NONE);
+        dsCfg.setWriteThrottlingEnabled(true);
         dsCfg.setCheckpointReadLockTimeout(0); // bugfix: ignite 2.7 has a bug for this.
         
         return dsCfg;
