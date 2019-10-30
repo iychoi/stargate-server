@@ -99,8 +99,7 @@ public class IgniteKeyValueStore extends AbstractKeyValueStore {
             int replicaNum = properties.getReplicaNum();
             cc.setBackups(replicaNum);
             
-            RendezvousAffinityFunction affinityFunction = new RendezvousAffinityFunction();
-            affinityFunction.setExcludeNeighbors(true);
+            DataNodesOnlyRendezvousAffinityFunction affinityFunction = new DataNodesOnlyRendezvousAffinityFunction();
             
             // remove non-data node from affinity
             IgniteCluster igniteCluster = this.ignite.cluster();
@@ -111,13 +110,16 @@ public class IgniteKeyValueStore extends AbstractKeyValueStore {
 
                 String nodeName = igniteDriver.getNodeNameFromNodeID(nodeId);
                 if(nonDataNodes.contains(nodeName)) {
-                    affinityFunction.removeNode(nodeId);
+                    affinityFunction.execludeNode(node);
                 }
             }
             
             cc.setAffinity(affinityFunction);
         } else {
             cc.setCacheMode(CacheMode.REPLICATED);
+            
+            RendezvousAffinityFunction affinityFunction = new RendezvousAffinityFunction();
+            cc.setAffinity(affinityFunction);
         }
         
         if(properties.isPersistent()) {
