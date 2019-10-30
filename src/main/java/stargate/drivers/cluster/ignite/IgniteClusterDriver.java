@@ -233,7 +233,7 @@ public class IgniteClusterDriver extends AbstractClusterDriver {
         Set<String> hostnames = new HashSet<String>();
         
         Collection<String> igniteHostNames = this.igniteDriver.getLocalNodeHostNames();
-        Collection<String> localHostNames = IPUtils.getHostNames();
+        Collection<String> localHostNames = IPUtils.getAllHostNames();
         
         hostnames.addAll(igniteHostNames);
         hostnames.addAll(localHostNames);

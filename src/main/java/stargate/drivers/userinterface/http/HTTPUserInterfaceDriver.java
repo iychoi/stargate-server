@@ -150,11 +150,11 @@ public class HTTPUserInterfaceDriver extends AbstractUserInterfaceDriver {
         }
         
         try {
-            Collection<String> hostAddress = IPUtils.getHostNames();
+            Collection<String> hostAddress = IPUtils.getAllHostNames();
             List<String> acceptedHostAddr = new ArrayList<String>();
+            Pattern pattern = Pattern.compile(this.config.getServiceHostNamePattern());
             
             for(String addr : hostAddress) {
-                Pattern pattern = Pattern.compile(this.config.getServiceHostNamePattern());
                 Matcher matcher = pattern.matcher(addr);
                 if(matcher.matches()) {
                     acceptedHostAddr.add(addr);

@@ -370,7 +370,7 @@ public class LocalFSDataSourceDriver extends AbstractDataSourceDriver {
         synchronized(this.cachedLocalNodeNameSyncObj) {
             if(this.cachedLocalNodeName == null || this.cachedLocalNodeName.isEmpty()) {
                 String nodeName = null;
-                Collection<String> hostnames = IPUtils.getHostNames();
+                Collection<String> hostnames = IPUtils.getAllHostNames();
                 for(String hostname : hostnames) {
                     // use one of hostnames that can be converted to node name
                     String newNodeName = convNodeName(cluster, hostname);
