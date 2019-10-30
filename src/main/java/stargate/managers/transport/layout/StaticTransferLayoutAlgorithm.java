@@ -23,6 +23,7 @@ import stargate.commons.datastore.AbstractKeyValueStore;
 import stargate.commons.recipe.Recipe;
 import stargate.commons.recipe.RecipeChunk;
 import stargate.commons.service.AbstractService;
+import stargate.commons.utils.StringUtils;
 import stargate.managers.transport.TransportManager;
 import stargate.service.StargateService;
 
@@ -139,14 +140,22 @@ public class StaticTransferLayoutAlgorithm extends AbstractTransferLayoutAlgorit
         
         RecipeChunk chunk = recipe.getChunk(hash);
         Collection<Integer> nodeIDs = chunk.getNodeIDs();
+        if(nodeIDs.isEmpty()) {
+            throw new IOException(String.format("There is no node for hash %s", hash));
+        }
+        
         Collection<String> nodeNames = recipe.getNodeNames(nodeIDs);
-
+        if(nodeNames.isEmpty()) {
+            throw new IOException(String.format("Cannot get node names for node IDs: %s", StringUtils.getCommaSeparatedString(nodeIDs)));
+        }
+        
         for(String nodeName : nodeNames) {
             Node remoteNode = remoteCluster.getNode(nodeName);
             // we return very first node who has the chunk
             return remoteNode;
         }
         
-        return null;
+        // ERROR
+        throw new IOException(String.format("Cannot determine remote node for hash %s, nodeNames %s", hash, StringUtils.getCommaSeparatedString(nodeNames)));
     }
 }
