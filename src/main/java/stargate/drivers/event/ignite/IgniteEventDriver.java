@@ -135,8 +135,6 @@ public class IgniteEventDriver extends AbstractEventDriver {
         IgniteBiPredicate<UUID, String> ignitePredicate = new IgniteBiPredicate<UUID, String>() {
             @Override
             public boolean apply(UUID nodeId, String msg) {
-                LOG.debug(String.format("Received an event from %s - %s", nodeId.toString(), msg));
-                
                 try {
                     // msg is an StargateEvent object
                     StargateEvent event = StargateEvent.createInstance(msg);
@@ -171,8 +169,6 @@ public class IgniteEventDriver extends AbstractEventDriver {
         IgniteBiPredicate<UUID, String> ignitePredicateForBulk = new IgniteBiPredicate<UUID, String>() {
             @Override
             public boolean apply(UUID nodeId, String msg) {
-                LOG.debug(String.format("Received a bulk event from %s - %s", nodeId.toString(), msg));
-                
                 try {
                     // msg is a BulkStargateEvent object
                     BulkStargateEvent event = BulkStargateEvent.createInstance(msg);
@@ -255,12 +251,12 @@ public class IgniteEventDriver extends AbstractEventDriver {
             throw new IllegalArgumentException("event is null");
         }
         
-        LOG.debug(String.format("Process an event from %s - %s", event.getSenderNodeName(), event.toJson()));
-            
         Collection<String> receiverNodeNames = event.getReceiverNodeNames();
         String localNodeName = this.igniteDriver.getLocalNodeName();
         if(receiverNodeNames.contains(localNodeName)) {
             Set<AbstractEventHandler> handlers = null;
+            
+            LOG.debug(String.format("Process an event from %s - %s", event.getSenderNodeName(), event.toJson()));
             
             synchronized(this.eventHandlersSyncObj) {
                 StargateEventType eventType = event.getEventType();
@@ -284,11 +280,11 @@ public class IgniteEventDriver extends AbstractEventDriver {
         String localNodeName = this.igniteDriver.getLocalNodeName();
         
         for(StargateEvent sevent : event.getEvents()) {
-            
-            LOG.debug(String.format("Process an event from %s - %s", sevent.getSenderNodeName(), event.toJson()));
             Collection<String> receiverNodeNames = sevent.getReceiverNodeNames();
             if(receiverNodeNames.contains(localNodeName)) {
                 Set<AbstractEventHandler> handlers = null;
+                
+                LOG.debug(String.format("Process an event from %s - %s", sevent.getSenderNodeName(), sevent.toJson()));
                 
                 synchronized(this.eventHandlersSyncObj) {
                     StargateEventType eventType = sevent.getEventType();
