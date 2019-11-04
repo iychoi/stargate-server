@@ -15,7 +15,6 @@
 */
 package stargate.drivers.transport.http;
 
-import stargate.drivers.userinterface.http.*;
 import java.io.IOException;
 import java.io.InputStream;
 import java.io.OutputStream;

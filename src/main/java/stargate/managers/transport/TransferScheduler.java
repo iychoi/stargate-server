@@ -63,11 +63,14 @@ public class TransferScheduler {
     }
     
     public void start() {
+        LOG.debug("Transfer scheduler starts");
+        
         this.schedulerRun = true;
         this.transferSchedulerThread = new Thread(new Runnable() {
             @Override
             public void run() {
                 try {
+                    LOG.debug("Transfer scheduler thread is starting");
                     while(schedulerRun) {
                         LOG.debug("Fetching a transfer from a queue");
                         AbstractTransferTask task = priorityTaskQueue.take();
@@ -97,6 +100,7 @@ public class TransferScheduler {
                             transferPoolExecutor.execute(r);
                         }
                     }
+                    LOG.debug("Transfer scheduler thread is terminating");
                 } catch (Exception ex) {
                     LOG.error("Unknown Exception", ex);
                 }
@@ -118,6 +122,8 @@ public class TransferScheduler {
         this.transferPoolExecutor.shutdownNow();
         this.priorityTaskQueue.clear();
         this.inTransferTasks.clear();
+        
+        LOG.debug("Transfer scheduler finished");
     }
     
     public void schedule(AbstractTransferTask task) throws IOException {
@@ -195,7 +201,7 @@ public class TransferScheduler {
                     }
                 }
 
-                // to prevent the item from expiring                
+                // to prevent the item from expiring
                 this.pendingPrefetchTasks.put(uriString, prefetchTasks);
             }
         }

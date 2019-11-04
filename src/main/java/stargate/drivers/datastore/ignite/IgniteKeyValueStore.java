@@ -22,7 +22,6 @@ import java.util.Iterator;
 import java.util.List;
 import java.util.ArrayList;
 import java.util.Map;
-import java.util.UUID;
 import java.util.concurrent.Future;
 import java.util.concurrent.TimeUnit;
 import javax.cache.Cache;
@@ -64,7 +63,7 @@ public class IgniteKeyValueStore extends AbstractKeyValueStore {
     private IgniteCache<String, ByteArray> store;
     private Affinity<String> affinity;
     
-    public IgniteKeyValueStore(IgniteDataStoreDriver driver, IgniteDriver igniteDriver, String name, Class valueClass, DataStoreProperties properties) {
+    public IgniteKeyValueStore(IgniteDataStoreDriver driver, IgniteDriver igniteDriver, String name, Class valueClass, DataStoreProperties properties) throws IOException {
         if(driver == null) {
             throw new IllegalArgumentException("driver is null");
         }
@@ -106,9 +105,7 @@ public class IgniteKeyValueStore extends AbstractKeyValueStore {
             Collection<String> nonDataNodes = properties.getNonDataNodes();
 
             for(ClusterNode node : igniteCluster.nodes()) {
-                UUID nodeId = node.id();
-
-                String nodeName = igniteDriver.getNodeNameFromNodeID(nodeId);
+                String nodeName = igniteDriver.getNodeNameFromClusterNode(node);
                 if(nonDataNodes.contains(nodeName)) {
                     affinityFunction.execludeNode(node);
                 }
@@ -270,6 +267,11 @@ public class IgniteKeyValueStore extends AbstractKeyValueStore {
     public String getPrimaryNodeForData(String key) throws IOException {
         ClusterNode primaryNode = this.affinity.mapKeyToNode(key);
         if(primaryNode == null) {
+            int partitionID = this.affinity.partition(key);
+            LOG.error(String.format("Map key(%s) to partition(%d)", key, partitionID));
+            
+            ClusterNode partitionNode = this.affinity.mapPartitionToNode(partitionID);
+            LOG.error(String.format("Map partition(%d) to node(%s)", partitionID, partitionNode.id()));
             return null;
         }
         return this.igniteDriver.getNodeNameFromClusterNode(primaryNode);

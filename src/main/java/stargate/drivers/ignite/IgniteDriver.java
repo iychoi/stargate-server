@@ -98,6 +98,15 @@ public class IgniteDriver {
         }
     }
     
+    public static IgniteDriver getInstanceIfInitialized() throws IOException {
+        synchronized (IgniteDriver.class) {
+            if(instance == null) {
+                throw new IOException("IgniteDriver is not initialized");
+            }
+            return instance;
+        }
+    }
+    
     public static void setStorageRootPath(File path) {
         if(path == null) {
             throw new IllegalArgumentException("path is null");

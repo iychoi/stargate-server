@@ -15,21 +15,24 @@
 */
 package stargate.drivers.userinterface.http;
 
+import java.io.Closeable;
+import stargate.commons.io.DiskBufferInputStream;
+
 /**
  *
  * @author iychoi
  */
-public class ChunkData implements Comparable<ChunkData> {
+public class ChunkData implements Comparable<ChunkData>, Closeable {
 
-    private byte[] data;
+    private DiskBufferInputStream is;
     private long offset;
     private long size;
 
-    public ChunkData(byte[] data, long offset, long size) {
-        if(data == null) {
-            throw new IllegalArgumentException("data is null");
+    public ChunkData(DiskBufferInputStream is, long offset, long size) {
+        if(is == null) {
+            throw new IllegalArgumentException("is is null");
         }
-
+        
         if(offset < 0) {
             throw new IllegalArgumentException("offset is negative");
         }
@@ -38,21 +41,21 @@ public class ChunkData implements Comparable<ChunkData> {
             throw new IllegalArgumentException("size is negative");
         }
         
-        this.data = data;
+        this.is = is;
         this.offset = offset;
         this.size = size;
     }
 
-    public byte[] getData() {
-        return this.data;
+    public DiskBufferInputStream getInputStream() {
+        return this.is;
     }
 
-    public void setData(byte[] data) {
-        if(data == null) {
-            throw new IllegalArgumentException("data is null");
+    public void setInputStream(DiskBufferInputStream is) {
+        if(is == null) {
+            throw new IllegalArgumentException("is is null");
         }
         
-        this.data = data;
+        this.is = is;
     }
 
     public long getOffset() {
@@ -86,5 +89,13 @@ public class ChunkData implements Comparable<ChunkData> {
         }
         
         return (int)(this.offset - other.offset);
+    }
+    
+    @Override
+    public void close() {
+        if(this.is != null) {
+            this.is.close();
+            this.is = null;
+        }
     }
 }

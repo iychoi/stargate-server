@@ -18,14 +18,16 @@ package stargate.drivers.userinterface.http;
 import java.io.IOException;
 import java.io.InputStream;
 import java.net.URI;
+import java.util.ArrayList;
 import java.util.Collection;
 import java.util.HashMap;
+import java.util.List;
 import java.util.Map;
 import java.util.Set;
 import org.apache.hadoop.fs.FSInputStream;
-import stargate.commons.utils.IOUtils;
 import stargate.commons.dataobject.DataObjectMetadata;
 import stargate.commons.dataobject.DataObjectURI;
+import stargate.commons.io.DiskBufferInputStream;
 import stargate.commons.recipe.Recipe;
 import stargate.commons.recipe.RecipeChunk;
 import stargate.commons.utils.IPUtils;
@@ -38,13 +40,14 @@ public class HTTPChunkInputStream extends FSInputStream {
 
     public static final String DEFAULT_NODE_NAME = "DEFAULT_NODE";
     public static final String LOCAL_NODE_NAME = "LOCAL_NODE";
+    public static final int MAX_CHUNKDATA_CACHE_SIZE = 3;
     
     // node-name to client mapping
     private Map<String, HTTPUserInterfaceClient> clients = new HashMap<String, HTTPUserInterfaceClient>();
     private Recipe recipe;
     private long offset;
     private long size;
-    private ChunkData chunkData;
+    private List<ChunkData> chunkDataList = new ArrayList<ChunkData>();
     
     public HTTPChunkInputStream(HTTPUserInterfaceClient client, Recipe recipe) {
         if(client == null) {
@@ -88,7 +91,6 @@ public class HTTPChunkInputStream extends FSInputStream {
         this.recipe = recipe;
         this.offset = 0;
         this.size = recipe.getMetadata().getSize();
-        this.chunkData = null;
     }
     
     private void setLocalClient() {
@@ -115,17 +117,24 @@ public class HTTPChunkInputStream extends FSInputStream {
     
     @Override
     public synchronized int available() throws IOException {
-        if(this.chunkData != null &&
-                this.chunkData.getOffset() <= this.offset &&
-                (this.chunkData.getOffset() + this.chunkData.getSize()) > this.offset) {
-            // safe to reuse
-            return (int) (this.chunkData.getSize() - (this.offset - this.chunkData.getOffset()));
+        for(ChunkData chunkData : this.chunkDataList) {
+            if(chunkData != null &&
+                chunkData.getOffset() <= this.offset &&
+                (chunkData.getOffset() + chunkData.getSize()) > this.offset) {
+                // safe to reuse
+                return (int) (chunkData.getSize() - (this.offset - chunkData.getOffset()));
+            }
         }
+        
         return 0;
     }
     
     @Override
     public synchronized void seek(long offset) throws IOException {
+        if(this.offset == offset) {
+            return;
+        }
+        
         if(offset < 0) {
             throw new IOException("cannot seek to negative offset : " + offset);
         }
@@ -162,21 +171,23 @@ public class HTTPChunkInputStream extends FSInputStream {
         return false;
     }
     
-    private void loadChunkData(long offset) throws IOException {
-        if(this.chunkData != null &&
-                this.chunkData.getOffset() <= offset &&
-                (this.chunkData.getOffset() + this.chunkData.getSize()) > offset) {
-            // safe to reuse
-            return;
+    private ChunkData loadChunkData() throws IOException {
+        for(ChunkData chunkData : this.chunkDataList) {
+            if(chunkData != null &&
+                chunkData.getOffset() <= this.offset &&
+                (chunkData.getOffset() + chunkData.getSize()) > this.offset) {
+                // safe to reuse
+                DiskBufferInputStream diskBufferInputStream = chunkData.getInputStream();
+                diskBufferInputStream.seek(this.offset - chunkData.getOffset());
+                return chunkData;
+            }
         }
         
-        this.chunkData = null;
-        
-        if(offset >= this.size) {
-            return;
+        if(this.offset >= this.size) {
+            return null;
         }
         
-        RecipeChunk chunk = this.recipe.getChunk(offset);
+        RecipeChunk chunk = this.recipe.getChunk(this.offset);
         
         DataObjectMetadata metadata = this.recipe.getMetadata();
         DataObjectURI uri = metadata.getURI();
@@ -238,39 +249,46 @@ public class HTTPChunkInputStream extends FSInputStream {
         }
         
         InputStream dataChunkIS = client.getDataChunk(uri, chunk.getHash());
-        this.chunkData = new ChunkData(IOUtils.toByteArray(dataChunkIS), chunk.getOffset(), chunk.getLength());
+        DiskBufferInputStream diskBufferInputStream = new DiskBufferInputStream(dataChunkIS, chunk.getLength());
         dataChunkIS.close();
-    }
-    
-    private synchronized boolean isEOF() {
-        if(this.offset >= this.size) {
-            return true;
+        
+        diskBufferInputStream.seek(this.offset - chunk.getOffset());
+        ChunkData chunkData = new ChunkData(diskBufferInputStream, chunk.getOffset(), chunk.getLength());
+        this.chunkDataList.add(0, chunkData);
+        
+        if(this.chunkDataList.size() > MAX_CHUNKDATA_CACHE_SIZE) {
+            int lastIdx = this.chunkDataList.size() - 1;
+            ChunkData toBeRemoved = this.chunkDataList.get(lastIdx);
+            toBeRemoved.close();
+            this.chunkDataList.remove(lastIdx);
         }
-        return false;
+        
+        return chunkData;
     }
     
     @Override
     public synchronized int read() throws IOException {
-        if(isEOF()) {
+        if(this.offset >= this.size) {
             return -1;
         }
         
-        loadChunkData(this.offset);
+        ChunkData chunkData = loadChunkData();
+        if(chunkData == null) {
+            throw new IOException("Cannot read chunk data");
+        }
         
-        int bufferOffset = (int) (this.offset - this.chunkData.getOffset());
-        byte[] data = this.chunkData.getData();
-        byte ch = data[bufferOffset];
-        
+        DiskBufferInputStream diskBufferInputStream = chunkData.getInputStream();
+        int ch = diskBufferInputStream.read();
         this.offset++;
         return ch;
     }
     
     @Override
     public synchronized int read(byte[] bytes, int off, int len) throws IOException {
-        if(isEOF()) {
+        if(this.offset >= this.size) {
             return -1;
         }
-            
+        
         if(bytes == null) {
             throw new IllegalArgumentException("bytes is null");
         }
@@ -284,7 +302,7 @@ public class HTTPChunkInputStream extends FSInputStream {
         }
             
         long lavailable = this.size - this.offset;
-        int remain = len;
+        int remain = Math.min(len, bytes.length);
         if(len > lavailable) {
             remain = (int) lavailable;
         }
@@ -293,15 +311,20 @@ public class HTTPChunkInputStream extends FSInputStream {
         
         int outputBufferOffset = off;
         while(remain > 0) {
-            loadChunkData(this.offset);
+            ChunkData chunkData = loadChunkData();
 
-            int bufferOffset = (int) (this.offset - this.chunkData.getOffset());
-            int bufferLength = (int) Math.min(this.chunkData.getSize() - bufferOffset, remain);
+            if(chunkData == null) {
+                throw new IOException("Cannot read chunk data");
+            }
             
-            System.arraycopy(this.chunkData.getData(), bufferOffset, bytes, outputBufferOffset, bufferLength);
-            this.offset += bufferLength;
-            outputBufferOffset += bufferLength;
-            remain -= bufferLength;
+            int bufferOffset = (int) (this.offset - chunkData.getOffset());
+            int bufferLength = (int) Math.min(chunkData.getSize() - bufferOffset, remain);
+            
+            DiskBufferInputStream diskBufferInputStream = chunkData.getInputStream();
+            int read = diskBufferInputStream.read(bytes, outputBufferOffset, bufferLength);
+            this.offset += read;
+            outputBufferOffset += read;
+            remain -= read;
         }
         return copied;
     }
@@ -310,13 +333,22 @@ public class HTTPChunkInputStream extends FSInputStream {
     public synchronized void close() throws IOException {
         if(this.clients != null) {
             Collection<HTTPUserInterfaceClient> clients = this.clients.values();
-            clients.clear();
+            // do not disconnect these
+            //for(HTTPUserInterfaceClient client : clients) {
+            //    client.disconnect();
+            //}
+            this.clients.clear();
         }
         
         this.recipe = null;
         this.offset = 0;
         this.size = 0;
-        this.chunkData = null;
+        
+        for(ChunkData chunkData : this.chunkDataList) {
+            chunkData.close();
+        }
+        
+        this.chunkDataList.clear();
     }
     
     @Override

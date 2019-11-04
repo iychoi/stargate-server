@@ -39,7 +39,7 @@
       "driver_class" : "stargate.drivers.recipe.overlappedfixedsize.OverlappedFixedSizeChunkRecipeDriver",
       "driver_config" : {
         "@class" : "stargate.drivers.recipe.overlappedfixedsize.OverlappedFixedSizeChunkRecipeDriverConfig",
-        "chunk_size" : 8388608,
+        "chunk_size" : 67108864,
         "overlap_size" : 4096,
         "hash_algorithm" : "SHA-1"
       }
@@ -54,7 +54,7 @@
         "service_port" : 31010
       }
     } ],
-    "transfer_layout" : "fair",
+    "transfer_layout" : "static",
     "contact_node_selection" : "roundrobin"
   },
   "user_interface" : {

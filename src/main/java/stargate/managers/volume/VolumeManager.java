@@ -21,6 +21,7 @@ import java.io.InputStream;
 import java.net.URI;
 import java.util.ArrayList;
 import java.util.Collection;
+import java.util.Collections;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
@@ -54,6 +55,7 @@ import stargate.managers.datastore.DataStoreManager;
 import stargate.managers.recipe.RecipeManager;
 import stargate.commons.transport.TransferAssignment;
 import stargate.managers.transport.PendingPrefetchSchedule;
+import stargate.managers.transport.PendingPrefetchScheduleComparator;
 import stargate.managers.transport.TransportManager;
 import stargate.service.StargateService;
 
@@ -529,7 +531,11 @@ public class VolumeManager extends AbstractManager<NullDriver> {
                 
                 // process pending prefetch schedules
                 if(!pendingPrefetchSchedules.isEmpty()) {
-                    transportManager.processPendingPrefetchSchedulesAsync(pendingPrefetchSchedules);
+                    List<PendingPrefetchSchedule> sortedPendingPrefetchSchedules = new ArrayList<PendingPrefetchSchedule>();
+                    sortedPendingPrefetchSchedules.addAll(pendingPrefetchSchedules);
+                    Collections.sort(sortedPendingPrefetchSchedules, new PendingPrefetchScheduleComparator());
+                    
+                    transportManager.processPendingPrefetchSchedulesAsync(sortedPendingPrefetchSchedules);
                 }
                 
                 if(!streamExMap.isEmpty()) {
