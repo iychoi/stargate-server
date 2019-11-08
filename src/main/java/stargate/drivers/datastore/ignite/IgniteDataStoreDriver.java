@@ -20,6 +20,7 @@ import java.util.HashMap;
 import java.util.Map;
 import org.apache.commons.logging.Log;
 import org.apache.commons.logging.LogFactory;
+import stargate.commons.datastore.AbstractBigKeyValueStore;
 import stargate.commons.driver.AbstractDriverConfig;
 import stargate.commons.datastore.AbstractKeyValueStore;
 import stargate.commons.datastore.AbstractDataStoreDriver;
@@ -40,7 +41,8 @@ public class IgniteDataStoreDriver extends AbstractDataStoreDriver {
     
     private IgniteDataStoreDriverConfig config;
     private IgniteDriver igniteDriver;
-    private Map<String, IgniteKeyValueStore> kvStores = new HashMap<String, IgniteKeyValueStore>();
+    private Map<String, AbstractKeyValueStore> kvStores = new HashMap<String, AbstractKeyValueStore>();
+    private Map<String, AbstractBigKeyValueStore> bigKVStores = new HashMap<String, AbstractBigKeyValueStore>();
     private Map<String, IgniteQueue> queueStores = new HashMap<String, IgniteQueue>();
     private Map<String, IgniteLock> lockStores = new HashMap<String, IgniteLock>();
     
@@ -113,10 +115,29 @@ public class IgniteDataStoreDriver extends AbstractDataStoreDriver {
             throw new DriverNotInitializedException("driver is not initialized");
         }
         
-        IgniteKeyValueStore store = this.kvStores.get(name);
+        AbstractKeyValueStore store = this.kvStores.get(name);
         if(store == null) {
             store = new IgniteKeyValueStore(this, this.igniteDriver, name, valueClass, properties);
             this.kvStores.put(name, store);
+        }
+        
+        return store;
+    }
+    
+    @Override
+    public AbstractBigKeyValueStore getBigKeyValueStore(String name, DataStoreProperties properties) throws IOException, DriverNotInitializedException {
+        if(name == null || name.isEmpty()) {
+            throw new IllegalArgumentException("name is null or empty");
+        }
+        
+        if(!isStarted()) {
+            throw new DriverNotInitializedException("driver is not initialized");
+        }
+        
+        AbstractBigKeyValueStore store = this.bigKVStores.get(name);
+        if(store == null) {
+            store = new IgniteBigKeyValueStore(this, this.igniteDriver, name, properties);
+            this.bigKVStores.put(name, store);
         }
         
         return store;

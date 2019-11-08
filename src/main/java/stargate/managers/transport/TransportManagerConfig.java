@@ -30,12 +30,11 @@ import stargate.managers.transport.layout.TransferLayoutAlgorithms;
  */
 public class TransportManagerConfig extends ManagerConfig {
     
-    private static final int DEFAULT_PREFETCH_THREADS = 3;
-    private static final int DEFAULT_PENDING_PREFETCH_THREADS = 1;
+    private static final int DEFAULT_TRANSFER_THREADS = 3;
+    private static final int DEFAULT_PREFETCH_SCHEDULER_THREADS = 1;
     private static final int DEFAULT_DATA_TRANSFER_TIMEOUT_SEC = 60*5; // 5min
     private static final int DEFAULT_PENDING_PREFETCH_TIMEOUT_SEC = 24*60*60; // 1day
-    //private static final long DEFAULT_PREFETCH_LENGTH = 10*1024*1024; // 10MB
-    private static final long DEFAULT_PREFETCH_LENGTH = 0; // None
+    private static final long DEFAULT_PREFETCH_WINDOW_SIZE = 0;
     private static final int DEFAULT_DIRECTORY_CACHE_TIMEOUT_SEC = 60*5; // 5min
     private static final int DEFAULT_RECIPE_CACHE_TIMEOUT_SEC = 24*60*60; // 1day
     private static final int DEFAULT_DATACHUNK_CACHE_TIMEOUT_SEC = 7*24*60*60; // 7day
@@ -43,11 +42,11 @@ public class TransportManagerConfig extends ManagerConfig {
     private TransferLayoutAlgorithms layoutAlgorithm = TransferLayoutAlgorithms.TRANSFER_LAYOUT_ALGORITHM_STATIC;
     private ContactNodeSelectionAlgorithms nodeSelectionAlgorithm = ContactNodeSelectionAlgorithms.CONTACT_NODE_SELECTION_ALGORITHM_ROUNDROBIN;
     
-    private int prefetchThreads = DEFAULT_PREFETCH_THREADS;
-    private int pendingPrefetchThreads = DEFAULT_PENDING_PREFETCH_THREADS;
+    private int transferThreads = DEFAULT_TRANSFER_THREADS;
+    private int prefetchSchedulerThreads = DEFAULT_PREFETCH_SCHEDULER_THREADS;
     private int pendingPrefetchTimeout = DEFAULT_PENDING_PREFETCH_TIMEOUT_SEC;
     private int dataTransferTimeout = DEFAULT_DATA_TRANSFER_TIMEOUT_SEC;
-    private long prefetchLength = DEFAULT_PREFETCH_LENGTH;
+    private long prefetchWindowSize = DEFAULT_PREFETCH_WINDOW_SIZE;
     private int directoryCacheTimeout = DEFAULT_DIRECTORY_CACHE_TIMEOUT_SEC;
     private int recipeCacheTimeout = DEFAULT_RECIPE_CACHE_TIMEOUT_SEC;
     private int dataChunkCacheTimeout = DEFAULT_DATACHUNK_CACHE_TIMEOUT_SEC;
@@ -141,36 +140,36 @@ public class TransportManagerConfig extends ManagerConfig {
         return null;
     }
     
-    @JsonProperty("prefetch_threads")
-    public void setPrefetchThreads(int threads) {
+    @JsonProperty("transfer_threads")
+    public void setTransferThreads(int threads) {
         super.checkMutableAndRaiseException();
         
         if(threads <= 0) {
-            this.prefetchThreads = DEFAULT_PREFETCH_THREADS;
+            this.transferThreads= DEFAULT_TRANSFER_THREADS;
         } else {
-            this.prefetchThreads = threads;
+            this.transferThreads = threads;
         }
     }
     
-    @JsonProperty("prefetch_threads")
-    public int getPrefetchThreads() {
-        return this.prefetchThreads;
+    @JsonProperty("transfer_threads")
+    public int getTransferThreads() {
+        return this.transferThreads;
     }
     
-    @JsonProperty("pending_prefetch_threads")
-    public void setPendingPrefetchThreads(int threads) {
+    @JsonProperty("prefetch_scheduler_threads")
+    public void setPrefetchSchedulerThreads(int threads) {
         super.checkMutableAndRaiseException();
         
         if(threads <= 0) {
-            this.pendingPrefetchThreads = DEFAULT_PENDING_PREFETCH_THREADS;
+            this.prefetchSchedulerThreads = DEFAULT_PREFETCH_SCHEDULER_THREADS;
         } else {
-            this.pendingPrefetchThreads = threads;
+            this.prefetchSchedulerThreads = threads;
         }
     }
     
-    @JsonProperty("pending_prefetch_threads")
-    public int getPendingPrefetchThreads() {
-        return this.pendingPrefetchThreads;
+    @JsonProperty("prefetch_scheduler_threads")
+    public int getPrefetchSchedulerThreads() {
+        return this.prefetchSchedulerThreads;
     }
         
     @JsonProperty("pending_prefetch_timeout")
@@ -205,20 +204,20 @@ public class TransportManagerConfig extends ManagerConfig {
         return this.dataTransferTimeout;
     }
     
-    @JsonProperty("prefetch_length")
-    public void setPrefetchLength(long length) {
+    @JsonProperty("prefetch_window_size")
+    public void setPrefetchWindowSize(long length) {
         super.checkMutableAndRaiseException();
         
         if(length < 0) {
-            this.prefetchLength = DEFAULT_PREFETCH_LENGTH;
+            this.prefetchWindowSize = DEFAULT_PREFETCH_WINDOW_SIZE;
         } else {
-            this.prefetchLength = length;
+            this.prefetchWindowSize = length;
         }
     }
     
-    @JsonProperty("prefetch_length")
-    public long getPrefetchLength() {
-        return this.prefetchLength;
+    @JsonProperty("prefetch_window_size")
+    public long getPrefetchWindowSize() {
+        return this.prefetchWindowSize;
     }
     
     @JsonProperty("directory_cache_timeout")

@@ -31,13 +31,11 @@ import org.apache.commons.logging.Log;
 import org.apache.commons.logging.LogFactory;
 import org.apache.ignite.Ignite;
 import org.apache.ignite.IgniteCache;
-import org.apache.ignite.IgniteCluster;
 import org.apache.ignite.cache.CacheAtomicityMode;
 import org.apache.ignite.cache.CacheMode;
 import org.apache.ignite.cache.CachePeekMode;
 import org.apache.ignite.cache.CacheWriteSynchronizationMode;
 import org.apache.ignite.cache.affinity.Affinity;
-import org.apache.ignite.cache.affinity.rendezvous.RendezvousAffinityFunction;
 import org.apache.ignite.cluster.ClusterNode;
 import org.apache.ignite.configuration.CacheConfiguration;
 import stargate.commons.datastore.AbstractKeyValueStore;
@@ -53,7 +51,7 @@ import stargate.drivers.ignite.IgniteDriver;
 public class IgniteKeyValueStore extends AbstractKeyValueStore {
 
     private static final Log LOG = LogFactory.getLog(IgniteKeyValueStore.class);
-    
+
     private IgniteDataStoreDriver driver;
     private IgniteDriver igniteDriver;
     private Ignite ignite;
@@ -62,6 +60,7 @@ public class IgniteKeyValueStore extends AbstractKeyValueStore {
     private DataStoreProperties properties;
     private IgniteCache<String, ByteArray> store;
     private Affinity<String> affinity;
+    
     
     public IgniteKeyValueStore(IgniteDataStoreDriver driver, IgniteDriver igniteDriver, String name, Class valueClass, DataStoreProperties properties) throws IOException {
         if(driver == null) {
@@ -97,34 +96,12 @@ public class IgniteKeyValueStore extends AbstractKeyValueStore {
             
             int replicaNum = properties.getReplicaNum();
             cc.setBackups(replicaNum);
-            
-            DataNodesOnlyRendezvousAffinityFunction affinityFunction = new DataNodesOnlyRendezvousAffinityFunction();
-            
-            // remove non-data node from affinity
-            IgniteCluster igniteCluster = this.ignite.cluster();
-            Collection<String> nonDataNodes = properties.getNonDataNodes();
-
-            for(ClusterNode node : igniteCluster.nodes()) {
-                String nodeName = igniteDriver.getNodeNameFromClusterNode(node);
-                if(nonDataNodes.contains(nodeName)) {
-                    affinityFunction.execludeNode(node);
-                }
-            }
-            
-            cc.setAffinity(affinityFunction);
         } else {
             cc.setCacheMode(CacheMode.REPLICATED);
-            
-            RendezvousAffinityFunction affinityFunction = new RendezvousAffinityFunction();
-            cc.setAffinity(affinityFunction);
         }
         
         if(properties.isPersistent()) {
-            if(properties.isBigStore()) {
-                cc.setDataRegionName(IgniteDriver.PERSISTENT_BIG_REGION_NAME);
-            } else {
-                cc.setDataRegionName(IgniteDriver.PERSISTENT_REGION_NAME);
-            }
+            cc.setDataRegionName(IgniteDriver.PERSISTENT_REGION_NAME);
         } else {
             cc.setDataRegionName(IgniteDriver.VOLATILE_REGION_NAME);
         }
@@ -177,7 +154,7 @@ public class IgniteKeyValueStore extends AbstractKeyValueStore {
     public boolean isEmpty() {
         return size() == 0;
     }
-
+    
     @Override
     public boolean containsKey(String key) {
         if(key == null || key.isEmpty()) {
@@ -197,10 +174,10 @@ public class IgniteKeyValueStore extends AbstractKeyValueStore {
         if(bytes == null) {
             return null;
         }
-        
+
         return ObjectSerializer.fromByteArray(bytes.getArray(), this.valueClass);
     }
-
+    
     @Override
     public void put(String key, Object value) throws IOException {
         if(key == null || key.isEmpty()) {

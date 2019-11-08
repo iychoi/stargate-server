@@ -43,9 +43,11 @@ import stargate.commons.dataobject.DataObjectURI;
 import stargate.commons.dataobject.Directory;
 import stargate.commons.datasource.AbstractDataSourceDriver;
 import stargate.commons.datasource.DataExportEntry;
+import stargate.commons.datastore.AbstractBigKeyValueStore;
 import stargate.commons.driver.AbstractDriver;
 import stargate.commons.driver.DriverFailedToLoadException;
 import stargate.commons.datastore.AbstractKeyValueStore;
+import stargate.commons.datastore.BigKeyValueStoreMetadata;
 import stargate.commons.datastore.DataStoreProperties;
 import stargate.commons.driver.DriverNotInitializedException;
 import stargate.commons.event.AbstractEventHandler;
@@ -87,7 +89,7 @@ public class TransportManager extends AbstractManager<AbstractTransportDriver> {
     private AbstractKeyValueStore remoteRecipeCacheStore; // <DataObjectURI, Recipe>
     private final Object remoteRecipeSyncObj = new Object();
     
-    private AbstractKeyValueStore dataChunkCacheStore; // <String, byte[]> key = hashstring
+    private AbstractBigKeyValueStore dataChunkCacheStore; // <String, byte[]> key = hashstring
     private final Object dataChunkSyncObj = new Object();
     private Map<String, Reference> waitObjects = new ConcurrentHashMap<String, Reference>();
     
@@ -183,9 +185,9 @@ public class TransportManager extends AbstractManager<AbstractTransportDriver> {
         
         TransportManagerConfig managerConfig = (TransportManagerConfig) this.config;
         
-        this.transferScheduler = new TransferScheduler(managerConfig.getPrefetchThreads(), managerConfig.getPendingPrefetchTimeoutSec());
+        this.transferScheduler = new TransferScheduler(managerConfig.getTransferThreads(), managerConfig.getPendingPrefetchTimeoutSec());
         this.transferScheduler.start();
-        this.pendingPrefetchThreadPool = Executors.newFixedThreadPool(managerConfig.getPendingPrefetchThreads());
+        this.pendingPrefetchThreadPool = Executors.newFixedThreadPool(managerConfig.getPrefetchSchedulerThreads());
         
         for(AbstractTransportDriver driver : drivers) {
             try {
@@ -316,7 +318,6 @@ public class TransportManager extends AbstractManager<AbstractTransportDriver> {
                     properties.setSharded(true);
                     properties.setReplicaNum(0);
                     properties.setPersistent(true);
-                    properties.setBigStore(true);
                     
                     if(managerConfig.getDataChunkCacheTimeoutSec() > 0) {
                         properties.setExpirable(true);
@@ -332,7 +333,7 @@ public class TransportManager extends AbstractManager<AbstractTransportDriver> {
                     Collection<String> nonDataNodeNames = localCluster.getNonDataNodeNames();
                     properties.addNonDataNodes(nonDataNodeNames);
                     
-                    this.dataChunkCacheStore = keyValueStoreManager.getDriver().getKeyValueStore(DATA_CHUNK_CACHE_STORE, byte[].class, properties);
+                    this.dataChunkCacheStore = keyValueStoreManager.getDriver().getBigKeyValueStore(DATA_CHUNK_CACHE_STORE, properties);
                 } catch (ManagerNotInstantiatedException ex) {
                     LOG.error("Manager is not instantiated", ex);
                     throw new IOException(ex);
@@ -466,22 +467,24 @@ public class TransportManager extends AbstractManager<AbstractTransportDriver> {
             
             // put to the cache
             boolean putPendingChunkCache = false;
-            DataChunkCache pendingDataChunkCache = new DataChunkCache(DataChunkCacheType.DATA_CHUNK_CACHE_PENDING, hash, 1, localNode.getName(), (byte[])null);
-            boolean insert = this.dataChunkCacheStore.putIfAbsent(hash, pendingDataChunkCache.toBytes());
+            DataChunkCacheMetadata pendingDataChunkCacheMetadata = new DataChunkCacheMetadata(DataChunkCacheType.DATA_CHUNK_CACHE_PENDING, hash, 1, localNode.getName());
+            boolean insert = this.dataChunkCacheStore.putIfAbsent(hash, pendingDataChunkCacheMetadata.toBigKeyValueStoreMetadata(), null);
             if(insert) {
                 this.lastUpdateTime = DateTimeUtils.getTimestamp();
                 putPendingChunkCache = true;
             }
-
+            
             this.waitObjects.putIfAbsent(hash, new Reference());
             Reference reference = this.waitObjects.get(hash);
             reference.increaseReference();
             // double-check cache
             if(!putPendingChunkCache) {
-                byte[] existingData = (byte[]) this.dataChunkCacheStore.get(hash);
-                if(existingData != null) {
-                    DataChunkCache existingCache = DataChunkCache.fromBytes(existingData);
-                    if(existingCache.getType().equals(DataChunkCacheType.DATA_CHUNK_CACHE_PRESENT)) {
+                BigKeyValueStoreMetadata existingMetadata = this.dataChunkCacheStore.getMetadata(hash);
+                
+                if(existingMetadata != null) {
+                    DataChunkCacheMetadata existingDataChunkCacheMetadata = DataChunkCacheMetadata.fromBigKeyValueStoreMetadata(existingMetadata);
+                    
+                    if(existingDataChunkCacheMetadata.getType().equals(DataChunkCacheType.DATA_CHUNK_CACHE_PRESENT)) {
                         // existing
                         reference.wakeup();
                         reference.decreaseReference();
@@ -491,8 +494,8 @@ public class TransportManager extends AbstractManager<AbstractTransportDriver> {
 
                         LOG.debug(String.format("cacheRemoteDataChunk: Found a chunk cache for - %s, %s", uri.toUri().toASCIIString(), hash));
                         return;
-                    } else if(existingCache.getType().equals(DataChunkCacheType.DATA_CHUNK_CACHE_PENDING)) {
-                        String transferNode = existingCache.getTransferNode();
+                    } else if(existingDataChunkCacheMetadata.getType().equals(DataChunkCacheType.DATA_CHUNK_CACHE_PENDING)) {
+                        String transferNode = existingDataChunkCacheMetadata.getTransferNode();
                         if(!localNode.getName().equals(transferNode)) {
                             // it's not my task
                             reference.decreaseReference();
@@ -560,9 +563,9 @@ public class TransportManager extends AbstractManager<AbstractTransportDriver> {
             this.transferLayoutAlgorithm.decreaseNodeWorkload(remoteCluster, remoteNode);
 
             // put to the cache
-            DataChunkCache dataChunkCache = new DataChunkCache(DataChunkCacheType.DATA_CHUNK_CACHE_PRESENT, hash, Integer.MAX_VALUE, null, dataChunkInputStream);
+            DataChunkCacheMetadata dataChunkCacheMetadata = new DataChunkCacheMetadata(DataChunkCacheType.DATA_CHUNK_CACHE_PRESENT, hash, Integer.MAX_VALUE, null);
             LOG.debug(String.format("cacheRemoteDataChunk: Putting a data chunk cache for - %s", hash));
-            this.dataChunkCacheStore.put(hash, dataChunkCache.toBytes());
+            this.dataChunkCacheStore.put(hash, dataChunkCacheMetadata.toBigKeyValueStoreMetadata(), dataChunkInputStream);
             this.lastUpdateTime = DateTimeUtils.getTimestamp();
 
             LOG.debug(String.format("cacheRemoteDataChunk: Waking up all threads that are waiting for a data chunk for - %s", hash));
@@ -666,8 +669,8 @@ public class TransportManager extends AbstractManager<AbstractTransportDriver> {
             
             // put to the cache
             boolean putPendingChunkCache = false;
-            DataChunkCache pendingDataChunkCache = new DataChunkCache(DataChunkCacheType.DATA_CHUNK_CACHE_PENDING, hash, 1, localNode.getName(), (byte[])null);
-            boolean insert = this.dataChunkCacheStore.putIfAbsent(hash, pendingDataChunkCache.toBytes());
+            DataChunkCacheMetadata pendingDataChunkCache = new DataChunkCacheMetadata(DataChunkCacheType.DATA_CHUNK_CACHE_PENDING, hash, 1, localNode.getName());
+            boolean insert = this.dataChunkCacheStore.putIfAbsent(hash, pendingDataChunkCache.toBigKeyValueStoreMetadata(), null);
             if(insert) {
                 LOG.debug(String.format("getDataChunk: Put a pending request for a on-demand transfer for - %s, %s", uri.toUri().toASCIIString(), hash));
                 this.lastUpdateTime = DateTimeUtils.getTimestamp();
@@ -681,16 +684,13 @@ public class TransportManager extends AbstractManager<AbstractTransportDriver> {
             // double-check cache
             if(!putPendingChunkCache) {
                 while(true) {
-                    LOG.debug(String.format("getDataChunk: Checking a pending request for an on-demand transfer for - %s, %s", uri.toUri().toASCIIString(), hash));
+                    BigKeyValueStoreMetadata existingMetadata = this.dataChunkCacheStore.getMetadata(hash);
                     
-                    byte[] existingData = (byte[]) this.dataChunkCacheStore.get(hash);
-                    if(existingData != null) {
-                        DataChunkCache existingCache = DataChunkCache.fromBytes(existingData);
-                        if(existingCache.getType().equals(DataChunkCacheType.DATA_CHUNK_CACHE_PRESENT)) {
+                    if(existingMetadata != null) {
+                        DataChunkCacheMetadata existingDataChunkCacheMetadata = DataChunkCacheMetadata.fromBigKeyValueStoreMetadata(existingMetadata);
+                        
+                        if(existingDataChunkCacheMetadata.getType().equals(DataChunkCacheType.DATA_CHUNK_CACHE_PRESENT)) {
                             // existing
-                            byte[] data = existingCache.getData();
-                            ByteArrayInputStream bais = new ByteArrayInputStream(data);
-
                             reference.wakeup();
                             reference.decreaseReference();
                             if(reference.getReferenceCount() <= 0) {
@@ -698,17 +698,17 @@ public class TransportManager extends AbstractManager<AbstractTransportDriver> {
                             }
 
                             LOG.debug(String.format("getDataChunk: Found a chunk cache for - %s, %s", uri.toUri().toASCIIString(), hash));
-                            return bais;
-                        } else if(existingCache.getType().equals(DataChunkCacheType.DATA_CHUNK_CACHE_PENDING)) {
+                            return this.dataChunkCacheStore.getData(hash);
+                        } else if(existingDataChunkCacheMetadata.getType().equals(DataChunkCacheType.DATA_CHUNK_CACHE_PENDING)) {
                             LOG.debug(String.format("getDataChunk: A request for a on-demand transfer for - %s, %s is still pending", uri.toUri().toASCIIString(), hash));
                             
                             // wait until the data transfer is complete
-                            if(!existingCache.getWaitingNodes().contains(localNode.getName())) {
-                                DataChunkCache newDataChunkCache = new DataChunkCache(DataChunkCacheType.DATA_CHUNK_CACHE_PENDING, hash, existingCache.getVersion() + 1, existingCache.getTransferNode(), (byte[])null);
-                                newDataChunkCache.addWaitingNodes(existingCache.getWaitingNodes());
+                            if(!existingDataChunkCacheMetadata.getWaitingNodes().contains(localNode.getName())) {
+                                DataChunkCacheMetadata newDataChunkCache = new DataChunkCacheMetadata(DataChunkCacheType.DATA_CHUNK_CACHE_PENDING, hash, existingDataChunkCacheMetadata.getVersion() + 1, existingDataChunkCacheMetadata.getTransferNode());
+                                newDataChunkCache.addWaitingNodes(existingDataChunkCacheMetadata.getWaitingNodes());
                                 newDataChunkCache.addWaitingNode(localNode.getName());
 
-                                boolean replaced = this.dataChunkCacheStore.replace(hash, existingData, newDataChunkCache.toBytes());
+                                boolean replaced = this.dataChunkCacheStore.replace(hash, existingMetadata, newDataChunkCache.toBigKeyValueStoreMetadata(), null);
                                 if(replaced) {
                                     this.lastUpdateTime = DateTimeUtils.getTimestamp();
                                 } else {
@@ -718,7 +718,7 @@ public class TransportManager extends AbstractManager<AbstractTransportDriver> {
                             }
                             
                             // increase priority by adding a new one
-                            raiseEventForOnDemandTransfer(uri, hash, recipeChunk.getOffset(), existingCache.getTransferNode());
+                            raiseEventForOnDemandTransfer(uri, hash, recipeChunk.getOffset(), existingDataChunkCacheMetadata.getTransferNode());
                             // tentatively unlock to allow prefetch to work
                             //lock.unlock();
                             
@@ -731,13 +731,10 @@ public class TransportManager extends AbstractManager<AbstractTransportDriver> {
                                         //lock.lock();
 
                                         LOG.debug(String.format("getDataChunk: Re-checking transferred data for %s", hash));
-                                        byte[] bytes = (byte[]) this.dataChunkCacheStore.get(hash);
-                                        DataChunkCache dataChunkCache = DataChunkCache.fromBytes(bytes);
+                                        BigKeyValueStoreMetadata existingMetadata2 = this.dataChunkCacheStore.getMetadata(hash);
+                                        DataChunkCacheMetadata dataChunkCache = DataChunkCacheMetadata.fromBigKeyValueStoreMetadata(existingMetadata2);
 
                                         if(dataChunkCache.getType().equals(DataChunkCacheType.DATA_CHUNK_CACHE_PRESENT)) {
-                                            byte[] data = dataChunkCache.getData();
-                                            ByteArrayInputStream bais = new ByteArrayInputStream(data);
-
                                             reference.wakeup();
                                             reference.decreaseReference();
                                             if(reference.getReferenceCount() <= 0) {
@@ -745,7 +742,7 @@ public class TransportManager extends AbstractManager<AbstractTransportDriver> {
                                             }
 
                                             LOG.debug(String.format("getDataChunk: Found a chunk cache for - %s, %s", uri.toUri().toASCIIString(), hash));
-                                            return bais;
+                                            return this.dataChunkCacheStore.getData(hash);
                                         } else {
                                             //lock.unlock();
                                             LOG.debug(String.format("getDataChunk: Could not find transferred data for %s - sleep", hash));
@@ -813,9 +810,9 @@ public class TransportManager extends AbstractManager<AbstractTransportDriver> {
             this.transferLayoutAlgorithm.decreaseNodeWorkload(remoteCluster, remoteNode);
 
             // put to the cache
-            DataChunkCache dataChunkCache = new DataChunkCache(DataChunkCacheType.DATA_CHUNK_CACHE_PRESENT, hash, Integer.MAX_VALUE, dataChunkInputStream);
+            DataChunkCacheMetadata dataChunkCache = new DataChunkCacheMetadata(DataChunkCacheType.DATA_CHUNK_CACHE_PRESENT, hash, Integer.MAX_VALUE);
             LOG.debug(String.format("getDataChunk: Putting a data chunk cache for - %s", hash));
-            this.dataChunkCacheStore.put(hash, dataChunkCache.toBytes());
+            this.dataChunkCacheStore.put(hash, dataChunkCache.toBigKeyValueStoreMetadata(), dataChunkInputStream);
             this.lastUpdateTime = DateTimeUtils.getTimestamp();
 
             LOG.debug(String.format("getDataChunk: Waking up all threads that are waiting for a data chunk for - %s", hash));
@@ -830,7 +827,7 @@ public class TransportManager extends AbstractManager<AbstractTransportDriver> {
 
             LOG.debug(String.format("getDataChunk: Get a chunk for - %s, %s", uri.toUri().toASCIIString(), hash));
 
-            return new ByteArrayInputStream(dataChunkCache.getData());
+            return this.dataChunkCacheStore.getData(hash);
         } catch (ManagerNotInstantiatedException ex) {
             LOG.error("Manager is not instantiated", ex);
             throw new IOException(ex);
@@ -905,15 +902,17 @@ public class TransportManager extends AbstractManager<AbstractTransportDriver> {
             LOG.debug(String.format("prefetchDataChunk: Checking a pending request for a prefetching for - %s, hash(%s)", metadata.getURI().toUri().toASCIIString(), hash));
             
             // check cache and go remote
-            byte[] existingData = (byte[]) this.dataChunkCacheStore.get(hash);
-            if(existingData != null) {
-                DataChunkCache existingCache = DataChunkCache.fromBytes(existingData);
-                if(existingCache.getType().equals(DataChunkCacheType.DATA_CHUNK_CACHE_PENDING)) {
+            BigKeyValueStoreMetadata existingMetadata = this.dataChunkCacheStore.getMetadata(hash);
+            
+            if(existingMetadata != null) {
+                DataChunkCacheMetadata existingDataChunkCacheMetadata = DataChunkCacheMetadata.fromBigKeyValueStoreMetadata(existingMetadata);
+                
+                if(existingDataChunkCacheMetadata.getType().equals(DataChunkCacheType.DATA_CHUNK_CACHE_PENDING)) {
                     Collection<String> primaryAndBackupNodesForData = this.dataChunkCacheStore.getPrimaryAndBackupNodesForData(hash);
-                    TransferAssignment assignment = new TransferAssignment(metadata.getURI(), hash, recipeChunk.getOffset(), existingCache.getTransferNode(), primaryAndBackupNodesForData);
-                    LOG.debug(String.format("prefetchDataChunk: Found a pending prefetch schedule for - %s, hash(%s) at node(%s)", metadata.getURI().toUri().toASCIIString(), hash, existingCache.getTransferNode()));
+                    TransferAssignment assignment = new TransferAssignment(metadata.getURI(), hash, recipeChunk.getOffset(), existingDataChunkCacheMetadata.getTransferNode(), primaryAndBackupNodesForData);
+                    LOG.debug(String.format("prefetchDataChunk: Found a pending prefetch schedule for - %s, hash(%s) at node(%s)", metadata.getURI().toUri().toASCIIString(), hash, existingDataChunkCacheMetadata.getTransferNode()));
                     return assignment;
-                } else if(existingCache.getType().equals(DataChunkCacheType.DATA_CHUNK_CACHE_PRESENT)) {
+                } else if(existingDataChunkCacheMetadata.getType().equals(DataChunkCacheType.DATA_CHUNK_CACHE_PRESENT)) {
                     Collection<String> primaryAndBackupNodesForData = this.dataChunkCacheStore.getPrimaryAndBackupNodesForData(hash);
                     String primaryNodeForData = primaryAndBackupNodesForData.iterator().next();
                     TransferAssignment assignment = new TransferAssignment(metadata.getURI(), hash, recipeChunk.getOffset(), primaryNodeForData, primaryAndBackupNodesForData);
@@ -933,12 +932,9 @@ public class TransportManager extends AbstractManager<AbstractTransportDriver> {
             }
 
             // put to the pending chunk cache
-            DataChunkCache newDataChunkCache = new DataChunkCache(DataChunkCacheType.DATA_CHUNK_CACHE_PENDING, hash, 1, determinedLocalNode.getName(), (byte[])null);
-            newDataChunkCache.addWaitingNode(determinedLocalNode.getName());
-            boolean inserted = this.dataChunkCacheStore.putIfAbsent(hash, newDataChunkCache.toBytes());
-            //lock.unlock();
-            //lock = null;
-
+            DataChunkCacheMetadata pendingDataChunkCache = new DataChunkCacheMetadata(DataChunkCacheType.DATA_CHUNK_CACHE_PENDING, hash, 1, determinedLocalNode.getName());
+            pendingDataChunkCache.addWaitingNode(determinedLocalNode.getName());
+            boolean inserted = this.dataChunkCacheStore.putIfAbsent(hash, pendingDataChunkCache.toBigKeyValueStoreMetadata(), null);
             if(inserted) {
                 this.lastUpdateTime = DateTimeUtils.getTimestamp();
                 
@@ -947,6 +943,8 @@ public class TransportManager extends AbstractManager<AbstractTransportDriver> {
                 raiseEventForPrefetch(metadata.getURI(), hash, recipeChunk.getOffset(), determinedLocalNode.getName());
             }
             
+            //lock.unlock();
+            //lock = null;
 
             Collection<String> primaryAndBackupNodesForData = this.dataChunkCacheStore.getPrimaryAndBackupNodesForData(hash);
             TransferAssignment assignment = new TransferAssignment(metadata.getURI(), hash, recipeChunk.getOffset(), determinedLocalNode.getName(), primaryAndBackupNodesForData);
@@ -1099,15 +1097,17 @@ public class TransportManager extends AbstractManager<AbstractTransportDriver> {
             LOG.debug(String.format("prefetchDataChunk2: Checking a pending request for a prefetching for - %s, %s", metadata.getURI().toUri().toASCIIString(), hash));
             
             // check cache and go remote
-            byte[] existingData = (byte[]) this.dataChunkCacheStore.get(hash);
-            if(existingData != null) {
-                DataChunkCache existingCache = DataChunkCache.fromBytes(existingData);
-                if(existingCache.getType().equals(DataChunkCacheType.DATA_CHUNK_CACHE_PENDING)) {
+            BigKeyValueStoreMetadata existingMetadata = this.dataChunkCacheStore.getMetadata(hash);
+            
+            if(existingMetadata != null) {
+                DataChunkCacheMetadata existingDataChunkCacheMetadata = DataChunkCacheMetadata.fromBigKeyValueStoreMetadata(existingMetadata);
+                
+                if(existingDataChunkCacheMetadata.getType().equals(DataChunkCacheType.DATA_CHUNK_CACHE_PENDING)) {
                     Collection<String> primaryAndBackupNodesForData = this.dataChunkCacheStore.getPrimaryAndBackupNodesForData(hash);
-                    TransferAssignment assignment = new TransferAssignment(metadata.getURI(), hash, recipeChunk.getOffset(), existingCache.getTransferNode(), primaryAndBackupNodesForData);
-                    LOG.debug(String.format("prefetchDataChunk2: Found a pending prefetch schedule for - %s, hash(%s) at node(%s)", metadata.getURI().toUri().toASCIIString(), hash, existingCache.getTransferNode()));
+                    TransferAssignment assignment = new TransferAssignment(metadata.getURI(), hash, recipeChunk.getOffset(), existingDataChunkCacheMetadata.getTransferNode(), primaryAndBackupNodesForData);
+                    LOG.debug(String.format("prefetchDataChunk2: Found a pending prefetch schedule for - %s, hash(%s) at node(%s)", metadata.getURI().toUri().toASCIIString(), hash, existingDataChunkCacheMetadata.getTransferNode()));
                     return new PendingPrefetchSchedule(assignment);
-                } else if(existingCache.getType().equals(DataChunkCacheType.DATA_CHUNK_CACHE_PRESENT)) {
+                } else if(existingDataChunkCacheMetadata.getType().equals(DataChunkCacheType.DATA_CHUNK_CACHE_PRESENT)) {
                     Collection<String> primaryAndBackupNodesForData = this.dataChunkCacheStore.getPrimaryAndBackupNodesForData(hash);
                     String primaryNodeForData = primaryAndBackupNodesForData.iterator().next();
                     TransferAssignment assignment = new TransferAssignment(metadata.getURI(), hash, recipeChunk.getOffset(), primaryNodeForData, primaryAndBackupNodesForData);
@@ -1127,12 +1127,12 @@ public class TransportManager extends AbstractManager<AbstractTransportDriver> {
             }
 
             // make the pending chunk cache
-            DataChunkCache newDataChunkCache = new DataChunkCache(DataChunkCacheType.DATA_CHUNK_CACHE_PENDING, hash, 1, determinedLocalNode.getName(), (byte[])null);
-            newDataChunkCache.addWaitingNode(determinedLocalNode.getName());
+            DataChunkCacheMetadata pendingDataChunkCache = new DataChunkCacheMetadata(DataChunkCacheType.DATA_CHUNK_CACHE_PENDING, hash, 1, determinedLocalNode.getName());
+            pendingDataChunkCache.addWaitingNode(determinedLocalNode.getName());
             
             Collection<String> primaryAndBackupNodesForData = this.dataChunkCacheStore.getPrimaryAndBackupNodesForData(hash);
             TransferAssignment assignment = new TransferAssignment(metadata.getURI(), hash, recipeChunk.getOffset(), determinedLocalNode.getName(), primaryAndBackupNodesForData);
-            return new PendingPrefetchSchedule(assignment, newDataChunkCache);
+            return new PendingPrefetchSchedule(assignment, pendingDataChunkCache);
         } catch (ManagerNotInstantiatedException ex) {
             LOG.error("Manager is not instantiated", ex);
             throw new IOException(ex);
@@ -1157,10 +1157,10 @@ public class TransportManager extends AbstractManager<AbstractTransportDriver> {
         
         for(PendingPrefetchSchedule schedule : pendingPrefetchSchedules) {
             TransferAssignment transferAssignment = schedule.getTransferAssignment();
-            DataChunkCache dataChunkCache = schedule.getDataChunkCache();
+            DataChunkCacheMetadata dataChunkCacheMetadata = schedule.getDataChunkCacheMetadata();
             
-            LOG.debug(String.format("processPendingPrefetchSchedules: Putting a pending request for a prefetching - %s, hash(%s)", transferAssignment.getDataObjectURI().toUri().toASCIIString(), dataChunkCache.getHash()));
-            boolean inserted = this.dataChunkCacheStore.putIfAbsent(dataChunkCache.getHash(), dataChunkCache.toBytes());
+            LOG.debug(String.format("processPendingPrefetchSchedules: Putting a pending request for a prefetching - %s, hash(%s)", transferAssignment.getDataObjectURI().toUri().toASCIIString(), dataChunkCacheMetadata.getHash()));
+            boolean inserted = this.dataChunkCacheStore.putIfAbsent(dataChunkCacheMetadata.getHash(), dataChunkCacheMetadata.toBigKeyValueStoreMetadata(), null);
             if(inserted) {
                 assignments.add(transferAssignment);
             }
@@ -1478,8 +1478,8 @@ public class TransportManager extends AbstractManager<AbstractTransportDriver> {
                 OnDemandTransferTask onDemandTask = new OnDemandTransferTask(event.getHash(), this, event.getDataObjectURI(), event.getHash(), event.getOffset());
                 this.transferScheduler.schedule(onDemandTask);
                 // start if there're prefetch schedules pending
-                if(managerConfig.getPrefetchLength() > 0) {
-                    this.transferScheduler.startPrefetch(event.getDataObjectURI(), event.getOffset(), event.getOffset() + managerConfig.getPrefetchLength());
+                if(managerConfig.getPrefetchWindowSize() > 0) {
+                    this.transferScheduler.startPrefetch(event.getDataObjectURI(), event.getOffset(), event.getOffset() + managerConfig.getPrefetchWindowSize());
                 }
                 break;
             case TRANSFER_EVENT_TYPE_PREFETCH:
@@ -1489,8 +1489,8 @@ public class TransportManager extends AbstractManager<AbstractTransportDriver> {
                 break;
             case TRANSFER_EVENT_TYPE_PREFETCH_START:
                 LOG.debug(String.format("processTransferEvent: Start prefetching : %s - offset(%d)", event.getDataObjectURI().toUri().toASCIIString(), event.getOffset()));
-                if(managerConfig.getPrefetchLength() > 0) {
-                    this.transferScheduler.startPrefetch(event.getDataObjectURI(), event.getOffset(), event.getOffset() + managerConfig.getPrefetchLength());
+                if(managerConfig.getPrefetchWindowSize() > 0) {
+                    this.transferScheduler.startPrefetch(event.getDataObjectURI(), event.getOffset(), event.getOffset() + managerConfig.getPrefetchWindowSize());
                 }
                 break;
             case TRANSFER_EVENT_TYPE_COMPLETE:

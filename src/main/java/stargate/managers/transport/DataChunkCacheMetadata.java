@@ -19,7 +19,6 @@ import java.io.ByteArrayInputStream;
 import java.io.ByteArrayOutputStream;
 import java.io.File;
 import java.io.IOException;
-import java.io.InputStream;
 import java.io.ObjectInputStream;
 import java.io.ObjectOutputStream;
 import java.util.Collection;
@@ -30,46 +29,44 @@ import org.apache.commons.logging.Log;
 import org.apache.commons.logging.LogFactory;
 import org.codehaus.jackson.annotate.JsonIgnore;
 import org.codehaus.jackson.annotate.JsonProperty;
+import stargate.commons.datastore.BigKeyValueStoreMetadata;
 import stargate.commons.utils.HexUtils;
-import stargate.commons.utils.IOUtils;
 import stargate.commons.utils.JsonSerializer;
 
 /**
  *
  * @author iychoi
  */
-public class DataChunkCache {
+public class DataChunkCacheMetadata {
 
-    private static final Log LOG = LogFactory.getLog(DataChunkCache.class);
+    private static final Log LOG = LogFactory.getLog(DataChunkCacheMetadata.class);
     
     private DataChunkCacheType type;
     private String hash;
     private long version; // incremental
     private String transferNode;
     private Set<String> waitingNodes = new HashSet<String>();
-    private byte[] data;
-    private InputStream dataIS;
     
-    public static DataChunkCache createInstance(File file) throws IOException {
+    public static DataChunkCacheMetadata createInstance(File file) throws IOException {
         if(file == null) {
             throw new IllegalArgumentException("file is null");
         }
 
-        return (DataChunkCache) JsonSerializer.fromJsonFile(file, DataChunkCache.class);
+        return (DataChunkCacheMetadata) JsonSerializer.fromJsonFile(file, DataChunkCacheMetadata.class);
     }
     
-    public static DataChunkCache createInstance(String json) throws IOException {
+    public static DataChunkCacheMetadata createInstance(String json) throws IOException {
         if(json == null || json.isEmpty()) {
             throw new IllegalArgumentException("json is null or empty");
         }
         
-        return (DataChunkCache) JsonSerializer.fromJson(json, DataChunkCache.class);
+        return (DataChunkCacheMetadata) JsonSerializer.fromJson(json, DataChunkCacheMetadata.class);
     }
     
-    DataChunkCache() {
+    DataChunkCacheMetadata() {
     }
     
-    public DataChunkCache(DataChunkCacheType type, String hash, long version, byte[] data) {
+    public DataChunkCacheMetadata(DataChunkCacheType type, String hash, long version) {
         if(type == null) {
             throw new IllegalArgumentException("type is null");
         }
@@ -81,45 +78,14 @@ public class DataChunkCache {
         if(version <= 0) {
             throw new IllegalArgumentException("version is negative");
         }
-        
-        //if(data == null) {
-        //    throw new IllegalArgumentException("data is null");
-        //}
         
         this.type = type;
         this.hash = hash;
         this.transferNode = null;
         this.version = version;
-        this.data = data;
-        this.dataIS = null;
     }
     
-    public DataChunkCache(DataChunkCacheType type, String hash, long version, InputStream dataIS) {
-        if(type == null) {
-            throw new IllegalArgumentException("type is null");
-        }
-        
-        if(hash == null || hash.isEmpty()) {
-            throw new IllegalArgumentException("hash is null or empty");
-        }
-        
-        if(version <= 0) {
-            throw new IllegalArgumentException("version is negative");
-        }
-        
-        //if(data == null) {
-        //    throw new IllegalArgumentException("data is null");
-        //}
-        
-        this.type = type;
-        this.hash = hash;
-        this.transferNode = null;
-        this.version = version;
-        this.data = null;
-        this.dataIS = dataIS;
-    }
-    
-    public DataChunkCache(DataChunkCacheType type, String hash, long version, String transferNode, byte[] data) {
+    public DataChunkCacheMetadata(DataChunkCacheType type, String hash, long version, String transferNode) {
         if(type == null) {
             throw new IllegalArgumentException("type is null");
         }
@@ -136,19 +102,13 @@ public class DataChunkCache {
         //    throw new IllegalArgumentException("transferNode is null or empty");
         //}
         
-        //if(data == null) {
-        //    throw new IllegalArgumentException("data is null");
-        //}
-        
         this.type = type;
         this.hash = hash;
         this.transferNode = transferNode;
         this.version = version;
-        this.data = data;
-        this.dataIS = null;
     }
     
-    public DataChunkCache(DataChunkCacheType type, String hash, long version, String transferNode, InputStream dataIS) {
+    public DataChunkCacheMetadata(DataChunkCacheType type, String hash, long version, String transferNode, Collection<String> waitingNodes) {
         if(type == null) {
             throw new IllegalArgumentException("type is null");
         }
@@ -165,38 +125,9 @@ public class DataChunkCache {
         //    throw new IllegalArgumentException("transferNode is null or empty");
         //}
         
-        //if(data == null) {
-        //    throw new IllegalArgumentException("data is null");
+        //if(waitingNodes == null) {
+        //    throw new IllegalArgumentException("waitingNodes is null or empty");
         //}
-        
-        this.type = type;
-        this.hash = hash;
-        this.transferNode = transferNode;
-        this.version = version;
-        this.data = null;
-        this.dataIS = dataIS;
-    }
-    
-    public DataChunkCache(DataChunkCacheType type, String hash, long version, String transferNode, String waitingNode, byte[] data) {
-        if(type == null) {
-            throw new IllegalArgumentException("type is null");
-        }
-        
-        if(hash == null || hash.isEmpty()) {
-            throw new IllegalArgumentException("hash is null or empty");
-        }
-        
-        if(version <= 0) {
-            throw new IllegalArgumentException("version is negative");
-        }
-        
-        //if(transferNode == null || transferNode.isEmpty()) {
-        //    throw new IllegalArgumentException("transferNode is null or empty");
-        //}
-        
-        if(waitingNode == null || waitingNode.isEmpty()) {
-            throw new IllegalArgumentException("waitingNode is null or empty");
-        }
         
         //if(data == null) {
         //    throw new IllegalArgumentException("data is null");
@@ -206,111 +137,9 @@ public class DataChunkCache {
         this.hash = hash;
         this.version = version;
         this.transferNode = transferNode;
-        this.waitingNodes.add(waitingNode);
-        this.data = data;
-        this.dataIS = null;
-    }
-    
-    public DataChunkCache(DataChunkCacheType type, String hash, long version, String transferNode, String waitingNode, InputStream dataIS) {
-        if(type == null) {
-            throw new IllegalArgumentException("type is null");
+        if(waitingNodes != null) {
+            this.waitingNodes.addAll(waitingNodes);
         }
-        
-        if(hash == null || hash.isEmpty()) {
-            throw new IllegalArgumentException("hash is null or empty");
-        }
-        
-        if(version <= 0) {
-            throw new IllegalArgumentException("version is negative");
-        }
-        
-        //if(transferNode == null || transferNode.isEmpty()) {
-        //    throw new IllegalArgumentException("transferNode is null or empty");
-        //}
-        
-        if(waitingNode == null || waitingNode.isEmpty()) {
-            throw new IllegalArgumentException("waitingNode is null or empty");
-        }
-        
-        //if(data == null) {
-        //    throw new IllegalArgumentException("data is null");
-        //}
-        
-        this.type = type;
-        this.hash = hash;
-        this.version = version;
-        this.transferNode = transferNode;
-        this.waitingNodes.add(waitingNode);
-        this.data = null;
-        this.dataIS = dataIS;
-    }
-    
-    public DataChunkCache(DataChunkCacheType type, String hash, long version, String transferNode, Collection<String> waitingNodes, byte[] data) {
-        if(type == null) {
-            throw new IllegalArgumentException("type is null");
-        }
-        
-        if(hash == null || hash.isEmpty()) {
-            throw new IllegalArgumentException("hash is null or empty");
-        }
-        
-        if(version <= 0) {
-            throw new IllegalArgumentException("version is negative");
-        }
-        
-        //if(transferNode == null || transferNode.isEmpty()) {
-        //    throw new IllegalArgumentException("transferNode is null or empty");
-        //}
-        
-        if(waitingNodes == null) {
-            throw new IllegalArgumentException("waitingNodes is null or empty");
-        }
-        
-        //if(data == null) {
-        //    throw new IllegalArgumentException("data is null");
-        //}
-        
-        this.type = type;
-        this.hash = hash;
-        this.version = version;
-        this.transferNode = transferNode;
-        this.waitingNodes.addAll(waitingNodes);
-        this.data = data;
-        this.dataIS = dataIS;
-    }
-    
-    public DataChunkCache(DataChunkCacheType type, String hash, long version, String transferNode, Collection<String> waitingNodes, InputStream dataIS) {
-        if(type == null) {
-            throw new IllegalArgumentException("type is null");
-        }
-        
-        if(hash == null || hash.isEmpty()) {
-            throw new IllegalArgumentException("hash is null or empty");
-        }
-        
-        if(version <= 0) {
-            throw new IllegalArgumentException("version is negative");
-        }
-        
-        //if(transferNode == null || transferNode.isEmpty()) {
-        //    throw new IllegalArgumentException("transferNode is null or empty");
-        //}
-        
-        if(waitingNodes == null) {
-            throw new IllegalArgumentException("waitingNodes is null or empty");
-        }
-        
-        //if(data == null) {
-        //    throw new IllegalArgumentException("data is null");
-        //}
-        
-        this.type = type;
-        this.hash = hash;
-        this.version = version;
-        this.transferNode = transferNode;
-        this.waitingNodes.addAll(waitingNodes);
-        this.data = null;
-        this.dataIS = dataIS;
     }
     
     @JsonProperty("type")
@@ -405,7 +234,9 @@ public class DataChunkCache {
             throw new IllegalArgumentException("node is null or empty");
         }
         
-        this.waitingNodes.add(node);
+        if(!this.waitingNodes.contains(node)) {
+            this.waitingNodes.add(node);
+        }
     }
     
     @JsonIgnore
@@ -420,36 +251,6 @@ public class DataChunkCache {
         }
         
         return this.waitingNodes.contains(node);
-    }
-        
-    @JsonProperty("data")
-    public byte[] getData() {
-        try {
-            readDataFromIS();
-        } catch (IOException ex) {
-            LOG.error("cannot read data from inputstream", ex);
-        }
-        return this.data;
-    }
-    
-    @JsonProperty("data")
-    public void setData(byte[] data) {
-        //if(data == null) {
-        //    throw new IllegalArgumentException("data is null");
-        //}
-        
-        this.data = data;
-        this.dataIS = null;
-    }
-    
-    @JsonIgnore
-    private void readDataFromIS() throws IOException {
-        if(this.data == null && this.dataIS != null) {
-            // read
-            this.data = IOUtils.toByteArray(this.dataIS);
-            this.dataIS.close();
-            this.dataIS = null;
-        }
     }
     
     @JsonIgnore
@@ -481,21 +282,13 @@ public class DataChunkCache {
             oos.write(nodeBytes);
         }
         
-        readDataFromIS();
-        if(this.data == null) {
-            oos.writeInt(0);
-        } else {
-            oos.writeInt(this.data.length);
-            oos.write(this.data);
-        }
-        
         oos.close();
         output.close();
         return output.toByteArray();
     }
     
     @JsonIgnore
-    public static DataChunkCache fromBytes(byte[] buf) throws IOException {
+    public static DataChunkCacheMetadata fromBytes(byte[] buf) throws IOException {
         ByteArrayInputStream input = new ByteArrayInputStream(buf);
         ObjectInputStream ois = new ObjectInputStream(input);
         
@@ -527,17 +320,10 @@ public class DataChunkCache {
             waitingNodes.add(waitingNode);
         }
         
-        int dataLen = ois.readInt();
-        byte[] data = null;
-        if(dataLen > 0) {
-            data = new byte[dataLen];
-            ois.readFully(data, 0, dataLen);
-        }
-        
         ois.close();
         input.close();
         
-        return new DataChunkCache(type, hash, version, transferNode, waitingNodes, data);
+        return new DataChunkCacheMetadata(type, hash, version, transferNode, waitingNodes);
     }
     
     @Override
@@ -549,6 +335,27 @@ public class DataChunkCache {
     @JsonIgnore
     public String toJson() throws IOException {
         return JsonSerializer.toJson(this);
+    }
+    
+    @JsonIgnore
+    public BigKeyValueStoreMetadata toBigKeyValueStoreMetadata() throws IOException {
+        BigKeyValueStoreMetadata kvMetadata = new BigKeyValueStoreMetadata(this.hash);
+        kvMetadata.setExtra(this.toBytes());
+        return kvMetadata;
+    }
+    
+    @JsonIgnore
+    public static DataChunkCacheMetadata fromBigKeyValueStoreMetadata(BigKeyValueStoreMetadata metadata) throws IOException {
+        if(metadata == null) {
+            throw new IllegalArgumentException("metadata is null");
+        }
+        
+        byte[] extra = metadata.getExtra();
+        if(extra == null) {
+            return null;
+        }
+        
+        return DataChunkCacheMetadata.fromBytes(extra);
     }
     
     @JsonIgnore

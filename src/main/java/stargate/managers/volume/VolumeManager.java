@@ -518,7 +518,7 @@ public class VolumeManager extends AbstractManager<NullDriver> {
                             
                             newRecipe.addChunk(newChunk);
                             
-                            if(pendingPrefetchSchedule.hasDataChunkCache()) {
+                            if(pendingPrefetchSchedule.hasDataChunkCacheMetadata()) {
                                 pendingPrefetchSchedules.add(pendingPrefetchSchedule);
                             }
                         } catch (IOException ex) {

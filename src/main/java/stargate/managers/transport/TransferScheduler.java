@@ -51,14 +51,14 @@ public class TransferScheduler {
     private Map<String, List<PrefetchTask>> pendingPrefetchTasks;
     private Object pendingPrefetchTasksSyncObj = new Object();
     
-    public TransferScheduler(int executorPoolSize, long pendingPrefetchTimeoutSec) {
-        if(executorPoolSize <= 0) {
-            throw new IllegalArgumentException("executorPoolSize is negative");
+    public TransferScheduler(int transferThreads, long pendingPrefetchTimeoutSec) {
+        if(transferThreads <= 0) {
+            throw new IllegalArgumentException("transferThreads is negative");
         }
         
-        this.transferPoolExecutor = new ThreadPoolExecutor(executorPoolSize, executorPoolSize, 0L, TimeUnit.MILLISECONDS, new LinkedBlockingQueue<Runnable>(executorPoolSize));
+        this.transferPoolExecutor = new ThreadPoolExecutor(transferThreads, transferThreads, 0L, TimeUnit.MILLISECONDS, new LinkedBlockingQueue<Runnable>(transferThreads));
         this.priorityTaskQueue = new PriorityBlockingQueue<AbstractTransferTask>(INITIAL_QUEUE_CAPACITY, new TransferTaskComparator());
-        this.taskIngestLock = new Semaphore(executorPoolSize);
+        this.taskIngestLock = new Semaphore(transferThreads);
         this.pendingPrefetchTasks = new PassiveExpiringMap<String, List<PrefetchTask>>(pendingPrefetchTimeoutSec, TimeUnit.SECONDS);
     }
     
@@ -155,6 +155,10 @@ public class TransferScheduler {
 
                 if(!toBeRemoved.isEmpty()) {
                     prefetchTasks.removeAll(toBeRemoved);
+                }
+                
+                if(prefetchTasks.isEmpty()) {
+                    this.pendingPrefetchTasks.remove(uriString);
                 }
             }
         }

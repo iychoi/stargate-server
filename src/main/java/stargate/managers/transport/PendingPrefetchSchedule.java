@@ -29,7 +29,7 @@ import stargate.commons.utils.JsonSerializer;
 public class PendingPrefetchSchedule {
 
     private TransferAssignment transferAssignment;
-    private DataChunkCache dataChunkCache;
+    private DataChunkCacheMetadata dataChunkCacheMetadata;
     
     public static PendingPrefetchSchedule createInstance(File file) throws IOException {
         if(file == null) {
@@ -56,20 +56,20 @@ public class PendingPrefetchSchedule {
         }
         
         this.transferAssignment = transferAssignment;
-        this.dataChunkCache = null;
+        this.dataChunkCacheMetadata = null;
     }
     
-    public PendingPrefetchSchedule(TransferAssignment transferAssignment, DataChunkCache dataChunkCache) {
+    public PendingPrefetchSchedule(TransferAssignment transferAssignment, DataChunkCacheMetadata dataChunkCacheMetadata) {
         if(transferAssignment == null) {
             throw new IllegalArgumentException("transferAssignment is null");
         }
         
-        if(dataChunkCache == null) {
-            throw new IllegalArgumentException("dataChunkCache is null");
+        if(dataChunkCacheMetadata == null) {
+            throw new IllegalArgumentException("dataChunkCacheMetadata is null");
         }
         
         this.transferAssignment = transferAssignment;
-        this.dataChunkCache = dataChunkCache;
+        this.dataChunkCacheMetadata = dataChunkCacheMetadata;
     }
     
     @JsonProperty("assignment")
@@ -86,22 +86,22 @@ public class PendingPrefetchSchedule {
         return this.transferAssignment;
     }
     
-    @JsonProperty("data_chunk_cache")
-    public void setDataChunkCache(DataChunkCache dataChunkCache) {
-        if(dataChunkCache == null) {
-            throw new IllegalArgumentException("dataChunkCache is null");
+    @JsonProperty("data_chunk_cache_metadata")
+    public void setDataChunkCacheMetadata(DataChunkCacheMetadata dataChunkCacheMetadata) {
+        if(dataChunkCacheMetadata == null) {
+            throw new IllegalArgumentException("dataChunkCacheMetadata is null");
         }
         
-        this.dataChunkCache = dataChunkCache;
+        this.dataChunkCacheMetadata = dataChunkCacheMetadata;
     }
 
-    @JsonProperty("data_chunk_cache")    
-    public DataChunkCache getDataChunkCache() {
-        return this.dataChunkCache;
+    @JsonProperty("data_chunk_cache_metadata")    
+    public DataChunkCacheMetadata getDataChunkCacheMetadata() {
+        return this.dataChunkCacheMetadata;
     }
     
-    public boolean hasDataChunkCache() {
-        return (this.dataChunkCache != null);
+    public boolean hasDataChunkCacheMetadata() {
+        return (this.dataChunkCacheMetadata != null);
     }
     
     @Override

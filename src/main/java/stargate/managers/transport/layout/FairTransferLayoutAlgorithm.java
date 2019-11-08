@@ -26,7 +26,7 @@ import org.apache.commons.logging.Log;
 import org.apache.commons.logging.LogFactory;
 import stargate.commons.cluster.Cluster;
 import stargate.commons.cluster.Node;
-import stargate.commons.datastore.AbstractKeyValueStore;
+import stargate.commons.datastore.AbstractBigKeyValueStore;
 import stargate.commons.driver.DriverNotInitializedException;
 import stargate.commons.event.AbstractEventHandler;
 import stargate.commons.event.StargateEvent;
@@ -50,13 +50,13 @@ public class FairTransferLayoutAlgorithm extends AbstractTransferLayoutAlgorithm
     
     private static final int CLUSTER_WORKLOADS_MAX_ENTRY_SIZE = 100;
     
-    private AbstractKeyValueStore dataCacheStore;
+    private AbstractBigKeyValueStore dataCacheStore;
     private Map<String, ClusterWorkload> clusterWorkloads = new LRUMap<String, ClusterWorkload>(CLUSTER_WORKLOADS_MAX_ENTRY_SIZE);
     private Map<String, ClusterWorkload> clusterWorkloadDelta = new LRUMap<String, ClusterWorkload>(CLUSTER_WORKLOADS_MAX_ENTRY_SIZE);
     
     private static final double WORKLOAD_INCREMENT = 10;
     
-    public FairTransferLayoutAlgorithm(AbstractService service, TransportManager manager, AbstractKeyValueStore dataCacheStore) throws IOException {
+    public FairTransferLayoutAlgorithm(AbstractService service, TransportManager manager, AbstractBigKeyValueStore dataCacheStore) throws IOException {
         if(service == null) {
             throw new IllegalArgumentException("service is null");
         }
@@ -89,7 +89,7 @@ public class FairTransferLayoutAlgorithm extends AbstractTransferLayoutAlgorithm
         setEventHandler();
     }
     
-    public FairTransferLayoutAlgorithm(StargateService service, TransportManager manager, AbstractKeyValueStore dataCacheStore) throws IOException {
+    public FairTransferLayoutAlgorithm(StargateService service, TransportManager manager, AbstractBigKeyValueStore dataCacheStore) throws IOException {
         if(service == null) {
             throw new IllegalArgumentException("service is null");
         }

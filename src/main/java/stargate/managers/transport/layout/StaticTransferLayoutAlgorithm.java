@@ -19,7 +19,7 @@ import java.io.IOException;
 import java.util.Collection;
 import stargate.commons.cluster.Cluster;
 import stargate.commons.cluster.Node;
-import stargate.commons.datastore.AbstractKeyValueStore;
+import stargate.commons.datastore.AbstractBigKeyValueStore;
 import stargate.commons.recipe.Recipe;
 import stargate.commons.recipe.RecipeChunk;
 import stargate.commons.service.AbstractService;
@@ -33,9 +33,9 @@ import stargate.service.StargateService;
  */
 public class StaticTransferLayoutAlgorithm extends AbstractTransferLayoutAlgorithm {
     
-    private AbstractKeyValueStore dataCacheStore;
+    private AbstractBigKeyValueStore dataCacheStore;
     
-    public StaticTransferLayoutAlgorithm(AbstractService service, TransportManager manager, AbstractKeyValueStore dataCacheStore) {
+    public StaticTransferLayoutAlgorithm(AbstractService service, TransportManager manager, AbstractBigKeyValueStore dataCacheStore) {
         if(service == null) {
             throw new IllegalArgumentException("service is null");
         }
@@ -66,7 +66,7 @@ public class StaticTransferLayoutAlgorithm extends AbstractTransferLayoutAlgorit
         this.dataCacheStore = dataCacheStore;
     }
     
-    public StaticTransferLayoutAlgorithm(StargateService service, TransportManager manager, AbstractKeyValueStore dataCacheStore) {
+    public StaticTransferLayoutAlgorithm(StargateService service, TransportManager manager, AbstractBigKeyValueStore dataCacheStore) {
         if(service == null) {
             throw new IllegalArgumentException("service is null");
         }

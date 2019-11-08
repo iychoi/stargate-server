@@ -27,8 +27,8 @@ import stargate.commons.recipe.AbstractRecipeDriverConfig;
  */
 public class OverlappedFixedSizeChunkRecipeDriverConfig extends AbstractRecipeDriverConfig {
     
-    private static final int DEFAULT_CHUNK_SIZE = 1024*1024; // 1MB
-    private static final int DEFAULT_OVERLAP_SIZE = 4*1024; // 4K
+    private static final int DEFAULT_CHUNK_SIZE = 16*1024*1024; // 16MB
+    private static final int DEFAULT_OVERLAP_SIZE = 16*1024; // 16K
     private static final String DEFAULT_HASH_ALGORITHM = "SHA-1";
     private static final int DEFAULT_BUFFER_SIZE = 64*1024; // 64KB
     
