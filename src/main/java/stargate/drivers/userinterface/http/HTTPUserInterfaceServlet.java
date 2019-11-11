@@ -81,6 +81,17 @@ public class HTTPUserInterfaceServlet extends AbstractUserInterfaceServer {
     private static final Log LOG = LogFactory.getLog(HTTPUserInterfaceServlet.class);
 
     private static HTTPUserInterfaceDriver driver = null;
+    
+    private UserInterfaceInitialDataPack initialDataPackCache = null;
+    private long lastInitialDataPackCacheUpdateTime = 0;
+    
+    private Collection<DataObjectMetadata> listDataObjectMetadataCache = null;
+    private DataObjectURI listDataObjectMetadataCacheUri = null;
+    private long lastListDataObjectMetadataCacheUpdateTime = 0;
+    
+    private Recipe recipeCache = null;
+    private DataObjectURI recipeCacheUri = null;
+    private long lastRecipeCacheUpdateTime = 0;
 
     static void setDriver(HTTPUserInterfaceDriver driver) {
         if(driver == null) {
@@ -239,22 +250,31 @@ public class HTTPUserInterfaceServlet extends AbstractUserInterfaceServer {
     @Override
     public UserInterfaceInitialDataPack getInitialDataPack() throws IOException {
         try {
-            StargateService stargateService = getStargateService();
             StargateService service = getStargateService();
+            VolumeManager volumeManager = service.getVolumeManager();
+            
+            if(this.lastInitialDataPackCacheUpdateTime == volumeManager.getLastUpdateTime() && this.initialDataPackCache != null) {
+                return this.initialDataPackCache;
+            }
+            
             ClusterManager clusterManager = service.getClusterManager();
             Cluster localCluster = clusterManager.getLocalCluster();
             
-            RecipeManager recipeManager = stargateService.getRecipeManager();
+            RecipeManager recipeManager = service.getRecipeManager();
             AbstractRecipeDriver recipeDriver = recipeManager.getDriver();
             int chunkSize = recipeDriver.getChunkSize();
             String hashAlgorithm = recipeDriver.getHashAlgorithm();
             FSServiceInfo serviceInfo = new FSServiceInfo(chunkSize, hashAlgorithm);
             
-            VolumeManager volumeManager = service.getVolumeManager();
+            
             DataObjectURI rootUri = new DataObjectURI("", "/");
             DataObjectMetadata dataObjectMetadata = volumeManager.getDataObjectMetadata(rootUri);
             
             UserInterfaceInitialDataPack dataPack = new UserInterfaceInitialDataPack(true, localCluster, serviceInfo, dataObjectMetadata);
+            
+            // cache
+            this.lastInitialDataPackCacheUpdateTime = volumeManager.getLastUpdateTime();
+            this.initialDataPackCache = dataPack;
             return dataPack;
         } catch (ManagerNotInstantiatedException ex) {
             LOG.error("Manager is not instantiated", ex);
@@ -913,8 +933,21 @@ public class HTTPUserInterfaceServlet extends AbstractUserInterfaceServer {
         try {
             StargateService service = getStargateService();
             VolumeManager volumeManager = service.getVolumeManager();
+            
+            
+            if(this.lastListDataObjectMetadataCacheUpdateTime == volumeManager.getLastUpdateTime() && this.listDataObjectMetadataCacheUri.equals(uri) && this.listDataObjectMetadataCache != null) {
+                return this.listDataObjectMetadataCache;
+            }
+            
             Directory directory = volumeManager.getDirectory(uri);
-            return directory.getEntries();
+            Collection<DataObjectMetadata> entries = directory.getEntries();
+
+            // cache
+            this.listDataObjectMetadataCacheUri = uri;
+            this.listDataObjectMetadataCache = entries;
+            this.lastListDataObjectMetadataCacheUpdateTime = volumeManager.getLastUpdateTime();
+            
+            return entries;
         } catch (ManagerNotInstantiatedException ex) {
             LOG.error("Manager is not instantiated", ex);
             throw new IOException(ex);
@@ -966,7 +999,18 @@ public class HTTPUserInterfaceServlet extends AbstractUserInterfaceServer {
         try {
             StargateService service = getStargateService();
             VolumeManager volumeManager = service.getVolumeManager();
-            return volumeManager.getRecipe(uri);
+            
+            if(this.lastRecipeCacheUpdateTime == volumeManager.getLastUpdateTime() && this.recipeCacheUri.equals(uri) && this.recipeCache != null) {
+                return this.recipeCache;
+            }
+            
+            Recipe recipe = volumeManager.getRecipe(uri);
+            
+            this.recipeCacheUri = uri;
+            this.recipeCache = recipe;
+            this.lastRecipeCacheUpdateTime = volumeManager.getLastUpdateTime();
+            
+            return recipe;
         } catch (ManagerNotInstantiatedException ex) {
             LOG.error("Manager is not instantiated", ex);
             throw new IOException(ex);
