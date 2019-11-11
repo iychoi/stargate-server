@@ -31,6 +31,7 @@ import org.apache.commons.collections4.map.PassiveExpiringMap;
 import org.apache.commons.logging.Log;
 import org.apache.commons.logging.LogFactory;
 import stargate.commons.dataobject.DataObjectURI;
+import stargate.commons.utils.DateTimeUtils;
 
 /**
  *
@@ -49,7 +50,10 @@ public class TransferScheduler {
     private Map<String, AbstractTransferTask> inTransferTasks = new ConcurrentHashMap<String, AbstractTransferTask>();
     private Semaphore taskIngestLock;
     private Map<String, List<PrefetchTask>> pendingPrefetchTasks;
-    private Object pendingPrefetchTasksSyncObj = new Object();
+    
+    private int numPendingPrefetchTasks = 0;
+    private int numQueuedTasks = 0;
+    private int numInTransferTasks = 0;
     
     public TransferScheduler(int transferThreads, long pendingPrefetchTimeoutSec) {
         if(transferThreads <= 0) {
@@ -62,7 +66,7 @@ public class TransferScheduler {
         this.pendingPrefetchTasks = new PassiveExpiringMap<String, List<PrefetchTask>>(pendingPrefetchTimeoutSec, TimeUnit.SECONDS);
     }
     
-    public void start() {
+    public synchronized void start() {
         LOG.debug("Transfer scheduler starts");
         
         this.schedulerRun = true;
@@ -72,21 +76,36 @@ public class TransferScheduler {
                 try {
                     LOG.debug("Transfer scheduler thread is starting");
                     while(schedulerRun) {
+                        taskIngestLock.acquire();
+                        
                         LOG.debug("Fetching a transfer from a queue");
                         AbstractTransferTask task = priorityTaskQueue.take();
                         String hash = task.getHash();
                         
+                        numQueuedTasks--;
+                        
+                        
                         if(inTransferTasks.containsKey(hash)) {
                             LOG.debug(String.format("Ignoring a transfer for %s - already in transfer", hash));
+                            taskIngestLock.release();
                         } else {
                             Runnable r = new Runnable() {
                                 @Override
                                 public void run() {
                                     try {
-                                        LOG.debug(String.format("Running a transfer task for %s (%s)", hash, task.getPriority().getStrVal()));
+                                        String priStr = task.getPriority().getStrVal();
+                                        LOG.debug(String.format("Running a transfer task for %s (%s)", hash, priStr));
+                                        task.setStartedTime(DateTimeUtils.getTimestamp());
                                         task.run();
+                                        
+                                        String creationTime = DateTimeUtils.getDateTimeString(task.getCreationTime());
+                                        String scheduledTime = DateTimeUtils.getDateTimeString(task.getScheduledTime());
+                                        String startedTime = DateTimeUtils.getDateTimeString(task.getStartedTime());
+                                        LOG.info(String.format("Transfer task for %s (%s) finished - created(%s), scheduled(%s), started(%s)", hash, priStr, creationTime, scheduledTime, startedTime));
                                     } finally {
                                         inTransferTasks.remove(hash);
+                                        numInTransferTasks--;
+                                        
                                         taskIngestLock.release();
                                     }
                                 }
@@ -94,8 +113,10 @@ public class TransferScheduler {
 
                             LOG.debug(String.format("Scheduling a transfer for %s (%s)", hash, task.getPriority().getStrVal()));
                             // register to inTransfer set
-                            taskIngestLock.acquire();
                             inTransferTasks.put(hash, task);
+                            
+                            numInTransferTasks++;
+                            
                             // go
                             transferPoolExecutor.execute(r);
                         }
@@ -110,7 +131,7 @@ public class TransferScheduler {
         this.transferSchedulerThread.start();
     }
     
-    public void stop() {
+    public synchronized void stop() {
         this.schedulerRun = false;
         if(this.transferSchedulerThread != null) {
             if(this.transferSchedulerThread.isAlive()) {
@@ -126,7 +147,7 @@ public class TransferScheduler {
         LOG.debug("Transfer scheduler finished");
     }
     
-    public void schedule(AbstractTransferTask task) throws IOException {
+    public synchronized void schedule(AbstractTransferTask task) throws IOException {
         if(task instanceof OnDemandTransferTask) {
             schedule((OnDemandTransferTask) task);
         } else if(task instanceof PrefetchTask) {
@@ -136,51 +157,70 @@ public class TransferScheduler {
         }
     }
     
-    public void schedule(OnDemandTransferTask task) {
+    public synchronized void schedule(OnDemandTransferTask task) {
+        if(task == null) {
+            throw new IllegalArgumentException("task is null");
+        }
+        
         LOG.debug("Putting an on-demand transfer into a queue");
+        task.setScheduledTime(DateTimeUtils.getTimestamp());
         this.priorityTaskQueue.add(task);
+        this.numQueuedTasks++;
         
         // remove prefetch tasks scheduled
         String uriString = task.getDataObjectURI().toUri().toASCIIString();
-        synchronized(this.pendingPrefetchTasksSyncObj) {
-            List<PrefetchTask> prefetchTasks = this.pendingPrefetchTasks.get(uriString);
-            if(prefetchTasks != null) {
-                List<PrefetchTask> toBeRemoved = new ArrayList<PrefetchTask>();
-
-                for(PrefetchTask prefetchTask : prefetchTasks) {
-                    if(prefetchTask.getHash().equals(task.getHash())) {
-                        toBeRemoved.add(prefetchTask);
-                    }
+        List<PrefetchTask> prefetchTasks = this.pendingPrefetchTasks.get(uriString);
+        if(prefetchTasks != null) {
+            Iterator<PrefetchTask> iterator = prefetchTasks.iterator();
+            while(iterator.hasNext()) {
+                PrefetchTask prefetchTask = iterator.next();
+                if(prefetchTask.getHash().equals(task.getHash())) {
+                    // remove
+                    iterator.remove();
+                    this.numPendingPrefetchTasks--;
                 }
+            }
 
-                if(!toBeRemoved.isEmpty()) {
-                    prefetchTasks.removeAll(toBeRemoved);
-                }
-                
-                if(prefetchTasks.isEmpty()) {
-                    this.pendingPrefetchTasks.remove(uriString);
+            if(prefetchTasks.isEmpty()) {
+                this.pendingPrefetchTasks.remove(uriString);
+            }
+        }
+        
+        printCurrentStates();
+    }
+    
+    public synchronized void schedule(PrefetchTask task) {
+        if(task == null) {
+            throw new IllegalArgumentException("task is null");
+        }
+        
+        String uriString = task.getDataObjectURI().toUri().toASCIIString();
+        List<PrefetchTask> prefetchTasks = this.pendingPrefetchTasks.get(uriString);
+        boolean taskExists = false;
+
+        if(prefetchTasks == null) {
+            prefetchTasks = new ArrayList<PrefetchTask>();
+        } else {
+            for(PrefetchTask prefetchTask : prefetchTasks) {
+                if(prefetchTask.getHash().equals(task.getHash())) {
+                    // has
+                    taskExists = true;
+                    break;
                 }
             }
         }
-    }
-    
-    public void schedule(PrefetchTask task) {
-        String uriString = task.getDataObjectURI().toUri().toASCIIString();
-        synchronized(this.pendingPrefetchTasksSyncObj) {
-            List<PrefetchTask> prefetchTasks = this.pendingPrefetchTasks.get(uriString);
-            if(prefetchTasks == null) {
-                prefetchTasks = new ArrayList<PrefetchTask>();
-                this.pendingPrefetchTasks.put(uriString, prefetchTasks);
-            }
 
+        if(!taskExists) {
             prefetchTasks.add(task);
-            
-            // to prevent the item from expiring
+            this.numPendingPrefetchTasks++;
+
             this.pendingPrefetchTasks.put(uriString, prefetchTasks);
         }
+        
+        printCurrentStates();
     }
     
-    public void startPrefetch(DataObjectURI uri, long startOffset, long endOffset) {
+    public synchronized void startPrefetch(DataObjectURI uri, long startOffset, long prefetchWindowSize) {
         if(uri == null) {
             throw new IllegalArgumentException("uri is null");
         }
@@ -189,25 +229,113 @@ public class TransferScheduler {
             throw new IllegalArgumentException("startOffset is negative");
         }
         
+        if(prefetchWindowSize < 0) {
+            throw new IllegalArgumentException("prefetchWindowSize is negative");
+        }
+        
+        long endOffset = 0;
+        if(prefetchWindowSize == 0) {
+            endOffset = Long.MAX_VALUE;
+        } else {
+            endOffset = startOffset + prefetchWindowSize;
+        }
+        
         String uriString = uri.toUri().toASCIIString();
-        synchronized(this.pendingPrefetchTasksSyncObj) {
-            List<PrefetchTask> prefetchTasks = this.pendingPrefetchTasks.get(uriString);
-            if(prefetchTasks != null) {
-                LOG.debug(String.format("Putting prefetching transfer starting from offset %d to offset %d into a queue for %s", startOffset, endOffset, uriString));
-                
-                Iterator<PrefetchTask> iterator = prefetchTasks.iterator();
-                while(iterator.hasNext()) {
-                    PrefetchTask prefetchTask = iterator.next();
-                    long offset = prefetchTask.getOffset();
-                    if(offset >= startOffset && offset < endOffset) {
-                        this.priorityTaskQueue.add(prefetchTask);
-                        iterator.remove();
-                    }
-                }
+        List<PrefetchTask> prefetchTasks = this.pendingPrefetchTasks.get(uriString);
+        if(prefetchTasks != null) {
+            LOG.debug(String.format("Putting prefetching transfer starting from offset %d to offset %d into a queue for %s", startOffset, endOffset, uriString));
 
+            Iterator<PrefetchTask> iterator = prefetchTasks.iterator();
+            while(iterator.hasNext()) {
+                PrefetchTask prefetchTask = iterator.next();
+                long offset = prefetchTask.getOffset();
+                if(offset >= startOffset && offset < endOffset) {
+                    prefetchTask.setScheduledTime(DateTimeUtils.getTimestamp());
+                    this.priorityTaskQueue.add(prefetchTask);
+                    this.numQueuedTasks++;
+
+                    iterator.remove();
+                    this.numPendingPrefetchTasks--;
+                }
+            }
+
+            if(prefetchTasks.isEmpty()) {
+                this.pendingPrefetchTasks.remove(uriString);
+            } else {
                 // to prevent the item from expiring
                 this.pendingPrefetchTasks.put(uriString, prefetchTasks);
             }
         }
+        
+        printCurrentStates();
+    }
+    
+    public void startPrefetch(DataObjectURI uri, long startOffset, long prefetchWindowSize, int count) {
+        if(uri == null) {
+            throw new IllegalArgumentException("uri is null");
+        }
+        
+        if(startOffset < 0) {
+            throw new IllegalArgumentException("startOffset is negative");
+        }
+        
+        if(prefetchWindowSize < 0) {
+            throw new IllegalArgumentException("prefetchWindowSize is negative");
+        }
+        
+        if(count < 0) {
+            throw new IllegalArgumentException("count is negative");
+        }
+        
+        if(count == 0) {
+            return;
+        }
+        
+        long endOffset = 0;
+        if(prefetchWindowSize == 0) {
+            endOffset = Long.MAX_VALUE;
+        } else {
+            endOffset = startOffset + prefetchWindowSize;
+        }
+        
+        String uriString = uri.toUri().toASCIIString();
+        List<PrefetchTask> prefetchTasks = this.pendingPrefetchTasks.get(uriString);
+        if(prefetchTasks != null) {
+            LOG.debug(String.format("Putting prefetching transfer starting from offset %d to offset %d into a queue for %s", startOffset, endOffset, uriString));
+            int remaining = count;
+
+            Iterator<PrefetchTask> iterator = prefetchTasks.iterator();
+            while(iterator.hasNext()) {
+                PrefetchTask prefetchTask = iterator.next();
+                long offset = prefetchTask.getOffset();
+                if(offset >= startOffset && offset < endOffset) {
+                    prefetchTask.setScheduledTime(DateTimeUtils.getTimestamp());
+                    this.priorityTaskQueue.add(prefetchTask);
+                    this.numQueuedTasks++;
+
+                    iterator.remove();
+                    this.numPendingPrefetchTasks--;
+
+                    remaining--;
+
+                    if(remaining <= 0) {
+                        break;
+                    }
+                }
+            }
+
+            if(prefetchTasks.isEmpty()) {
+                this.pendingPrefetchTasks.remove(uriString);
+            } else {
+                // to prevent the item from expiring
+                this.pendingPrefetchTasks.put(uriString, prefetchTasks);
+            }
+        }
+        
+        printCurrentStates();
+    }
+    
+    private void printCurrentStates() {
+        LOG.info(String.format("Transfer(%d), Queued(%d), Pending Prefetch(%d)", numInTransferTasks, numQueuedTasks, numPendingPrefetchTasks));
     }
 }

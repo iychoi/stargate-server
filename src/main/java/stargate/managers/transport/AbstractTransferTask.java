@@ -30,6 +30,8 @@ public abstract class AbstractTransferTask implements Runnable {
     protected long offset;
     protected TransferTaskPriority priority;
     protected long creationTime;
+    protected long scheduledTime;
+    protected long startedTime;
     
     public void setName(String name) {
         this.name = name;
@@ -69,5 +71,21 @@ public abstract class AbstractTransferTask implements Runnable {
     
     public void setCreationTime(long creationTime) {
         this.creationTime = creationTime;
+    }
+    
+    public long getScheduledTime() {
+        return this.scheduledTime;
+    }
+    
+    public void setScheduledTime(long scheduledTime) {
+        this.scheduledTime = scheduledTime;
+    }
+    
+    public long getStartedTime() {
+        return this.startedTime;
+    }
+    
+    public void setStartedTime(long startedTime) {
+        this.startedTime = startedTime;
     }
 }

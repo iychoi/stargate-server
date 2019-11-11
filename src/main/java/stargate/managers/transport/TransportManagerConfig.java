@@ -35,6 +35,7 @@ public class TransportManagerConfig extends ManagerConfig {
     private static final int DEFAULT_DATA_TRANSFER_TIMEOUT_SEC = 60*5; // 5min
     private static final int DEFAULT_PENDING_PREFETCH_TIMEOUT_SEC = 24*60*60; // 1day
     private static final long DEFAULT_PREFETCH_WINDOW_SIZE = 0;
+    private static final int DEFAULT_PREFETCH_BLOCKS = 1;
     private static final int DEFAULT_DIRECTORY_CACHE_TIMEOUT_SEC = 60*5; // 5min
     private static final int DEFAULT_RECIPE_CACHE_TIMEOUT_SEC = 24*60*60; // 1day
     private static final int DEFAULT_DATACHUNK_CACHE_TIMEOUT_SEC = 7*24*60*60; // 7day
@@ -47,6 +48,7 @@ public class TransportManagerConfig extends ManagerConfig {
     private int pendingPrefetchTimeout = DEFAULT_PENDING_PREFETCH_TIMEOUT_SEC;
     private int dataTransferTimeout = DEFAULT_DATA_TRANSFER_TIMEOUT_SEC;
     private long prefetchWindowSize = DEFAULT_PREFETCH_WINDOW_SIZE;
+    private int prefetchBlocks = DEFAULT_PREFETCH_BLOCKS;
     private int directoryCacheTimeout = DEFAULT_DIRECTORY_CACHE_TIMEOUT_SEC;
     private int recipeCacheTimeout = DEFAULT_RECIPE_CACHE_TIMEOUT_SEC;
     private int dataChunkCacheTimeout = DEFAULT_DATACHUNK_CACHE_TIMEOUT_SEC;
@@ -218,6 +220,22 @@ public class TransportManagerConfig extends ManagerConfig {
     @JsonProperty("prefetch_window_size")
     public long getPrefetchWindowSize() {
         return this.prefetchWindowSize;
+    }
+    
+    @JsonProperty("prefetch_blocks")
+    public void setPrefetchBlocks(int blocks) {
+        super.checkMutableAndRaiseException();
+        
+        if(blocks < 0) {
+            this.prefetchBlocks = DEFAULT_PREFETCH_BLOCKS;
+        } else {
+            this.prefetchBlocks = blocks;
+        }
+    }
+    
+    @JsonProperty("prefetch_blocks")
+    public int getPrefetchBlocks() {
+        return this.prefetchBlocks;
     }
     
     @JsonProperty("directory_cache_timeout")

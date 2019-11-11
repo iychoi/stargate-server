@@ -38,7 +38,17 @@ public class TransferTaskComparator implements Comparator<Runnable> {
             }
         }
         
-        return t1.getPriority().getIntVal() - t2.getPriority().getIntVal();
+        int priDiff = t1.getPriority().getIntVal() - t2.getPriority().getIntVal();
+        if(priDiff == 0) {
+            int scheDiff = Long.compare(t1.getScheduledTime(), t2.getScheduledTime());
+            if(scheDiff == 0) {
+                return Long.compare(t1.getCreationTime(), t2.getCreationTime());
+            }
+            
+            return scheDiff;
+        }
+        
+        return priDiff;
     }
 
     @Override

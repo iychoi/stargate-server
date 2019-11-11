@@ -836,7 +836,8 @@ public class TransportManager extends AbstractManager<AbstractTransportDriver> {
             //    lock.unlock();
             //}
             
-            raiseEventForPrefetchStart(uri, recipeChunk.getOffset());
+            // do not propagate prefetch start event to other nodes in the cluster
+            //raiseEventForPrefetchStart(uri, recipeChunk.getOffset());
         }
     }
     
@@ -1478,9 +1479,7 @@ public class TransportManager extends AbstractManager<AbstractTransportDriver> {
                 OnDemandTransferTask onDemandTask = new OnDemandTransferTask(event.getHash(), this, event.getDataObjectURI(), event.getHash(), event.getOffset());
                 this.transferScheduler.schedule(onDemandTask);
                 // start if there're prefetch schedules pending
-                if(managerConfig.getPrefetchWindowSize() > 0) {
-                    this.transferScheduler.startPrefetch(event.getDataObjectURI(), event.getOffset(), event.getOffset() + managerConfig.getPrefetchWindowSize());
-                }
+                this.transferScheduler.startPrefetch(event.getDataObjectURI(), event.getOffset(), managerConfig.getPrefetchWindowSize(), managerConfig.getPrefetchBlocks());
                 break;
             case TRANSFER_EVENT_TYPE_PREFETCH:
                 LOG.debug(String.format("processTransferEvent: A prefetching is requested : %s - hash(%s), offset(%d)", event.getDataObjectURI().toUri().toASCIIString(), event.getHash(), event.getOffset()));
@@ -1489,9 +1488,7 @@ public class TransportManager extends AbstractManager<AbstractTransportDriver> {
                 break;
             case TRANSFER_EVENT_TYPE_PREFETCH_START:
                 LOG.debug(String.format("processTransferEvent: Start prefetching : %s - offset(%d)", event.getDataObjectURI().toUri().toASCIIString(), event.getOffset()));
-                if(managerConfig.getPrefetchWindowSize() > 0) {
-                    this.transferScheduler.startPrefetch(event.getDataObjectURI(), event.getOffset(), event.getOffset() + managerConfig.getPrefetchWindowSize());
-                }
+                this.transferScheduler.startPrefetch(event.getDataObjectURI(), event.getOffset(), managerConfig.getPrefetchWindowSize(), managerConfig.getPrefetchBlocks());
                 break;
             case TRANSFER_EVENT_TYPE_COMPLETE:
                 LOG.debug(String.format("processTransferEvent: Transfer is finished : %s - hash(%s), offset(%d)", event.getDataObjectURI().toUri().toASCIIString(), event.getHash(), event.getOffset()));
