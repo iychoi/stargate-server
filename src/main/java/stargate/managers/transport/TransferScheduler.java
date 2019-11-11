@@ -107,6 +107,8 @@ public class TransferScheduler {
                                         numInTransferTasks--;
                                         
                                         taskIngestLock.release();
+                                        
+                                        printCurrentStates();
                                     }
                                 }
                             };
@@ -119,6 +121,8 @@ public class TransferScheduler {
                             
                             // go
                             transferPoolExecutor.execute(r);
+                            
+                            printCurrentStates();
                         }
                     }
                     LOG.debug("Transfer scheduler thread is terminating");

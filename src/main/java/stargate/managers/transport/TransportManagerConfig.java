@@ -32,7 +32,7 @@ public class TransportManagerConfig extends ManagerConfig {
     
     private static final int DEFAULT_TRANSFER_THREADS = 3;
     private static final int DEFAULT_PREFETCH_SCHEDULER_THREADS = 1;
-    private static final int DEFAULT_DATA_TRANSFER_TIMEOUT_SEC = 60*5; // 5min
+    private static final int DEFAULT_DATA_TRANSFER_TIMEOUT_SEC = 30*60; // 30min
     private static final int DEFAULT_PENDING_PREFETCH_TIMEOUT_SEC = 24*60*60; // 1day
     private static final long DEFAULT_PREFETCH_WINDOW_SIZE = 0;
     private static final int DEFAULT_PREFETCH_BLOCKS = 1;
