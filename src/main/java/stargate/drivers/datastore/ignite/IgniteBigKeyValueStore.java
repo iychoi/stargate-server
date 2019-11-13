@@ -248,13 +248,15 @@ public class IgniteBigKeyValueStore extends AbstractBigKeyValueStore {
             int partNo = 0;
             if(dataIS != null) {
                 boolean cont = true;
+                
+                byte[] buffer  = new byte[CHUNK_SIZE];
                 while(cont) {
                     String partkey = IgniteBigKeyValueStore.makePartkey(key, partNo);
-                    byte[] dataBytes = IOUtils.toByteArray(dataIS, CHUNK_SIZE);
-                    if(dataBytes.length > 0) {
-                        this.store.put(partkey, new ByteArray(dataBytes));
+                    int readLen = IOUtils.toByteArray(dataIS, buffer, CHUNK_SIZE);
+                    if(readLen > 0) {
+                        this.store.put(partkey, new ByteArray(buffer, readLen));
                         partNo++;
-                        dataSize += dataBytes.length;
+                        dataSize += readLen;
                     } else {
                         // no data
                         cont = false;
