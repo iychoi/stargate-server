@@ -18,16 +18,13 @@ package stargate.drivers.userinterface.http;
 import java.io.IOException;
 import java.io.InputStream;
 import java.net.URI;
-import java.util.ArrayList;
 import java.util.Collection;
 import java.util.HashMap;
-import java.util.List;
 import java.util.Map;
 import java.util.Set;
 import org.apache.hadoop.fs.FSInputStream;
 import stargate.commons.dataobject.DataObjectMetadata;
 import stargate.commons.dataobject.DataObjectURI;
-import stargate.commons.io.DiskBufferInputStream;
 import stargate.commons.recipe.Recipe;
 import stargate.commons.recipe.RecipeChunk;
 import stargate.commons.utils.IPUtils;
@@ -40,14 +37,13 @@ public class HTTPChunkInputStream extends FSInputStream {
 
     public static final String DEFAULT_NODE_NAME = "DEFAULT_NODE";
     public static final String LOCAL_NODE_NAME = "LOCAL_NODE";
-    public static final int MAX_CHUNKDATA_CACHE_SIZE = 3;
-    
+     
     // node-name to client mapping
     private Map<String, HTTPUserInterfaceClient> clients = new HashMap<String, HTTPUserInterfaceClient>();
     private Recipe recipe;
     private long offset;
     private long size;
-    private List<ChunkData> chunkDataList = new ArrayList<ChunkData>();
+    private ChunkData chunkData;
     
     public HTTPChunkInputStream(HTTPUserInterfaceClient client, Recipe recipe) {
         if(client == null) {
@@ -117,12 +113,13 @@ public class HTTPChunkInputStream extends FSInputStream {
     
     @Override
     public synchronized int available() throws IOException {
-        for(ChunkData chunkData : this.chunkDataList) {
-            if(chunkData != null &&
-                chunkData.getOffset() <= this.offset &&
-                (chunkData.getOffset() + chunkData.getSize()) > this.offset) {
-                // safe to reuse
-                return (int) (chunkData.getSize() - (this.offset - chunkData.getOffset()));
+        if(this.chunkData != null && this.chunkData.containsOffset(this.offset)) {
+            if((this.chunkData.getCurrentOffsetInChunk() + this.chunkData.getChunkStartOffset()) > this.offset) {
+                // backward
+                return 0;
+            } else {
+                // forward
+                return (int) ((this.chunkData.getChunkStartOffset() + this.chunkData.getChunkSize()) - this.offset);
             }
         }
         
@@ -171,99 +168,97 @@ public class HTTPChunkInputStream extends FSInputStream {
         return false;
     }
     
-    private ChunkData loadChunkData() throws IOException {
-        for(ChunkData chunkData : this.chunkDataList) {
-            if(chunkData != null &&
-                chunkData.getOffset() <= this.offset &&
-                (chunkData.getOffset() + chunkData.getSize()) > this.offset) {
-                // safe to reuse
-                DiskBufferInputStream diskBufferInputStream = chunkData.getInputStream();
-                diskBufferInputStream.seek(this.offset - chunkData.getOffset());
-                return chunkData;
-            }
-        }
-        
+    private void loadChunkData() throws IOException {
         if(this.offset >= this.size) {
-            return null;
+            return;
         }
         
-        RecipeChunk chunk = this.recipe.getChunk(this.offset);
-        
-        DataObjectMetadata metadata = this.recipe.getMetadata();
-        DataObjectURI uri = metadata.getURI();
-        
-        Collection<Integer> nodeIDs = chunk.getNodeIDs();
-        Collection<String> nodeNames = this.recipe.getNodeNames(nodeIDs);
-        
-        HTTPUserInterfaceClient localClient = this.clients.get(LOCAL_NODE_NAME);
-        HTTPUserInterfaceClient client = null;
-        
-        if (this.clients.size() == 1) {
-            // no other choice
-            Collection<HTTPUserInterfaceClient> values = this.clients.values();
-            for(HTTPUserInterfaceClient value : values) {
-                client = value;
-                break;
+        if(this.chunkData != null && this.chunkData.containsOffset(this.offset)) {
+            if((this.chunkData.getCurrentOffsetInChunk() + this.chunkData.getChunkStartOffset()) > this.offset) {
+                // backward - re-download the chunk
+                this.chunkData.close();
+                this.chunkData = null;
+            } else {
+                // forward
+                // safe to reuse
             }
-        } else if (this.clients.size() >= 2) {
-            // Step1. check if local node has the block
-            if(localClient != null) {
-                URI localServiceURI = localClient.getServiceURI();
+        }
+        
+        if(this.chunkData == null) {
+            // load chunk
+            RecipeChunk chunk = this.recipe.getChunk(this.offset);
+        
+            DataObjectMetadata metadata = this.recipe.getMetadata();
+            DataObjectURI uri = metadata.getURI();
 
-                for(String nodeName : nodeNames) {
-                    HTTPUserInterfaceClient candidateClient = this.clients.get(nodeName);
-                    if(candidateClient != null) {
-                        URI candidateServiceURI = candidateClient.getServiceURI();
-                        if(candidateServiceURI.equals(localServiceURI)) {
+            Collection<Integer> nodeIDs = chunk.getNodeIDs();
+            Collection<String> nodeNames = this.recipe.getNodeNames(nodeIDs);
+
+            HTTPUserInterfaceClient localClient = this.clients.get(LOCAL_NODE_NAME);
+            HTTPUserInterfaceClient client = null;
+
+            if (this.clients.size() == 1) {
+                // no other choice
+                Collection<HTTPUserInterfaceClient> values = this.clients.values();
+                for(HTTPUserInterfaceClient value : values) {
+                    client = value;
+                    break;
+                }
+            } else if (this.clients.size() >= 2) {
+                // Step1. check if local node has the block
+                if(localClient != null) {
+                    URI localServiceURI = localClient.getServiceURI();
+
+                    for(String nodeName : nodeNames) {
+                        HTTPUserInterfaceClient candidateClient = this.clients.get(nodeName);
+                        if(candidateClient != null) {
+                            URI candidateServiceURI = candidateClient.getServiceURI();
+                            if(candidateServiceURI.equals(localServiceURI)) {
+                                // we found
+                                client = candidateClient;
+                                break;
+                            }
+                        }
+                    }
+                }
+
+                // Step2. use any of nodes having the block
+                if(client == null) {
+                    for(String nodeName : nodeNames) {
+                        client = this.clients.get(nodeName);
+                        if(client != null) {
                             // we found
-                            client = candidateClient;
                             break;
                         }
                     }
                 }
-            }
 
-            // Step2. use any of nodes having the block
-            if(client == null) {
-                for(String nodeName : nodeNames) {
-                    client = this.clients.get(nodeName);
-                    if(client != null) {
-                        // we found
-                        break;
-                    }
+                // Step3. use wild card
+                if(client == null) {
+                    client = this.clients.get(DEFAULT_NODE_NAME);
                 }
             }
 
-            // Step3. use wild card
             if(client == null) {
-                client = this.clients.get(DEFAULT_NODE_NAME);
+                throw new IOException("Cannot find responsible remote nodes");
+            }
+
+            if(!client.isConnected()) {
+                client.connect();
+            }
+
+            InputStream dataChunkIS = client.getDataChunk(uri, chunk.getHash());
+            dataChunkIS.skip(this.offset - chunk.getOffset());
+            this.chunkData = new ChunkData(dataChunkIS, (int) (this.offset - chunk.getOffset()), chunk.getOffset(), chunk.getLength());
+        } else {
+            // forward
+            int skip = (int) (this.offset - (this.chunkData.getCurrentOffsetInChunk() + this.chunkData.getChunkStartOffset()));
+            if(skip > 0) {
+                InputStream is = this.chunkData.getInputStream();
+                is.skip(skip);
+                this.chunkData.increaseCurrentOffset(skip);
             }
         }
-        
-        if(client == null) {
-            throw new IOException("Cannot find responsible remote nodes");
-        }
-        
-        if(!client.isConnected()) {
-            client.connect();
-        }
-        
-        InputStream dataChunkIS = client.getDataChunk(uri, chunk.getHash());
-        DiskBufferInputStream diskBufferInputStream = new DiskBufferInputStream(dataChunkIS, chunk.getLength());
-        dataChunkIS.close();
-        
-        diskBufferInputStream.seek(this.offset - chunk.getOffset());
-        ChunkData chunkData = new ChunkData(diskBufferInputStream, chunk.getOffset(), chunk.getLength());
-        this.chunkDataList.add(0, chunkData);
-        
-        if(this.chunkDataList.size() > MAX_CHUNKDATA_CACHE_SIZE) {
-            int lastIdx = this.chunkDataList.size() - 1;
-            ChunkData toBeRemoved = this.chunkDataList.get(lastIdx);
-            toBeRemoved.close();
-            this.chunkDataList.remove(lastIdx);
-        }
-        
-        return chunkData;
     }
     
     @Override
@@ -272,13 +267,14 @@ public class HTTPChunkInputStream extends FSInputStream {
             return -1;
         }
         
-        ChunkData chunkData = loadChunkData();
-        if(chunkData == null) {
+        loadChunkData();
+        if(this.chunkData == null) {
             throw new IOException("Cannot read chunk data");
         }
         
-        DiskBufferInputStream diskBufferInputStream = chunkData.getInputStream();
-        int ch = diskBufferInputStream.read();
+        InputStream is = this.chunkData.getInputStream();
+        int ch = is.read();
+        this.chunkData.increaseCurrentOffset(1);
         this.offset++;
         return ch;
     }
@@ -311,18 +307,19 @@ public class HTTPChunkInputStream extends FSInputStream {
         
         int outputBufferOffset = off;
         while(remain > 0) {
-            ChunkData chunkData = loadChunkData();
-
-            if(chunkData == null) {
+            loadChunkData();
+            if(this.chunkData == null) {
                 throw new IOException("Cannot read chunk data");
             }
             
-            int bufferOffset = (int) (this.offset - chunkData.getOffset());
-            int bufferLength = (int) Math.min(chunkData.getSize() - bufferOffset, remain);
+            int bufferOffset = (int) (this.offset - this.chunkData.getChunkStartOffset());
+            int bufferLength = (int) Math.min(this.chunkData.getChunkSize() - bufferOffset, remain);
             
-            DiskBufferInputStream diskBufferInputStream = chunkData.getInputStream();
-            int read = diskBufferInputStream.read(bytes, outputBufferOffset, bufferLength);
+            InputStream is = this.chunkData.getInputStream();
+            int read = is.read(bytes, outputBufferOffset, bufferLength);
+            this.chunkData.increaseCurrentOffset(read);
             this.offset += read;
+            
             outputBufferOffset += read;
             remain -= read;
         }
@@ -344,11 +341,10 @@ public class HTTPChunkInputStream extends FSInputStream {
         this.offset = 0;
         this.size = 0;
         
-        for(ChunkData chunkData : this.chunkDataList) {
-            chunkData.close();
+        if(this.chunkData != null) {
+            this.chunkData.close();
+            this.chunkData = null;
         }
-        
-        this.chunkDataList.clear();
     }
     
     @Override

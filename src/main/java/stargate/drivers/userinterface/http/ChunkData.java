@@ -16,7 +16,8 @@
 package stargate.drivers.userinterface.http;
 
 import java.io.Closeable;
-import stargate.commons.io.DiskBufferInputStream;
+import java.io.IOException;
+import java.io.InputStream;
 
 /**
  *
@@ -24,62 +25,96 @@ import stargate.commons.io.DiskBufferInputStream;
  */
 public class ChunkData implements Comparable<ChunkData>, Closeable {
 
-    private DiskBufferInputStream is;
-    private long offset;
-    private long size;
-
-    public ChunkData(DiskBufferInputStream is, long offset, long size) {
+    private InputStream is;
+    private int currentOffsetInChunk;
+    private long chunkStartOffset;
+    private long chunkSize;
+    
+    public ChunkData(InputStream is, int currentOffsetInChunk, long chunkStartOffset, long chunkSize) {
         if(is == null) {
             throw new IllegalArgumentException("is is null");
         }
         
-        if(offset < 0) {
-            throw new IllegalArgumentException("offset is negative");
+        if(currentOffsetInChunk < 0) {
+            throw new IllegalArgumentException("currentOffsetInChunk is negative");
         }
         
-        if(size < 0) {
-            throw new IllegalArgumentException("size is negative");
+        if(chunkStartOffset < 0) {
+            throw new IllegalArgumentException("chunkStartOffset is negative");
+        }
+        
+        if(chunkSize < 0) {
+            throw new IllegalArgumentException("chunkSize is negative");
         }
         
         this.is = is;
-        this.offset = offset;
-        this.size = size;
+        this.currentOffsetInChunk = currentOffsetInChunk;
+        this.chunkStartOffset = chunkStartOffset;
+        this.chunkSize = chunkSize;
     }
 
-    public DiskBufferInputStream getInputStream() {
+    public InputStream getInputStream() {
         return this.is;
     }
 
-    public void setInputStream(DiskBufferInputStream is) {
+    public void setInputStream(InputStream is) {
         if(is == null) {
             throw new IllegalArgumentException("is is null");
         }
         
         this.is = is;
     }
-
-    public long getOffset() {
-        return this.offset;
+    
+    public int getCurrentOffsetInChunk() {
+        return this.currentOffsetInChunk;
     }
 
-    public void setOffset(long offset) {
-        if(offset < 0) {
-            throw new IllegalArgumentException("offset is negative");
+    public void setCurrentOffsetInChunk(int currentOffsetInChunk) {
+        if(currentOffsetInChunk < 0) {
+            throw new IllegalArgumentException("currentOffsetInChunk is negative");
         }
         
-        this.offset = offset;
+        this.currentOffsetInChunk = currentOffsetInChunk;
     }
-
-    public long getSize() {
-        return this.size;
-    }
-
-    public void setSize(long size) {
-        if(size < 0) {
-            throw new IllegalArgumentException("size is negative");
+    
+    public void increaseCurrentOffset(int skip) {
+        if(skip < 0) {
+            throw new IllegalArgumentException("skip is negative");
         }
         
-        this.size = size;
+        this.currentOffsetInChunk += skip;
+    }
+
+    public long getChunkStartOffset() {
+        return this.chunkStartOffset;
+    }
+
+    public void setChunkStartOffset(long chunkStartOffset) {
+        if(chunkStartOffset < 0) {
+            throw new IllegalArgumentException("chunkStartOffset is negative");
+        }
+        
+        this.chunkStartOffset = chunkStartOffset;
+    }
+
+    public long getChunkSize() {
+        return this.chunkSize;
+    }
+
+    public void setChunkSize(long chunkSize) {
+        if(chunkSize < 0) {
+            throw new IllegalArgumentException("chunkSize is negative");
+        }
+        
+        this.chunkSize = chunkSize;
+    }
+    
+    public boolean containsOffset(long offset) {
+        if (this.chunkStartOffset <= offset &&
+            (this.chunkStartOffset + this.chunkSize) > offset) {
+            return true;
+        }
+        return false;
     }
 
     @Override
@@ -88,14 +123,18 @@ public class ChunkData implements Comparable<ChunkData>, Closeable {
             return -1;
         }
         
-        return (int)(this.offset - other.offset);
+        return (int)(this.chunkStartOffset - other.chunkStartOffset);
     }
     
     @Override
     public void close() {
         if(this.is != null) {
-            this.is.close();
-            this.is = null;
+            try {
+                this.is.close();
+            } catch (IOException ex) {
+            } finally {
+                this.is = null;
+            }
         }
     }
 }
