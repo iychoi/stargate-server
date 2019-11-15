@@ -28,17 +28,28 @@ import stargate.commons.utils.ByteArray;
  */
 public class IgniteCacheInputStream extends InputStream {
 
-    private IgniteCache<String, ByteArray> store;
+    private IgniteBigKeyValueStore store;
+    private IgniteDataStoreDriverConfig config;
+    private IgniteCache<String, ByteArray> cache;
     private BigKeyValueStoreMetadata metadata;
     private Lock lock;
     private int currentPartNo;
     private byte[] chunkData;
     private long offset;
     private long size;
+    private int chunkSize;
     
-    IgniteCacheInputStream(IgniteCache<String, ByteArray> store, BigKeyValueStoreMetadata metadata, Lock lock) {
+    IgniteCacheInputStream(IgniteBigKeyValueStore store, IgniteDataStoreDriverConfig config, IgniteCache<String, ByteArray> cache, BigKeyValueStoreMetadata metadata) {
         if(store == null) {
             throw new IllegalArgumentException("store is null");
+        }
+        
+        if(config == null) {
+            throw new IllegalArgumentException("config is null");
+        }
+        
+        if(cache == null) {
+            throw new IllegalArgumentException("cache is null");
         }
         
         if(metadata == null) {
@@ -49,11 +60,48 @@ public class IgniteCacheInputStream extends InputStream {
         //    throw new IllegalArgumentException("partKeys is null");
         //}
         
-        if(lock == null) {
-            throw new IllegalArgumentException("lock is null");
+        this.store = store;
+        this.config = config;
+        this.cache = cache;
+        this.metadata = metadata;
+        this.lock = null;
+        
+        this.chunkData = null;
+        this.currentPartNo = 0;
+        this.offset = 0;
+        
+        this.size = metadata.getEntrySize();
+        this.chunkSize = config.getChunkSize();
+    }
+    
+    IgniteCacheInputStream(IgniteBigKeyValueStore store, IgniteDataStoreDriverConfig config, IgniteCache<String, ByteArray> cache, BigKeyValueStoreMetadata metadata, Lock lock) {
+        if(store == null) {
+            throw new IllegalArgumentException("store is null");
         }
         
+        if(config == null) {
+            throw new IllegalArgumentException("config is null");
+        }
+        
+        if(cache == null) {
+            throw new IllegalArgumentException("cache is null");
+        }
+        
+        if(metadata == null) {
+            throw new IllegalArgumentException("metadata is null");
+        }
+        
+        //if(partKeys == null) {
+        //    throw new IllegalArgumentException("partKeys is null");
+        //}
+        
+        //if(lock == null) {
+        //    throw new IllegalArgumentException("lock is null");
+        //}
+        
         this.store = store;
+        this.config = config;
+        this.cache = cache;
         this.metadata = metadata;
         this.lock = lock;
         
@@ -62,12 +110,14 @@ public class IgniteCacheInputStream extends InputStream {
         this.offset = 0;
         
         this.size = metadata.getEntrySize();
+        this.chunkSize = config.getChunkSize();
     }
-    
+
     @Override
     public synchronized int available() throws IOException {
+        
         if(this.chunkData != null) {
-            long currentStartOffset = IgniteBigKeyValueStore.CHUNK_SIZE * this.currentPartNo;
+            long currentStartOffset = this.chunkSize * this.currentPartNo;
             if(currentStartOffset <= this.offset && this.offset < currentStartOffset + this.chunkData.length) {
                 return this.chunkData.length - (int)(this.offset - currentStartOffset);
             }
@@ -98,7 +148,7 @@ public class IgniteCacheInputStream extends InputStream {
     
     private synchronized void loadChunkData() throws IOException {
         if(this.chunkData != null) {
-            long currentStartOffset = IgniteBigKeyValueStore.CHUNK_SIZE * this.currentPartNo;
+            long currentStartOffset = this.chunkSize * this.currentPartNo;
             if(currentStartOffset <= this.offset && this.offset < currentStartOffset + this.chunkData.length) {
                 // safe to reuse 
                 return;
@@ -111,10 +161,10 @@ public class IgniteCacheInputStream extends InputStream {
             return;
         }
         
-        int partNo = (int)(this.offset / IgniteBigKeyValueStore.CHUNK_SIZE);
+        int partNo = (int)(this.offset / this.chunkSize);
         String partKey = IgniteBigKeyValueStore.makePartkey(this.metadata.getKey(), partNo);
         
-        ByteArray chunkDataByteArr = this.store.get(partKey);
+        ByteArray chunkDataByteArr = this.cache.get(partKey);
         if(chunkDataByteArr == null) {
             throw new IOException(String.format("Cannot read chunk data for %s", partKey));
         }
@@ -131,7 +181,7 @@ public class IgniteCacheInputStream extends InputStream {
         
         loadChunkData();
         
-        long currentStartOffset = IgniteBigKeyValueStore.CHUNK_SIZE * this.currentPartNo;
+        long currentStartOffset = this.chunkSize * this.currentPartNo;
         int bufferOffset = (int)(this.offset - currentStartOffset);
         if(bufferOffset < this.chunkData.length) {
             byte ch = this.chunkData[bufferOffset];
@@ -172,7 +222,7 @@ public class IgniteCacheInputStream extends InputStream {
         while(remain > 0) {
             loadChunkData();
 
-            long currentStartOffset = IgniteBigKeyValueStore.CHUNK_SIZE * this.currentPartNo;
+            long currentStartOffset = this.chunkSize * this.currentPartNo;
             int bufferOffset = (int)(this.offset - currentStartOffset);
             int bufferLength = (int) Math.min(this.chunkData.length - bufferOffset, remain);
             
@@ -187,7 +237,9 @@ public class IgniteCacheInputStream extends InputStream {
     
     @Override
     public synchronized void close() throws IOException {
-        this.lock.unlock();
+        if(this.lock != null) {
+            this.lock.unlock();
+        }
     }
     
     @Override

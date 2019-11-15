@@ -35,6 +35,7 @@ import stargate.drivers.ignite.IgniteDriver;
 public class IgniteQueue extends AbstractQueue {
 
     private IgniteDataStoreDriver driver;
+    private IgniteDataStoreDriverConfig config;
     private IgniteDriver igniteDriver;
     private Ignite ignite;
     private String name;
@@ -43,9 +44,13 @@ public class IgniteQueue extends AbstractQueue {
     
     private org.apache.ignite.IgniteQueue<byte[]> store;
     
-    public IgniteQueue(IgniteDataStoreDriver driver, IgniteDriver igniteDriver, String name, Class valueClass, DataStoreProperties properties) {
+    public IgniteQueue(IgniteDataStoreDriver driver, IgniteDataStoreDriverConfig config, IgniteDriver igniteDriver, String name, Class valueClass, DataStoreProperties properties) {
         if(driver == null) {
             throw new IllegalArgumentException("driver is null");
+        }
+        
+        if(config == null) {
+            throw new IllegalArgumentException("config is null");
         }
         
         if(igniteDriver == null) {
@@ -65,6 +70,7 @@ public class IgniteQueue extends AbstractQueue {
         }
         
         this.driver = driver;
+        this.config = config;
         this.igniteDriver = igniteDriver;
         this.ignite = igniteDriver.getIgnite();
         this.name = name;

@@ -117,7 +117,7 @@ public class IgniteDataStoreDriver extends AbstractDataStoreDriver {
         
         AbstractKeyValueStore store = this.kvStores.get(name);
         if(store == null) {
-            store = new IgniteKeyValueStore(this, this.igniteDriver, name, valueClass, properties);
+            store = new IgniteKeyValueStore(this, this.config, this.igniteDriver, name, valueClass, properties);
             this.kvStores.put(name, store);
         }
         
@@ -136,7 +136,7 @@ public class IgniteDataStoreDriver extends AbstractDataStoreDriver {
         
         AbstractBigKeyValueStore store = this.bigKVStores.get(name);
         if(store == null) {
-            store = new IgniteBigKeyValueStore(this, this.igniteDriver, name, properties);
+            store = new IgniteBigKeyValueStore(this, this.config, this.igniteDriver, name, properties);
             this.bigKVStores.put(name, store);
         }
         
@@ -159,7 +159,7 @@ public class IgniteDataStoreDriver extends AbstractDataStoreDriver {
         
         IgniteQueue queue = this.queueStores.get(name);
         if(queue == null) {
-            queue = new IgniteQueue(this, this.igniteDriver, name, valueClass, properties);
+            queue = new IgniteQueue(this, this.config, this.igniteDriver, name, valueClass, properties);
             this.queueStores.put(name, queue);
         }
         
@@ -174,7 +174,7 @@ public class IgniteDataStoreDriver extends AbstractDataStoreDriver {
         
         IgniteLock lock = this.lockStores.get(name);
         if(lock == null) {
-            lock = new IgniteLock(this, this.igniteDriver, name);
+            lock = new IgniteLock(this, this.config, this.igniteDriver, name);
             this.lockStores.put(name, lock);
         }
         

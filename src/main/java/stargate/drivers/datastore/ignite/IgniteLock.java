@@ -31,14 +31,19 @@ public class IgniteLock extends AbstractLock {
     private static final Log LOG = LogFactory.getLog(IgniteLock.class);
     
     private IgniteDataStoreDriver driver;
+    private IgniteDataStoreDriverConfig config;
     private IgniteDriver igniteDriver;
     private Ignite ignite;
     private String name;
     private org.apache.ignite.IgniteLock reentrantLock;
     
-    public IgniteLock(IgniteDataStoreDriver driver, IgniteDriver igniteDriver, String name) {
+    public IgniteLock(IgniteDataStoreDriver driver, IgniteDataStoreDriverConfig config, IgniteDriver igniteDriver, String name) {
         if(driver == null) {
             throw new IllegalArgumentException("driver is null");
+        }
+        
+        if(config == null) {
+            throw new IllegalArgumentException("config is null");
         }
         
         if(igniteDriver == null) {
@@ -50,6 +55,7 @@ public class IgniteLock extends AbstractLock {
         }
         
         this.driver = driver;
+        this.config = config;
         this.igniteDriver = igniteDriver;
         this.ignite = igniteDriver.getIgnite();
         this.name = name;

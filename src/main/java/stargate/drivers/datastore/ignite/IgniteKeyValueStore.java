@@ -53,6 +53,7 @@ public class IgniteKeyValueStore extends AbstractKeyValueStore {
     private static final Log LOG = LogFactory.getLog(IgniteKeyValueStore.class);
 
     private IgniteDataStoreDriver driver;
+    private IgniteDataStoreDriverConfig config;
     private IgniteDriver igniteDriver;
     private Ignite ignite;
     private String name;
@@ -62,9 +63,13 @@ public class IgniteKeyValueStore extends AbstractKeyValueStore {
     private Affinity<String> affinity;
     
     
-    public IgniteKeyValueStore(IgniteDataStoreDriver driver, IgniteDriver igniteDriver, String name, Class valueClass, DataStoreProperties properties) throws IOException {
+    public IgniteKeyValueStore(IgniteDataStoreDriver driver, IgniteDataStoreDriverConfig config, IgniteDriver igniteDriver, String name, Class valueClass, DataStoreProperties properties) throws IOException {
         if(driver == null) {
             throw new IllegalArgumentException("driver is null");
+        }
+        
+        if(config == null) {
+            throw new IllegalArgumentException("config is null");
         }
         
         if(igniteDriver == null) {
@@ -84,6 +89,7 @@ public class IgniteKeyValueStore extends AbstractKeyValueStore {
         }
         
         this.driver = driver;
+        this.config = config;
         this.igniteDriver = igniteDriver;
         this.ignite = igniteDriver.getIgnite();
         this.name = name;

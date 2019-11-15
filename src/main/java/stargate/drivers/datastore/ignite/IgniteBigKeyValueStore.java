@@ -15,6 +15,7 @@
 */
 package stargate.drivers.datastore.ignite;
 
+import java.io.BufferedInputStream;
 import java.io.IOException;
 import java.io.InputStream;
 import java.util.Collection;
@@ -29,6 +30,7 @@ import org.apache.commons.logging.LogFactory;
 import org.apache.ignite.Ignite;
 import org.apache.ignite.IgniteCache;
 import org.apache.ignite.IgniteCluster;
+import org.apache.ignite.IgniteDataStreamer;
 import org.apache.ignite.cache.CacheAtomicityMode;
 import org.apache.ignite.cache.CacheMode;
 import org.apache.ignite.cache.CacheWriteSynchronizationMode;
@@ -50,9 +52,8 @@ public class IgniteBigKeyValueStore extends AbstractBigKeyValueStore {
 
     private static final Log LOG = LogFactory.getLog(IgniteBigKeyValueStore.class);
     
-    public static final int CHUNK_SIZE = 8*1024*1024; // 8MB
-
     private IgniteDataStoreDriver driver;
+    private IgniteDataStoreDriverConfig config;
     private IgniteDriver igniteDriver;
     private Ignite ignite;
     private String name;
@@ -82,9 +83,13 @@ public class IgniteBigKeyValueStore extends AbstractBigKeyValueStore {
         return false;
     }
     
-    public IgniteBigKeyValueStore(IgniteDataStoreDriver driver, IgniteDriver igniteDriver, String name, DataStoreProperties properties) throws IOException {
+    public IgniteBigKeyValueStore(IgniteDataStoreDriver driver, IgniteDataStoreDriverConfig config, IgniteDriver igniteDriver, String name, DataStoreProperties properties) throws IOException {
         if(driver == null) {
             throw new IllegalArgumentException("driver is null");
+        }
+        
+        if(config == null) {
+            throw new IllegalArgumentException("config is null");
         }
         
         if(igniteDriver == null) {
@@ -100,6 +105,7 @@ public class IgniteBigKeyValueStore extends AbstractBigKeyValueStore {
         }
         
         this.driver = driver;
+        this.config = config;
         this.igniteDriver = igniteDriver;
         this.ignite = igniteDriver.getIgnite();
         this.name = name;
@@ -137,8 +143,8 @@ public class IgniteBigKeyValueStore extends AbstractBigKeyValueStore {
         }
         
         cc.setWriteSynchronizationMode(CacheWriteSynchronizationMode.PRIMARY_SYNC);
-        //cc.setAtomicityMode(CacheAtomicityMode.ATOMIC);
-        cc.setAtomicityMode(CacheAtomicityMode.TRANSACTIONAL);
+        cc.setAtomicityMode(CacheAtomicityMode.ATOMIC);
+        //cc.setAtomicityMode(CacheAtomicityMode.TRANSACTIONAL);
         cc.setCopyOnRead(true);
         cc.setReadFromBackup(true);
         cc.setName(name);
@@ -199,9 +205,12 @@ public class IgniteBigKeyValueStore extends AbstractBigKeyValueStore {
             throw new IllegalArgumentException("key is null or empty");
         }
         
-        Lock lock = this.store.lock(key);
-        lock.lock();
         
+        LOG.info(String.format("getData: lock - %s", key));
+        //Lock lock = this.store.lock(key);
+        //lock.lock();
+        
+        LOG.info(String.format("getData: retrieve metadata - %s", key));
         ByteArray bytes = this.store.get(key);
         if(bytes == null) {
             return null;
@@ -209,16 +218,21 @@ public class IgniteBigKeyValueStore extends AbstractBigKeyValueStore {
         
         BigKeyValueStoreMetadata metadata = BigKeyValueStoreMetadata.fromBytes(bytes.getArray());
 
+        /*
+        LOG.info(String.format("getData: check consistency - %s", key));
         for(int partNo=0;partNo<metadata.getPartNum();partNo++) {
             String partKey = IgniteBigKeyValueStore.makePartkey(key, partNo);
             
             if(!this.store.containsKey(partKey)) {
-                lock.unlock();
+                //lock.unlock();
                 throw new IOException(String.format("Partkey %s does not exist in key-value store", partKey));
             }
         }
-
-        return new IgniteCacheInputStream(this.store, metadata, lock);
+        */
+        
+        LOG.info(String.format("getData: return data - %s", key));
+        //return new IgniteCacheInputStream(this.store, metadata, lock);
+        return new BufferedInputStream(new IgniteCacheInputStream(this, this.config, this.store, metadata));
     }
     
     @Override
@@ -240,8 +254,8 @@ public class IgniteBigKeyValueStore extends AbstractBigKeyValueStore {
             newMetadata = new BigKeyValueStoreMetadata(key);
         }
         
-        Lock lock = this.store.lock(key);
-        lock.lock();
+        //Lock lock = this.store.lock(key);
+        //lock.lock();
         
         try {
             long dataSize = 0;
@@ -249,12 +263,19 @@ public class IgniteBigKeyValueStore extends AbstractBigKeyValueStore {
             if(dataIS != null) {
                 boolean cont = true;
                 
-                byte[] buffer  = new byte[CHUNK_SIZE];
+                int chunkSize = this.config.getChunkSize();
+                byte[] buffer  = new byte[chunkSize];
+                
+                IgniteDataStreamer<String, ByteArray> streamer = this.ignite.dataStreamer(this.name);
+                streamer.perNodeBufferSize(this.config.getChunkSize() * 32);
+                streamer.perThreadBufferSize(this.config.getChunkSize() * 8);
+                
                 while(cont) {
                     String partkey = IgniteBigKeyValueStore.makePartkey(key, partNo);
-                    int readLen = IOUtils.toByteArray(dataIS, buffer, CHUNK_SIZE);
+                    int readLen = IOUtils.toByteArray(dataIS, buffer, chunkSize);
                     if(readLen > 0) {
-                        this.store.put(partkey, new ByteArray(buffer, readLen));
+                        //this.store.put(partkey, new ByteArray(buffer, readLen));
+                        streamer.addData(partkey, new ByteArray(buffer, readLen));
                         partNo++;
                         dataSize += readLen;
                     } else {
@@ -262,16 +283,26 @@ public class IgniteBigKeyValueStore extends AbstractBigKeyValueStore {
                         cont = false;
                     }
                 }
+                
+                newMetadata.setKey(key);
+                newMetadata.setEntrySize(dataSize);
+                newMetadata.setPartNum(partNo);
+
+                byte[] metadataBytes = newMetadata.toBytes();
+                //this.store.put(key, new ByteArray(metadataBytes));
+                streamer.addData(key, new ByteArray(metadataBytes));
+                
+                streamer.close();
+            } else {
+                newMetadata.setKey(key);
+                newMetadata.setEntrySize(dataSize);
+                newMetadata.setPartNum(partNo);
+
+                byte[] metadataBytes = newMetadata.toBytes();
+                this.store.put(key, new ByteArray(metadataBytes));
             }
-            
-            newMetadata.setKey(key);
-            newMetadata.setEntrySize(dataSize);
-            newMetadata.setPartNum(partNo);
-            
-            byte[] metadataBytes = newMetadata.toBytes();
-            this.store.put(key, new ByteArray(metadataBytes));
         } finally {
-            lock.unlock();
+            //lock.unlock();
         }
     }
     
@@ -294,8 +325,8 @@ public class IgniteBigKeyValueStore extends AbstractBigKeyValueStore {
             newMetadata = new BigKeyValueStoreMetadata(key);
         }
         
-        Lock lock = this.store.lock(key);
-        lock.lock();
+        //Lock lock = this.store.lock(key);
+        //lock.lock();
         
         boolean result = false;
         try {
@@ -304,31 +335,50 @@ public class IgniteBigKeyValueStore extends AbstractBigKeyValueStore {
                 int partNo = 0;
                 if(dataIS != null) {
                     boolean cont = true;
+                    
+                    int chunkSize = this.config.getChunkSize();
+                    byte[] buffer  = new byte[chunkSize];
+                    
+                    IgniteDataStreamer<String, ByteArray> streamer = this.ignite.dataStreamer(this.name);
+                    streamer.perNodeBufferSize(this.config.getChunkSize() * 32);
+                    streamer.perThreadBufferSize(this.config.getChunkSize() * 8);
+                
                     while(cont) {
                         String partkey = IgniteBigKeyValueStore.makePartkey(key, partNo);
-                        byte[] dataBytes = IOUtils.toByteArray(dataIS, CHUNK_SIZE);
-                        if(dataBytes.length > 0) {
-                            this.store.put(partkey, new ByteArray(dataBytes));
+                        int readLen = IOUtils.toByteArray(dataIS, buffer, chunkSize);
+                        if(readLen > 0) {
+                            //this.store.put(partkey, new ByteArray(buffer, readLen));
+                            streamer.addData(partkey, new ByteArray(buffer, readLen));
                             partNo++;
-                            dataSize += dataBytes.length;
+                            dataSize += readLen;
                         } else {
                             // no data
                             cont = false;
                         }
                     }
+                    
+                    newMetadata.setKey(key);
+                    newMetadata.setEntrySize(dataSize);
+                    newMetadata.setPartNum(partNo);
+
+                    byte[] metadataBytes = newMetadata.toBytes();
+                    //this.store.put(key, new ByteArray(metadataBytes));
+                    streamer.addData(key, new ByteArray(metadataBytes));
+                    
+                    streamer.close();
+                } else {
+                    newMetadata.setKey(key);
+                    newMetadata.setEntrySize(dataSize);
+                    newMetadata.setPartNum(partNo);
+
+                    byte[] metadataBytes = newMetadata.toBytes();
+                    this.store.put(key, new ByteArray(metadataBytes));
                 }
-
-                newMetadata.setKey(key);
-                newMetadata.setEntrySize(dataSize);
-                newMetadata.setPartNum(partNo);
-
-                byte[] metadataBytes = newMetadata.toBytes();
-                this.store.put(key, new ByteArray(metadataBytes));
 
                 result = true;
             }
         } finally {
-            lock.unlock();
+            //lock.unlock();
         }
         
         return result;
@@ -357,8 +407,8 @@ public class IgniteBigKeyValueStore extends AbstractBigKeyValueStore {
             newMetadata2 = new BigKeyValueStoreMetadata(key);
         }
         
-        Lock lock = this.store.lock(key);
-        lock.lock();
+        //Lock lock = this.store.lock(key);
+        //lock.lock();
         
         boolean result = false;
         try {
@@ -376,29 +426,48 @@ public class IgniteBigKeyValueStore extends AbstractBigKeyValueStore {
                 int partNo = 0;
                 if(dataIS != null) {
                     boolean cont = true;
+                    
+                    int chunkSize = this.config.getChunkSize();
+                    byte[] buffer  = new byte[chunkSize];
+                    
+                    IgniteDataStreamer<String, ByteArray> streamer = this.ignite.dataStreamer(this.name);
+                    streamer.perNodeBufferSize(this.config.getChunkSize() * 32);
+                    streamer.perThreadBufferSize(this.config.getChunkSize() * 8);
+
                     while(cont) {
                         String partkey = IgniteBigKeyValueStore.makePartkey(key, partNo);
-                        byte[] dataBytes = IOUtils.toByteArray(dataIS, CHUNK_SIZE);
-                        if(dataBytes.length > 0) {
-                            this.store.put(partkey, new ByteArray(dataBytes));
+                        int readLen = IOUtils.toByteArray(dataIS, buffer, chunkSize);
+                        if(readLen > 0) {
+                            //this.store.put(partkey, new ByteArray(buffer, readLen));
+                            streamer.addData(partkey, new ByteArray(buffer, readLen));
                             partNo++;
-                            dataSize += dataBytes.length;
+                            dataSize += readLen;
                         } else {
                             // no data
                             cont = false;
                         }
                     }
+                    
+                    newMetadata2.setKey(key);
+                    newMetadata2.setEntrySize(dataSize);
+                    newMetadata2.setPartNum(partNo);
+
+                    byte[] metadataBytes = newMetadata2.toBytes();
+                    //this.store.put(key, new ByteArray(metadataBytes));
+                    streamer.addData(key, new ByteArray(metadataBytes));
+                
+                    streamer.close();
+                } else {
+                    newMetadata2.setKey(key);
+                    newMetadata2.setEntrySize(dataSize);
+                    newMetadata2.setPartNum(partNo);
+
+                    byte[] metadataBytes = newMetadata2.toBytes();
+                    this.store.put(key, new ByteArray(metadataBytes));
                 }
-
-                newMetadata2.setKey(key);
-                newMetadata2.setEntrySize(dataSize);
-                newMetadata2.setPartNum(partNo);
-
-                byte[] metadataBytes = newMetadata2.toBytes();
-                this.store.put(key, new ByteArray(metadataBytes));
             }
         } finally {
-            lock.unlock();
+            //lock.unlock();
         }
         
         return result;
@@ -462,22 +531,29 @@ public class IgniteBigKeyValueStore extends AbstractBigKeyValueStore {
             throw new IllegalArgumentException("key is null or empty");
         }
         
-        Lock lock = this.store.lock(key);
-        lock.lock();
+        //Lock lock = this.store.lock(key);
+        //lock.lock();
         
         try {
             ByteArray bytes = this.store.get(key);
             if(bytes != null) {
                 BigKeyValueStoreMetadata metadata = BigKeyValueStoreMetadata.fromBytes(bytes.getArray());
 
+                IgniteDataStreamer<String, ByteArray> streamer = this.ignite.dataStreamer(this.name);
+                
                 for(int partNo=0;partNo<metadata.getPartNum();partNo++) {
                     String partKey = IgniteBigKeyValueStore.makePartkey(key, partNo);
-                    this.store.remove(partKey);
+                    //this.store.remove(partKey);
+                    streamer.removeData(partKey);
                 }
-                this.store.remove(key);
+                
+                //this.store.remove(key);
+                streamer.removeData(key);
+                
+                streamer.close();
             }
         } finally {
-            lock.unlock();
+            //lock.unlock();
         }
     }
     

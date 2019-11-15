@@ -17,8 +17,7 @@ package stargate.drivers.datastore.ignite;
 
 import java.io.File;
 import java.io.IOException;
-import org.apache.commons.logging.Log;
-import org.apache.commons.logging.LogFactory;
+import org.codehaus.jackson.annotate.JsonProperty;
 import stargate.commons.utils.JsonSerializer;
 import stargate.commons.datastore.AbstractDataStoreDriverConfig;
 
@@ -27,6 +26,10 @@ import stargate.commons.datastore.AbstractDataStoreDriverConfig;
  * @author iychoi
  */
 public class IgniteDataStoreDriverConfig extends AbstractDataStoreDriverConfig {
+    
+    private static final int DEFAULT_CHUNK_SIZE = 1 * 1024 * 1024; // 1MB
+    
+    private int chunkSize = DEFAULT_CHUNK_SIZE;
     
     public static IgniteDataStoreDriverConfig createInstance(File file) throws IOException {
         if(file == null) {
@@ -45,5 +48,21 @@ public class IgniteDataStoreDriverConfig extends AbstractDataStoreDriverConfig {
     }
     
     public IgniteDataStoreDriverConfig() {
+    }
+    
+    @JsonProperty("chunk_size")
+    public void setChunkSize(int chunkSize) {
+        super.checkMutableAndRaiseException();
+        
+        if(chunkSize < 0) {
+            this.chunkSize = DEFAULT_CHUNK_SIZE;
+        } else {
+            this.chunkSize = chunkSize;
+        }
+    }
+    
+    @JsonProperty("chunk_size")
+    public int getChunkSize() {
+        return this.chunkSize;
     }
 }
