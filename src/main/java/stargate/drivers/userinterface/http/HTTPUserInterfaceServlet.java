@@ -45,6 +45,7 @@ import stargate.commons.dataobject.Directory;
 import stargate.commons.datasource.AbstractDataSourceDriver;
 import stargate.commons.datasource.DataExportEntry;
 import stargate.commons.datasource.SourceFileMetadata;
+import stargate.commons.datastore.AbstractDataStoreDriver;
 import stargate.commons.driver.DriverNotInitializedException;
 import stargate.commons.manager.AbstractManager;
 import stargate.commons.manager.ManagerNotInstantiatedException;
@@ -64,7 +65,9 @@ import stargate.managers.datasource.DataSourceManager;
 import stargate.managers.recipe.RecipeManager;
 import stargate.managers.recipe.RecipeManagerException;
 import stargate.commons.transport.TransferAssignment;
+import stargate.commons.userinterface.DataChunkStatus;
 import stargate.commons.userinterface.UserInterfaceInitialDataPack;
+import stargate.managers.datastore.DataStoreManager;
 import stargate.managers.statistics.StatisticsManager;
 import stargate.managers.transport.TransportManager;
 import stargate.managers.volume.VolumeManager;
@@ -132,7 +135,7 @@ public class HTTPUserInterfaceServlet extends AbstractUserInterfaceServer {
             RestfulResponse rres = new RestfulResponse(ex);
             Response res = Response.status(Response.Status.INTERNAL_SERVER_ERROR).entity(rres).build();
             
-            LOG.info("RES (ERR) - isLiveRestful");
+            LOG.info("RES (ERR) - isLiveRestful", ex);
             
             return res;
         }
@@ -161,7 +164,7 @@ public class HTTPUserInterfaceServlet extends AbstractUserInterfaceServer {
             RestfulResponse rres = new RestfulResponse(ex);
             Response res = Response.status(Response.Status.INTERNAL_SERVER_ERROR).entity(rres).build();
             
-            LOG.info("RES (ERR) - getServiceConfigRestful");
+            LOG.info("RES (ERR) - getServiceConfigRestful", ex);
             
             return res;
         }
@@ -170,8 +173,8 @@ public class HTTPUserInterfaceServlet extends AbstractUserInterfaceServer {
     @Override
     public String getServiceConfig() throws IOException {
         try {
-            StargateService stargateService = getStargateService();
-            StargateServiceConfig config = stargateService.getConfig();
+            StargateService service = getStargateService();
+            StargateServiceConfig config = service.getConfig();
             return config.toJson();
         } catch (Exception ex) {
             LOG.error("Unknown exception", ex);
@@ -197,7 +200,7 @@ public class HTTPUserInterfaceServlet extends AbstractUserInterfaceServer {
             RestfulResponse rres = new RestfulResponse(ex);
             Response res = Response.status(Response.Status.INTERNAL_SERVER_ERROR).entity(rres).build();
             
-            LOG.info("RES (ERR) - getFSServiceInfoRestful");
+            LOG.info("RES (ERR) - getFSServiceInfoRestful", ex);
             
             return res;
         }
@@ -206,13 +209,17 @@ public class HTTPUserInterfaceServlet extends AbstractUserInterfaceServer {
     @Override
     public FSServiceInfo getFSServiceInfo() throws IOException {
         try {
-            StargateService stargateService = getStargateService();
-            RecipeManager recipeManager = stargateService.getRecipeManager();
+            StargateService service = getStargateService();
+            RecipeManager recipeManager = service.getRecipeManager();
             AbstractRecipeDriver recipeDriver = recipeManager.getDriver();
             int chunkSize = recipeDriver.getChunkSize();
             String hashAlgorithm = recipeDriver.getHashAlgorithm();
             
-            FSServiceInfo serviceInfo = new FSServiceInfo(chunkSize, hashAlgorithm);
+            DataStoreManager dataStoreManager = service.getDataStoreManager();
+            AbstractDataStoreDriver dataStoreDriver = dataStoreManager.getDriver();
+            int partSize = dataStoreDriver.getPartSize();
+            
+            FSServiceInfo serviceInfo = new FSServiceInfo(chunkSize, hashAlgorithm, partSize);
             return serviceInfo;
         } catch (ManagerNotInstantiatedException ex) {
             LOG.error("Manager is not instantiated", ex);
@@ -241,7 +248,7 @@ public class HTTPUserInterfaceServlet extends AbstractUserInterfaceServer {
             RestfulResponse rres = new RestfulResponse(ex);
             Response res = Response.status(Response.Status.INTERNAL_SERVER_ERROR).entity(rres).build();
             
-            LOG.info("RES (ERR) - getInitialDataPackRestful");
+            LOG.info("RES (ERR) - getInitialDataPackRestful", ex);
             
             return res;
         }
@@ -264,7 +271,12 @@ public class HTTPUserInterfaceServlet extends AbstractUserInterfaceServer {
             AbstractRecipeDriver recipeDriver = recipeManager.getDriver();
             int chunkSize = recipeDriver.getChunkSize();
             String hashAlgorithm = recipeDriver.getHashAlgorithm();
-            FSServiceInfo serviceInfo = new FSServiceInfo(chunkSize, hashAlgorithm);
+            
+            DataStoreManager dataStoreManager = service.getDataStoreManager();
+            AbstractDataStoreDriver dataStoreDriver = dataStoreManager.getDriver();
+            int partSize = dataStoreDriver.getPartSize();
+            
+            FSServiceInfo serviceInfo = new FSServiceInfo(chunkSize, hashAlgorithm, partSize);
             
             
             DataObjectURI rootUri = new DataObjectURI("", "/");
@@ -308,7 +320,7 @@ public class HTTPUserInterfaceServlet extends AbstractUserInterfaceServer {
             RestfulResponse rres = new RestfulResponse(ex);
             Response res = Response.status(Response.Status.INTERNAL_SERVER_ERROR).entity(rres).build();
             
-            LOG.info("RES (ERR) - getClusterRestful");
+            LOG.info("RES (ERR) - getClusterRestful", ex);
             
             return res;
         }
@@ -359,7 +371,7 @@ public class HTTPUserInterfaceServlet extends AbstractUserInterfaceServer {
             RestfulResponse rres = new RestfulResponse(ex);
             Response res = Response.status(Response.Status.INTERNAL_SERVER_ERROR).entity(rres).build();
             
-            LOG.info("RES (ERR) - getLocalClusterRestful");
+            LOG.info("RES (ERR) - getLocalClusterRestful", ex);
             
             return res;
         }
@@ -402,7 +414,7 @@ public class HTTPUserInterfaceServlet extends AbstractUserInterfaceServer {
             RestfulResponse rres = new RestfulResponse(ex);
             Response res = Response.status(Response.Status.INTERNAL_SERVER_ERROR).entity(rres).build();
             
-            LOG.info("RES (ERR) - activateClusterRestful");
+            LOG.info("RES (ERR) - activateClusterRestful", ex);
             
             return res;
         }
@@ -445,7 +457,7 @@ public class HTTPUserInterfaceServlet extends AbstractUserInterfaceServer {
             RestfulResponse rres = new RestfulResponse(ex);
             Response res = Response.status(Response.Status.INTERNAL_SERVER_ERROR).entity(rres).build();
             
-            LOG.info("RES (ERR) - isClusterActiveRestful");
+            LOG.info("RES (ERR) - isClusterActiveRestful", ex);
             
             return res;
         }
@@ -488,7 +500,7 @@ public class HTTPUserInterfaceServlet extends AbstractUserInterfaceServer {
             RestfulResponse rres = new RestfulResponse(ex);
             Response res = Response.status(Response.Status.INTERNAL_SERVER_ERROR).entity(rres).build();
             
-            LOG.info("RES (ERR) - getLocalNodeRestful");
+            LOG.info("RES (ERR) - getLocalNodeRestful", ex);
             
             return res;
         }
@@ -530,7 +542,7 @@ public class HTTPUserInterfaceServlet extends AbstractUserInterfaceServer {
             RestfulResponse rres = new RestfulResponse(ex);
             Response res = Response.status(Response.Status.INTERNAL_SERVER_ERROR).entity(rres).build();
             
-            LOG.info("RES (ERR) - getLeaderNodeRestful");
+            LOG.info("RES (ERR) - getLeaderNodeRestful", ex);
             
             return res;
         }
@@ -577,7 +589,7 @@ public class HTTPUserInterfaceServlet extends AbstractUserInterfaceServer {
             RestfulResponse rres = new RestfulResponse(ex);
             Response res = Response.status(Response.Status.INTERNAL_SERVER_ERROR).entity(rres).build();
             
-            LOG.info(String.format("RES (ERR) - getRemoteClusterRestful - %s", name));
+            LOG.info(String.format("RES (ERR) - getRemoteClusterRestful - %s", name), ex);
             
             return res;
         }
@@ -623,7 +635,7 @@ public class HTTPUserInterfaceServlet extends AbstractUserInterfaceServer {
             RestfulResponse rres = new RestfulResponse(ex);
             Response res = Response.status(Response.Status.INTERNAL_SERVER_ERROR).entity(rres).build();
             
-            LOG.info("RES (ERR) - listRemoteClustersRestful");
+            LOG.info("RES (ERR) - listRemoteClustersRestful", ex);
             
             return res;
         }
@@ -665,7 +677,7 @@ public class HTTPUserInterfaceServlet extends AbstractUserInterfaceServer {
             RestfulResponse rres = new RestfulResponse(ex);
             Response res = Response.status(Response.Status.INTERNAL_SERVER_ERROR).entity(rres).build();
             
-            LOG.info("RES (ERR) - getRemoteClustersRestful");
+            LOG.info("RES (ERR) - getRemoteClustersRestful", ex);
             
             return res;
         }
@@ -709,7 +721,7 @@ public class HTTPUserInterfaceServlet extends AbstractUserInterfaceServer {
             RestfulResponse rres = new RestfulResponse(ex);
             Response res = Response.status(Response.Status.INTERNAL_SERVER_ERROR).entity(rres).build();
             
-            LOG.info(String.format("RES (ERR) - addRemoteClusterRestful - %s", cluster.getName()));
+            LOG.info(String.format("RES (ERR) - addRemoteClusterRestful - %s", cluster.getName()), ex);
             
             return res;
         }
@@ -759,7 +771,7 @@ public class HTTPUserInterfaceServlet extends AbstractUserInterfaceServer {
             RestfulResponse rres = new RestfulResponse(ex);
             Response res = Response.status(Response.Status.INTERNAL_SERVER_ERROR).entity(rres).build();
             
-            LOG.info(String.format("RES (ERR) - removeRemoteClusterRestful - %s", cluster));
+            LOG.info(String.format("RES (ERR) - removeRemoteClusterRestful - %s", cluster), ex);
         
             return res;
         }
@@ -801,7 +813,7 @@ public class HTTPUserInterfaceServlet extends AbstractUserInterfaceServer {
             RestfulResponse rres = new RestfulResponse(ex);
             Response res = Response.status(Response.Status.INTERNAL_SERVER_ERROR).entity(rres).build();
             
-            LOG.info("RES (ERR) - syncRemoteClustersRestful");
+            LOG.info("RES (ERR) - syncRemoteClustersRestful", ex);
             
             return res;
         }
@@ -859,14 +871,14 @@ public class HTTPUserInterfaceServlet extends AbstractUserInterfaceServer {
             RestfulResponse rres = new RestfulResponse(ex);
             Response res = Response.status(Response.Status.NOT_FOUND).entity(rres).build();
             
-            LOG.info(String.format("RES (ERR) - getDataObjectMetadataRestful - %s", path));
+            LOG.info(String.format("RES (ERR) - getDataObjectMetadataRestful - %s", path), ex);
             
             return res;
         } catch(Exception ex) {
             RestfulResponse rres = new RestfulResponse(ex);
             Response res = Response.status(Response.Status.INTERNAL_SERVER_ERROR).entity(rres).build();
             
-            LOG.info(String.format("RES (ERR) - getDataObjectMetadataRestful - %s", path));
+            LOG.info(String.format("RES (ERR) - getDataObjectMetadataRestful - %s", path), ex);
             
             return res;
         }
@@ -918,7 +930,7 @@ public class HTTPUserInterfaceServlet extends AbstractUserInterfaceServer {
             RestfulResponse rres = new RestfulResponse(ex);
             Response res = Response.status(Response.Status.INTERNAL_SERVER_ERROR).entity(rres).build();
             
-            LOG.info(String.format("RES (ERR) - listDataObjectMetadataRestful - %s", path));
+            LOG.info(String.format("RES (ERR) - listDataObjectMetadataRestful - %s", path), ex);
             
             return res;
         }
@@ -984,7 +996,7 @@ public class HTTPUserInterfaceServlet extends AbstractUserInterfaceServer {
             RestfulResponse rres = new RestfulResponse(ex);
             Response res = Response.status(Response.Status.INTERNAL_SERVER_ERROR).entity(rres).build();
             
-            LOG.info(String.format("RES (ERR) - getRecipeRestful - %s", path));
+            LOG.info(String.format("RES (ERR) - getRecipeRestful - %s", path), ex);
             
             return res;
         }
@@ -1041,7 +1053,7 @@ public class HTTPUserInterfaceServlet extends AbstractUserInterfaceServer {
             RestfulResponse rres = new RestfulResponse(ex);
             Response res = Response.status(Response.Status.INTERNAL_SERVER_ERROR).entity(rres).build();
             
-            LOG.info("RES (ERR) - listRecipesRestful");
+            LOG.info("RES (ERR) - listRecipesRestful", ex);
             
             return res;
         }
@@ -1087,7 +1099,7 @@ public class HTTPUserInterfaceServlet extends AbstractUserInterfaceServer {
             RestfulResponse rres = new RestfulResponse(ex);
             Response res = Response.status(Response.Status.INTERNAL_SERVER_ERROR).entity(rres).build();
             
-            LOG.info(String.format("RES (ERR) - removeRecipeRestful - %s", path));
+            LOG.info(String.format("RES (ERR) - removeRecipeRestful - %s", path), ex);
             
             return res;
         }
@@ -1126,7 +1138,7 @@ public class HTTPUserInterfaceServlet extends AbstractUserInterfaceServer {
             RestfulResponse rres = new RestfulResponse(ex);
             Response res = Response.status(Response.Status.INTERNAL_SERVER_ERROR).entity(rres).build();
             
-            LOG.info("RES (ERR) - syncRecipesRestful");
+            LOG.info("RES (ERR) - syncRecipesRestful", ex);
             
             return res;
         }
@@ -1187,7 +1199,7 @@ public class HTTPUserInterfaceServlet extends AbstractUserInterfaceServer {
             RestfulResponse rres = new RestfulResponse(ex);
             Response res = Response.status(Response.Status.INTERNAL_SERVER_ERROR).entity(rres).build();
             
-            LOG.info(String.format("RES (ERR) - getDataChunkRestful - %s (%s)", path, hash));
+            LOG.info(String.format("RES (ERR) - getDataChunkRestful - %s (%s)", path, hash), ex);
             
             return res;
         }
@@ -1207,6 +1219,148 @@ public class HTTPUserInterfaceServlet extends AbstractUserInterfaceServer {
             StargateService service = getStargateService();
             VolumeManager volumeManager = service.getVolumeManager();
             return volumeManager.getDataChunk(uri, hash);
+        } catch (ManagerNotInstantiatedException ex) {
+            LOG.error("Manager is not instantiated", ex);
+            throw new IOException(ex);
+        } catch (DriverNotInitializedException ex) {
+            LOG.error("Driver is not initialized", ex);
+            throw new IOException(ex);
+        } catch (Exception ex) {
+            LOG.error("Unknown exception", ex);
+            throw new IOException(ex);
+        }
+    }
+    
+    @GET
+    @Path(HTTPUserInterfaceRestfulConstants.API_PATH + "/" + HTTPUserInterfaceRestfulConstants.API_INIT_DATA_CHUNK_PART_PATH + "/{path:.*}/{hash:.*}")
+    @Produces(MediaType.APPLICATION_JSON)
+    public Response initDataChunkPartRestful(
+            @DefaultValue("") @PathParam("path") String path,
+            @DefaultValue("") @PathParam("hash") String hash) throws IOException {
+        if(path == null || path.isEmpty()) {
+            throw new IllegalArgumentException("path is null or empty");
+        }
+        
+        if(hash == null || hash.isEmpty()) {
+            throw new IllegalArgumentException("hash is null or empty");
+        }
+        
+        LOG.info(String.format("REQ - initDataChunkPartRestful - %s (%s)", path, hash));
+        
+        try {
+            DataObjectURI objectUri = new DataObjectURI(PathUtils.makeAbsolutePath(path));
+            DataChunkStatus dataChunkStatus = initDataChunkPart(objectUri, hash);
+            
+            RestfulResponse rres = new RestfulResponse(dataChunkStatus);
+            Response res = Response.status(Response.Status.OK).entity(rres).build();
+            
+            LOG.info(String.format("RES - initDataChunkPartRestful - %s (%s)", path, hash));
+            
+            return res;
+        } catch (Exception ex) {
+            RestfulResponse rres = new RestfulResponse(ex);
+            Response res = Response.status(Response.Status.INTERNAL_SERVER_ERROR).entity(rres).build();
+            
+            LOG.info(String.format("RES (ERR) - initDataChunkPartRestful - %s (%s)", path, hash), ex);
+            
+            return res;
+        }
+    }
+    
+    @Override
+    public DataChunkStatus initDataChunkPart(DataObjectURI uri, String hash) throws IOException {
+        if(uri == null) {
+            throw new IllegalArgumentException("uri is null");
+        }
+        
+        if(hash == null || hash.isEmpty()) {
+            throw new IllegalArgumentException("hash is null or empty");
+        }
+        
+        try {
+            StargateService service = getStargateService();
+            VolumeManager volumeManager = service.getVolumeManager();
+            return volumeManager.initDataChunkPart(uri, hash);
+        } catch (ManagerNotInstantiatedException ex) {
+            LOG.error("Manager is not instantiated", ex);
+            throw new IOException(ex);
+        } catch (DriverNotInitializedException ex) {
+            LOG.error("Driver is not initialized", ex);
+            throw new IOException(ex);
+        } catch (Exception ex) {
+            LOG.error("Unknown exception", ex);
+            throw new IOException(ex);
+        }
+    }
+    
+    @GET
+    @Path(HTTPUserInterfaceRestfulConstants.API_PATH + "/" + HTTPUserInterfaceRestfulConstants.API_GET_DATA_CHUNK_PART_PATH + "/{path:.*}/{hash:.*}/{partNoStr:\\d*}")
+    @Produces({MediaType.APPLICATION_OCTET_STREAM, MediaType.APPLICATION_JSON})
+    public Response getDataChunkPartRestful(
+            @DefaultValue("") @PathParam("path") String path,
+            @DefaultValue("") @PathParam("hash") String hash,
+            @DefaultValue("") @PathParam("partNoStr") String partNoStr) throws IOException {
+        if(path == null || path.isEmpty()) {
+            throw new IllegalArgumentException("path is null or empty");
+        }
+        
+        if(hash == null || hash.isEmpty()) {
+            throw new IllegalArgumentException("hash is null or empty");
+        }
+        
+        if(partNoStr == null || partNoStr.isEmpty()) {
+            throw new IllegalArgumentException("partNoStr is null or empty");
+        }
+        
+        int partNo = Integer.parseInt(partNoStr);
+        if(partNo < 0) {
+            throw new IllegalArgumentException("partNo is negative");
+        }
+        
+        LOG.info(String.format("REQ - getDataChunkPartRestful - %s (%s, %d)", path, hash, partNo));
+        
+        try {
+            DataObjectURI objectUri = new DataObjectURI(PathUtils.makeAbsolutePath(path));
+            final InputStream is = getDataChunkPart(objectUri, hash, partNo);
+            if(is == null) {
+                LOG.info(String.format("RES (ERR) - getDataChunkPartRestful - %s (%s, %d)", path, hash, partNo));
+                return Response.status(Response.Status.NOT_FOUND).build();
+            }
+            
+            StreamingOutputData stream = new StreamingOutputData(is);
+            Response res = Response.ok(stream).header("content-disposition", "attachment; filename = " + hash + "-" + partNo).build();
+            
+            LOG.info(String.format("RES - getDataChunkPartRestful - %s (%s, %d)", path, hash, partNo));
+            
+            return res;
+        } catch (Exception ex) {
+            RestfulResponse rres = new RestfulResponse(ex);
+            Response res = Response.status(Response.Status.INTERNAL_SERVER_ERROR).entity(rres).build();
+            
+            LOG.info(String.format("RES (ERR) - getDataChunkPartRestful - %s (%s, %d)", path, hash, partNo), ex);
+            
+            return res;
+        }
+    }
+    
+    @Override
+    public InputStream getDataChunkPart(DataObjectURI uri, String hash, int partNo) throws IOException {
+        if(uri == null) {
+            throw new IllegalArgumentException("uri is null");
+        }
+        
+        if(hash == null || hash.isEmpty()) {
+            throw new IllegalArgumentException("hash is null or empty");
+        }
+        
+        if(partNo < 0) {
+            throw new IllegalArgumentException("part is negative");
+        }
+        
+        try {
+            StargateService service = getStargateService();
+            VolumeManager volumeManager = service.getVolumeManager();
+            return volumeManager.getDataChunkPart(uri, hash, partNo);
         } catch (ManagerNotInstantiatedException ex) {
             LOG.error("Manager is not instantiated", ex);
             throw new IOException(ex);
@@ -1248,7 +1402,7 @@ public class HTTPUserInterfaceServlet extends AbstractUserInterfaceServer {
             RestfulResponse rres = new RestfulResponse(ex);
             Response res = Response.status(Response.Status.INTERNAL_SERVER_ERROR).entity(rres).build();
             
-            LOG.info(String.format("RES (ERR) - schedulePrefetchRestful - %s (%s)", path, hash));
+            LOG.info(String.format("RES (ERR) - schedulePrefetchRestful - %s (%s)", path, hash), ex);
             
             return res;
         }
@@ -1305,7 +1459,7 @@ public class HTTPUserInterfaceServlet extends AbstractUserInterfaceServer {
             RestfulResponse rres = new RestfulResponse(ex);
             Response res = Response.status(Response.Status.INTERNAL_SERVER_ERROR).entity(rres).build();
             
-            LOG.info(String.format("RES (ERR) - getRemoteRecipeWithTransferScheduleRestful - %s", path));
+            LOG.info(String.format("RES (ERR) - getRemoteRecipeWithTransferScheduleRestful - %s", path), ex);
             
             return res;
         }
@@ -1358,7 +1512,7 @@ public class HTTPUserInterfaceServlet extends AbstractUserInterfaceServer {
             RestfulResponse rres = new RestfulResponse(ex);
             Response res = Response.status(Response.Status.INTERNAL_SERVER_ERROR).entity(rres).build();
             
-            LOG.info(String.format("RES (ERR) - getDataExportEntryRestful - %s", path));
+            LOG.info(String.format("RES (ERR) - getDataExportEntryRestful - %s", path), ex);
             
             return res;
         }
@@ -1401,7 +1555,7 @@ public class HTTPUserInterfaceServlet extends AbstractUserInterfaceServer {
             RestfulResponse rres = new RestfulResponse(ex);
             Response res = Response.status(Response.Status.INTERNAL_SERVER_ERROR).entity(rres).build();
             
-            LOG.info("RES (ERR) - listDataExportEntriesRestful");
+            LOG.info("RES (ERR) - listDataExportEntriesRestful", ex);
             
             return res;
         }
@@ -1448,7 +1602,7 @@ public class HTTPUserInterfaceServlet extends AbstractUserInterfaceServer {
             RestfulResponse rres = new RestfulResponse(ex);
             Response res = Response.status(Response.Status.INTERNAL_SERVER_ERROR).entity(rres).build();
             
-            LOG.info("RES (ERR) - getDataExportEntriesRestful");
+            LOG.info("RES (ERR) - getDataExportEntriesRestful", ex);
             
             return res;
         }
@@ -1489,7 +1643,7 @@ public class HTTPUserInterfaceServlet extends AbstractUserInterfaceServer {
             RestfulResponse rres = new RestfulResponse(ex);
             Response res = Response.status(Response.Status.INTERNAL_SERVER_ERROR).entity(rres).build();
             
-            LOG.info(String.format("RES (ERR) - addDataExportEntryRestful - %s", entry.getStargatePath()));
+            LOG.info(String.format("RES (ERR) - addDataExportEntryRestful - %s", entry.getStargatePath()), ex);
             
             return res;
         }
@@ -1572,7 +1726,7 @@ public class HTTPUserInterfaceServlet extends AbstractUserInterfaceServer {
             RestfulResponse rres = new RestfulResponse(ex);
             Response res = Response.status(Response.Status.INTERNAL_SERVER_ERROR).entity(rres).build();
             
-            LOG.info(String.format("RES (ERR) - removeDataExportEntryRestful - %s", path));
+            LOG.info(String.format("RES (ERR) - removeDataExportEntryRestful - %s", path), ex);
             
             return res;
         }
@@ -1614,7 +1768,7 @@ public class HTTPUserInterfaceServlet extends AbstractUserInterfaceServer {
             RestfulResponse rres = new RestfulResponse(ex);
             Response res = Response.status(Response.Status.INTERNAL_SERVER_ERROR).entity(rres).build();
             
-            LOG.info("RES (ERR) - listDataSourcesRestful");
+            LOG.info("RES (ERR) - listDataSourcesRestful", ex);
             
             return res;
         }
@@ -1659,7 +1813,7 @@ public class HTTPUserInterfaceServlet extends AbstractUserInterfaceServer {
             RestfulResponse rres = new RestfulResponse(ex);
             Response res = Response.status(Response.Status.INTERNAL_SERVER_ERROR).entity(rres).build();
             
-            LOG.info(String.format("RES (ERR) - getStatisticsRestful - %s", type));
+            LOG.info(String.format("RES (ERR) - getStatisticsRestful - %s", type), ex);
             
             return res;
         }
@@ -1704,7 +1858,7 @@ public class HTTPUserInterfaceServlet extends AbstractUserInterfaceServer {
             RestfulResponse rres = new RestfulResponse(ex);
             Response res = Response.status(Response.Status.INTERNAL_SERVER_ERROR).entity(rres).build();
             
-            LOG.info(String.format("RES (ERR) - clearStatisticsRestful - %s", type));
+            LOG.info(String.format("RES (ERR) - clearStatisticsRestful - %s", type), ex);
             
             return res;
         }
@@ -1743,7 +1897,7 @@ public class HTTPUserInterfaceServlet extends AbstractUserInterfaceServer {
             RestfulResponse rres = new RestfulResponse(ex);
             Response res = Response.status(Response.Status.INTERNAL_SERVER_ERROR).entity(rres).build();
             
-            LOG.info("RES (ERR) - clearAllStatisticsRestful");
+            LOG.info("RES (ERR) - clearAllStatisticsRestful", ex);
             
             return res;
         }

@@ -21,6 +21,8 @@ import java.io.InputStream;
 import java.net.URI;
 import java.util.Arrays;
 import java.util.Collection;
+import org.apache.commons.logging.Log;
+import org.apache.commons.logging.LogFactory;
 import stargate.commons.cluster.Cluster;
 import stargate.commons.cluster.Node;
 import stargate.commons.dataobject.DataObjectMetadata;
@@ -33,6 +35,8 @@ import stargate.commons.statistics.StatisticsEntry;
 import stargate.commons.statistics.StatisticsType;
 import stargate.commons.transport.TransferAssignment;
 import stargate.commons.userinterface.AbstractUserInterfaceClient;
+import stargate.commons.userinterface.DataChunkSourceType;
+import stargate.commons.userinterface.DataChunkStatus;
 import stargate.commons.userinterface.UserInterfaceInitialDataPack;
 import stargate.commons.utils.DateTimeUtils;
 import stargate.commons.utils.PathUtils;
@@ -43,13 +47,17 @@ import stargate.commons.utils.PathUtils;
  */
 public class HTTPUserInterfaceClient extends AbstractUserInterfaceClient {
 
+    private static final Log LOG = LogFactory.getLog(HTTPUserInterfaceClient.class);
+    
     private URI serviceUri;
     private String username;
     private String password;
     private RestfulClient restfulClient;
+    private IgniteCacheClient igniteCacheClient;
     private long connectionEstablishedTime;
     private long lastActiveTime;
     private boolean connected = false;
+    private boolean useDirectIgniteAccess = false;
     
     public HTTPUserInterfaceClient(URI serviceURI, String username, String password) throws IOException {
         if(serviceURI == null) {
@@ -62,6 +70,21 @@ public class HTTPUserInterfaceClient extends AbstractUserInterfaceClient {
         this.username = username;
         this.password = password;
         this.connected = false;
+        this.useDirectIgniteAccess = false;
+    }
+    
+    public HTTPUserInterfaceClient(URI serviceURI, String username, String password, boolean useDirectIgniteAccess) throws IOException {
+        if(serviceURI == null) {
+            throw new IllegalArgumentException("serviceURI is null");
+        }
+        
+        // username and password can be null
+        
+        this.serviceUri = serviceURI;
+        this.username = username;
+        this.password = password;
+        this.connected = false;
+        this.useDirectIgniteAccess = useDirectIgniteAccess;
     }
     
     @Override
@@ -72,19 +95,38 @@ public class HTTPUserInterfaceClient extends AbstractUserInterfaceClient {
             this.connectionEstablishedTime = DateTimeUtils.getTimestamp();
             this.lastActiveTime = this.connectionEstablishedTime;
             this.connected = true;
+            
+            // ignite
+            if(this.useDirectIgniteAccess) {
+                this.igniteCacheClient = new IgniteCacheClient();
+                this.igniteCacheClient.connect();
+            }
+            
+            LOG.debug("Connected to " + this.serviceUri.toString());
         }
     }
     
     @Override
     public synchronized void disconnect() {
         if(this.connected) {
-            this.restfulClient.close();
+            // ignite
+            if(this.igniteCacheClient != null) {
+                this.igniteCacheClient.disconnect();
+                this.igniteCacheClient = null;
+            }
+            
+            if(this.restfulClient != null) {
+                this.restfulClient.close();
+                this.restfulClient = null;
+            }
+            
             this.connected = false;
+            LOG.debug("Disconnected to " + this.serviceUri.toString());
         }
     }
     
     @Override
-    public boolean isConnected() {
+    public synchronized boolean isConnected() {
         return this.connected;
     }
     
@@ -473,10 +515,101 @@ public class HTTPUserInterfaceClient extends AbstractUserInterfaceClient {
         String path = PathUtils.concatPath(uri.getClusterName(), uri.getPath());
         String pathHash = PathUtils.concatPath(path, hash);
         String url = makeAPIPath(HTTPUserInterfaceRestfulConstants.API_GET_DATA_CHUNK_PATH, pathHash);
-        InputStream is = this.restfulClient.download(url);
 
+        InputStream is = this.restfulClient.download(url);
         updateLastActivetime();
         return is;
+    }
+    
+    @Override
+    public DataChunkStatus initDataChunkPart(DataObjectURI uri, String hash) throws IOException {
+        if(!this.connected) {
+            throw new IOException("Client is not connected");
+        }
+        
+        if(uri == null) {
+            throw new IllegalArgumentException("uri is null");
+        }
+        
+        if(hash == null || hash.isEmpty()) {
+            throw new IllegalArgumentException("hash is null or empty");
+        }
+        
+        // URL pattern = http://xxx.xxx.xxx.xxx/api/datapart/path/hash
+        String path = PathUtils.concatPath(uri.getClusterName(), uri.getPath());
+        String pathHash = PathUtils.concatPath(path, hash);
+        String url = makeAPIPath(HTTPUserInterfaceRestfulConstants.API_INIT_DATA_CHUNK_PART_PATH, pathHash);
+
+        DataChunkStatus status = (DataChunkStatus) this.restfulClient.get(url);
+
+        updateLastActivetime();
+        return status;
+    }
+    
+    @Override
+    public InputStream getDataChunkPart(DataObjectURI uri, String hash, int partNo) throws IOException {
+        if(!this.connected) {
+            throw new IOException("Client is not connected");
+        }
+        
+        if(uri == null) {
+            throw new IllegalArgumentException("uri is null");
+        }
+        
+        if(hash == null || hash.isEmpty()) {
+            throw new IllegalArgumentException("hash is null or empty");
+        }
+        
+        InputStream is = getDataChunkPartRest(uri, hash, partNo);
+        updateLastActivetime();
+        return is;
+    }
+    
+    public InputStream getDataChunkPart(DataObjectURI uri, String hash, int partNo, DataChunkSourceType sourceType) throws IOException {
+        if(!this.connected) {
+            throw new IOException("Client is not connected");
+        }
+        
+        if(uri == null) {
+            throw new IllegalArgumentException("uri is null");
+        }
+        
+        if(hash == null || hash.isEmpty()) {
+            throw new IllegalArgumentException("hash is null or empty");
+        }
+        
+        InputStream is = null;
+        if(this.useDirectIgniteAccess) {
+            switch(sourceType) {
+                case DATA_CHUNK_SOURCE_LOCAL:
+                    is = getDataChunkPartRest(uri, hash, partNo);
+                    break;
+                case DATA_CHUNK_SOURCE_REMOTE:
+                    is = getDataChunkPartIgnite(uri, hash, partNo);
+                    break;
+                default:
+                    throw new IOException("Unknown source type");
+            }
+        } else {
+            is = getDataChunkPartRest(uri, hash, partNo);
+        }
+        
+        updateLastActivetime();
+        return is;
+    }
+    
+    private InputStream getDataChunkPartRest(DataObjectURI uri, String hash, int partNo) throws IOException {
+        // URL pattern = http://xxx.xxx.xxx.xxx/api/datapart/path/hash/###
+        String path = PathUtils.concatPath(uri.getClusterName(), uri.getPath());
+        String pathHash = PathUtils.concatPath(path, hash);
+        String pathHashPart = PathUtils.concatPath(pathHash, Integer.toString(partNo));
+        String url = makeAPIPath(HTTPUserInterfaceRestfulConstants.API_GET_DATA_CHUNK_PART_PATH, pathHashPart);
+
+        return this.restfulClient.download(url);
+    }
+    
+    private InputStream getDataChunkPartIgnite(DataObjectURI uri, String hash, int partNo) throws IOException {
+        return this.igniteCacheClient.getDataChunkPart(hash, partNo);
     }
     
     @Override

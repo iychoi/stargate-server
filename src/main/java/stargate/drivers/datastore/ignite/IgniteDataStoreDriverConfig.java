@@ -27,9 +27,13 @@ import stargate.commons.datastore.AbstractDataStoreDriverConfig;
  */
 public class IgniteDataStoreDriverConfig extends AbstractDataStoreDriverConfig {
     
-    private static final int DEFAULT_CHUNK_SIZE = 1 * 1024 * 1024; // 1MB
+    private static final int DEFAULT_PART_SIZE = 512 * 1024; // 512 KB
+    private static final long DEFAULT_PART_WAIT_TIMEOUT_SEC = 300; // 300 seconds
+    private static final long DEFAULT_PART_WAIT_SLEEP_MILLISEC = 500; // 500 msec
     
-    private int chunkSize = DEFAULT_CHUNK_SIZE;
+    private int partSize = DEFAULT_PART_SIZE;
+    private long partWaitTimeoutSec = DEFAULT_PART_WAIT_TIMEOUT_SEC;
+    private long partWaitSleepMsec = DEFAULT_PART_WAIT_SLEEP_MILLISEC;
     
     public static IgniteDataStoreDriverConfig createInstance(File file) throws IOException {
         if(file == null) {
@@ -50,19 +54,51 @@ public class IgniteDataStoreDriverConfig extends AbstractDataStoreDriverConfig {
     public IgniteDataStoreDriverConfig() {
     }
     
-    @JsonProperty("chunk_size")
-    public void setChunkSize(int chunkSize) {
+    @JsonProperty("part_size")
+    public void setPartSize(int partSize) {
         super.checkMutableAndRaiseException();
         
-        if(chunkSize < 0) {
-            this.chunkSize = DEFAULT_CHUNK_SIZE;
+        if(partSize < 0) {
+            this.partSize = DEFAULT_PART_SIZE;
         } else {
-            this.chunkSize = chunkSize;
+            this.partSize = partSize;
         }
     }
     
-    @JsonProperty("chunk_size")
-    public int getChunkSize() {
-        return this.chunkSize;
+    @JsonProperty("part_size")
+    public int getPartSize() {
+        return this.partSize;
+    }
+    
+    @JsonProperty("part_wait_timeout_sec")
+    public void setPartWaitTimeoutSec(long partWaitTimeoutSec) {
+        super.checkMutableAndRaiseException();
+        
+        if(partWaitTimeoutSec < 0) {
+            this.partWaitTimeoutSec = DEFAULT_PART_WAIT_TIMEOUT_SEC;
+        } else {
+            this.partWaitTimeoutSec = partWaitTimeoutSec;
+        }
+    }
+    
+    @JsonProperty("part_wait_timeout_sec")
+    public long getPartWaitTimeoutSec() {
+        return this.partWaitTimeoutSec;
+    }
+    
+    @JsonProperty("part_wait_sleep_msec")
+    public void setPartWaitSleepMsec(long partWaitSleepMsec) {
+        super.checkMutableAndRaiseException();
+        
+        if(partWaitSleepMsec < 0) {
+            this.partWaitSleepMsec = DEFAULT_PART_WAIT_SLEEP_MILLISEC;
+        } else {
+            this.partWaitSleepMsec = partWaitSleepMsec;
+        }
+    }
+    
+    @JsonProperty("part_wait_sleep_msec")
+    public long getPartWaitSleepMsec() {
+        return this.partWaitSleepMsec;
     }
 }

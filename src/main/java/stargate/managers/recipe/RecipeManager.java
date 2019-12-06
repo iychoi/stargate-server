@@ -148,6 +148,21 @@ public class RecipeManager extends AbstractManager<AbstractRecipeDriver> {
     @Override
     public synchronized void start() throws IOException {
         super.start();
+        
+        this.getService().addPostStartTask(new Runnable() {
+            @Override
+            public void run() {
+                try {
+                    postStart();
+                } catch (IOException ex) {
+                    LOG.error("Cannot execute postStart", ex);
+                }
+            }
+        });
+    }
+    
+    private synchronized void postStart() throws IOException {
+        safeInitRecipeStore();
     }
     
     @Override

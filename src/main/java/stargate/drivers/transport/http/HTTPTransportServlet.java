@@ -32,6 +32,7 @@ import stargate.commons.cluster.Cluster;
 import stargate.commons.dataobject.DataObjectMetadata;
 import stargate.commons.dataobject.DataObjectURI;
 import stargate.commons.dataobject.Directory;
+import stargate.commons.datastore.AbstractDataStoreDriver;
 import stargate.commons.driver.DriverNotInitializedException;
 import stargate.commons.manager.AbstractManager;
 import stargate.commons.manager.ManagerNotInstantiatedException;
@@ -42,6 +43,7 @@ import stargate.commons.service.FSServiceInfo;
 import stargate.commons.transport.AbstractTransportServer;
 import stargate.commons.utils.PathUtils;
 import stargate.managers.cluster.ClusterManager;
+import stargate.managers.datastore.DataStoreManager;
 import stargate.managers.recipe.RecipeManager;
 import stargate.managers.statistics.StatisticsManager;
 import stargate.managers.volume.VolumeManager;
@@ -97,7 +99,7 @@ public class HTTPTransportServlet extends AbstractTransportServer {
             RestfulResponse rres = new RestfulResponse(ex);
             Response res = Response.status(Response.Status.INTERNAL_SERVER_ERROR).entity(rres).build();
             
-            LOG.info("RES (ERR) - isLiveRestful");
+            LOG.info("RES (ERR) - isLiveRestful", ex);
             
             return res;
         }
@@ -126,7 +128,7 @@ public class HTTPTransportServlet extends AbstractTransportServer {
             RestfulResponse rres = new RestfulResponse(ex);
             Response res = Response.status(Response.Status.INTERNAL_SERVER_ERROR).entity(rres).build();
             
-            LOG.info("RES (ERR) - getFSServiceInfoRestful");
+            LOG.info("RES (ERR) - getFSServiceInfoRestful", ex);
             
             return res;
         }
@@ -135,13 +137,17 @@ public class HTTPTransportServlet extends AbstractTransportServer {
     @Override
     public FSServiceInfo getFSServiceInfo() throws IOException {
         try {
-            StargateService stargateService = getStargateService();
-            RecipeManager recipeManager = stargateService.getRecipeManager();
+            StargateService service = getStargateService();
+            RecipeManager recipeManager = service.getRecipeManager();
             AbstractRecipeDriver recipeDriver = recipeManager.getDriver();
             int chunkSize = recipeDriver.getChunkSize();
             String hashAlgorithm = recipeDriver.getHashAlgorithm();
             
-            FSServiceInfo serviceInfo = new FSServiceInfo(chunkSize, hashAlgorithm);
+            DataStoreManager dataStoreManager = service.getDataStoreManager();
+            AbstractDataStoreDriver dataStoreDriver = dataStoreManager.getDriver();
+            int partSize = dataStoreDriver.getPartSize();
+            
+            FSServiceInfo serviceInfo = new FSServiceInfo(chunkSize, hashAlgorithm, partSize);
             return serviceInfo;
         } catch (ManagerNotInstantiatedException ex) {
             LOG.error("Manager is not instantiated", ex);
@@ -170,7 +176,7 @@ public class HTTPTransportServlet extends AbstractTransportServer {
             RestfulResponse rres = new RestfulResponse(ex);
             Response res = Response.status(Response.Status.INTERNAL_SERVER_ERROR).entity(rres).build();
             
-            LOG.info("RES (ERR) - getLocalClusterRestful");
+            LOG.info("RES (ERR) - getLocalClusterRestful", ex);
             
             return res;
         }
@@ -220,14 +226,14 @@ public class HTTPTransportServlet extends AbstractTransportServer {
             RestfulResponse rres = new RestfulResponse(ex);
             Response res = Response.status(Response.Status.NOT_FOUND).entity(rres).build();
             
-            LOG.info(String.format("RES (ERR) - getDataObjectMetadataRestful - %s", path));
+            LOG.info(String.format("RES (ERR) - getDataObjectMetadataRestful - %s", path), ex);
             
             return res;
         } catch(Exception ex) {
             RestfulResponse rres = new RestfulResponse(ex);
             Response res = Response.status(Response.Status.INTERNAL_SERVER_ERROR).entity(rres).build();
             
-            LOG.info(String.format("RES (ERR) - getDataObjectMetadataRestful - %s", path));
+            LOG.info(String.format("RES (ERR) - getDataObjectMetadataRestful - %s", path), ex);
             
             return res;
         }
@@ -280,7 +286,7 @@ public class HTTPTransportServlet extends AbstractTransportServer {
             RestfulResponse rres = new RestfulResponse(ex);
             Response res = Response.status(Response.Status.INTERNAL_SERVER_ERROR).entity(rres).build();
             
-            LOG.info(String.format("RES (ERR) - listDataObjectMetadataRestful - %s", path));
+            LOG.info(String.format("RES (ERR) - listDataObjectMetadataRestful - %s", path), ex);
             
             return res;
         }
@@ -334,7 +340,7 @@ public class HTTPTransportServlet extends AbstractTransportServer {
             RestfulResponse rres = new RestfulResponse(ex);
             Response res = Response.status(Response.Status.INTERNAL_SERVER_ERROR).entity(rres).build();
             
-            LOG.info(String.format("RES (ERR) - getRecipeRestful - %s", path));
+            LOG.info(String.format("RES (ERR) - getRecipeRestful - %s", path), ex);
             
             return res;
         }
@@ -387,7 +393,7 @@ public class HTTPTransportServlet extends AbstractTransportServer {
             RestfulResponse rres = new RestfulResponse(ex);
             Response res = Response.status(Response.Status.INTERNAL_SERVER_ERROR).entity(rres).build();
             
-            LOG.info(String.format("RES (ERR) - getDirectoryRestful - %s", path));
+            LOG.info(String.format("RES (ERR) - getDirectoryRestful - %s", path), ex);
             
             return res;
         }
@@ -443,7 +449,7 @@ public class HTTPTransportServlet extends AbstractTransportServer {
             RestfulResponse rres = new RestfulResponse(ex);
             Response res = Response.status(Response.Status.INTERNAL_SERVER_ERROR).entity(rres).build();
             
-            LOG.info(String.format("RES (ERR) - getDataChunkRestful - %s", hash));
+            LOG.info(String.format("RES (ERR) - getDataChunkRestful - %s", hash), ex);
             
             return res;
         }

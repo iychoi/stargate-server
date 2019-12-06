@@ -17,6 +17,8 @@ package stargate.drivers.datastore.ignite;
 
 import java.io.IOException;
 import java.io.InputStream;
+import java.util.concurrent.CountDownLatch;
+import java.util.concurrent.TimeUnit;
 import org.apache.commons.logging.Log;
 import org.apache.commons.logging.LogFactory;
 import org.apache.ignite.IgniteCache;
@@ -28,25 +30,22 @@ import stargate.commons.utils.DateTimeUtils;
  *
  * @author iychoi
  */
-public class IgniteCacheInputStream extends InputStream {
+public class IgniteCachePartInputStream extends InputStream {
 
-    private static final Log LOG = LogFactory.getLog(IgniteCacheInputStream.class);
+    private static final Log LOG = LogFactory.getLog(IgniteCachePartInputStream.class);
     
     private IgniteBigKeyValueStore store;
     private IgniteDataStoreDriverConfig config;
     private IgniteCache<String, ByteArray> cache;
     private BigKeyValueStoreMetadata metadata;
-    private int currentPartNo;
+    private int partNo;
     private byte[] partData;
-    private long offset;
-    private long size;
-    private int partSize;
-    private int lastCompletedPartNo;
-    private int currentWaitingPartNo;
-    private Object partCompletionSyncObject = new Object();
+    private int offset;
+    private int size;
+    private CountDownLatch latch;
     
     
-    IgniteCacheInputStream(IgniteBigKeyValueStore store, IgniteDataStoreDriverConfig config, IgniteCache<String, ByteArray> cache, BigKeyValueStoreMetadata metadata) {
+    IgniteCachePartInputStream(IgniteBigKeyValueStore store, IgniteDataStoreDriverConfig config, IgniteCache<String, ByteArray> cache, BigKeyValueStoreMetadata metadata, int partNo) {
         if(store == null) {
             throw new IllegalArgumentException("store is null");
         }
@@ -63,30 +62,32 @@ public class IgniteCacheInputStream extends InputStream {
             throw new IllegalArgumentException("metadata is null");
         }
         
+        if(partNo < 0) {
+            throw new IllegalArgumentException("partNo is negative");
+        }
+        
+        if(partNo >= metadata.getPartNum()) {
+            throw new IllegalArgumentException(String.format("partNo %d does not exist in %d parts", partNo, metadata.getPartNum()));
+        }
+        
         this.store = store;
         this.config = config;
         this.cache = cache;
         this.metadata = metadata;
         
         this.partData = null;
-        this.currentPartNo = 0;
+        this.partNo = partNo;
         this.offset = 0;
         
-        this.size = metadata.getEntrySize();
-        this.partSize = config.getPartSize();
-        
-        this.lastCompletedPartNo = -1;
-        this.currentWaitingPartNo = -1;
+        this.size = Math.min((int)(metadata.getEntrySize() - (partNo * config.getPartSize())), config.getPartSize());
+        this.latch = new CountDownLatch(1);
     }
     
     @Override
     public synchronized int available() throws IOException {
         
         if(this.partData != null) {
-            long currentStartOffset = this.partSize * this.currentPartNo;
-            if(currentStartOffset <= this.offset && this.offset < currentStartOffset + this.partData.length) {
-                return this.partData.length - (int)(this.offset - currentStartOffset);
-            }
+            return (int)(this.size - this.offset);
         }
         
         return 0;
@@ -112,46 +113,28 @@ public class IgniteCacheInputStream extends InputStream {
         }
     }
     
-    public void notifyPartCompletion(int partNo) {
-        synchronized(this.partCompletionSyncObject) {
-            if(this.lastCompletedPartNo < partNo) {
-                this.lastCompletedPartNo = partNo;
-            }
-            
-            if(this.currentWaitingPartNo <= partNo && this.currentWaitingPartNo >= 0) {
-                this.partCompletionSyncObject.notifyAll();
-            }
-        }
+    public void notifyPartCompletion() {
+        this.latch.countDown();
     }
     
     private synchronized void loadPartData() throws IOException {
         if(this.partData != null) {
-            long currentStartOffset = this.partSize * this.currentPartNo;
-            if(currentStartOffset <= this.offset && this.offset < currentStartOffset + this.partData.length) {
-                // safe to reuse 
-                return;
-            }
+            // safe to reuse 
+            return;
         }
         
         if(this.offset >= this.size) {
             this.partData = null;
-            this.currentPartNo = 0;
             return;
         }
         
-        int partNo = (int)(this.offset / this.partSize);
-        if(partNo >= this.metadata.getPartNum()) {
-            throw new IOException(String.format("partNo %d does not exist in %d parts", partNo, this.metadata.getPartNum()));
-        }
-        
-        String partKey = IgniteBigKeyValueStore.makePartkey(this.metadata.getKey(), partNo);
+        String partKey = IgniteBigKeyValueStore.makePartkey(this.metadata.getKey(), this.partNo);
         long beginTime = DateTimeUtils.getTimestamp();
         
         try {
             while(true) {
                 ByteArray partDataByteArr = this.cache.get(partKey);
                 if(partDataByteArr == null) {
-                    // pending
                     long curTime = DateTimeUtils.getTimestamp();
                     if(DateTimeUtils.timeElapsedSec(beginTime, curTime, this.config.getPartWaitTimeoutSec())) {
                         // timeout
@@ -160,23 +143,14 @@ public class IgniteCacheInputStream extends InputStream {
                     } else {
                         // pending
                         //LOG.error(String.format("Sleep for waiting a part %s", partKey));
-                        synchronized(this.partCompletionSyncObject) {
-                            if(this.lastCompletedPartNo < partNo) {
-                                LOG.info(String.format("Wait a part %s", partKey));
-                                this.currentWaitingPartNo = partNo;
-                                this.partCompletionSyncObject.wait(this.config.getPartWaitSleepMsec());
-                            }
+                        LOG.info(String.format("Wait a part %s", partKey));
+                        boolean wokeup = this.latch.await(this.config.getPartWaitSleepMsec(), TimeUnit.MILLISECONDS);
+                        if(wokeup) {
+                            LOG.info(String.format("Woke up. Found a part %s", partKey));
                         }
                     }
                 } else {
                     this.partData = partDataByteArr.getArray();
-                    this.currentPartNo = partNo;
-                    synchronized(this.partCompletionSyncObject) {
-                        if(this.lastCompletedPartNo < partNo) {
-                            this.lastCompletedPartNo = partNo;
-                        }
-                        this.currentWaitingPartNo = -1;
-                    }
                     break;
                 }
             }
@@ -195,10 +169,8 @@ public class IgniteCacheInputStream extends InputStream {
             throw new IOException("part data is null");
         }
         
-        long currentStartOffset = this.partSize * this.currentPartNo;
-        int bufferOffset = (int)(this.offset - currentStartOffset);
-        if(bufferOffset < this.partData.length) {
-            byte ch = this.partData[bufferOffset];
+        if(this.offset < this.partData.length) {
+            byte ch = this.partData[this.offset];
             this.offset++;
             return ch;
         } else {
@@ -239,11 +211,9 @@ public class IgniteCacheInputStream extends InputStream {
                 throw new IOException("part data is null");
             }
 
-            long currentStartOffset = this.partSize * this.currentPartNo;
-            int bufferOffset = (int)(this.offset - currentStartOffset);
-            int bufferLength = (int) Math.min(this.partData.length - bufferOffset, remain);
+            int bufferLength = (int) Math.min(this.partData.length - this.offset, remain);
             
-            System.arraycopy(this.partData, bufferOffset, bytes, outputBufferOffset, bufferLength);
+            System.arraycopy(this.partData, this.offset, bytes, outputBufferOffset, bufferLength);
             this.offset += bufferLength;
             outputBufferOffset += bufferLength;
             remain -= bufferLength;
@@ -254,7 +224,7 @@ public class IgniteCacheInputStream extends InputStream {
     
     @Override
     public synchronized void close() throws IOException {
-        this.store.notifyInputStreamClosed(this.metadata.getKey());
+        this.store.notifyPartInputStreamClosed(this.metadata.getKey(), this.partNo);
     }
     
     @Override

@@ -328,7 +328,7 @@ public class IgniteClusterDriver extends AbstractClusterDriver {
         // Dynamic cluster group representing the oldest cluster node.
         // Will automatically shift to the next oldest, if the oldest
         // node crashes.
-        ClusterGroup oldestNode = cluster.forOldest();
+        ClusterGroup oldestNode = cluster.forServers().forOldest();
         ClusterNode node = oldestNode.node();
         return this.igniteDriver.getNodeNameFromClusterNode(node);
     }

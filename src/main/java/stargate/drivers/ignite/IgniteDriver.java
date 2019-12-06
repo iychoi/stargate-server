@@ -33,6 +33,7 @@ import org.apache.ignite.IgniteCluster;
 import org.apache.ignite.IgniteLogger;
 import org.apache.ignite.Ignition;
 import org.apache.ignite.cluster.ClusterNode;
+import org.apache.ignite.configuration.ClientConnectorConfiguration;
 import org.apache.ignite.configuration.DataPageEvictionMode;
 import org.apache.ignite.configuration.DataRegionConfiguration;
 import org.apache.ignite.configuration.DataStorageConfiguration;
@@ -63,10 +64,10 @@ public class IgniteDriver {
     public static final String VOLATILE_REGION_NAME = "VOLATILE_REGION";
     
     public static final long FAILURE_DETECTION_TIMEOUT = 30000; // 30 sec
-    public static final long INITIAL_DATA_REGION_SIZE = 10 * 1024 * 1024; // 10MB
-    public static final long MAX_DATA_REGION_SIZE = 100 * 1024 * 1024; // 100MB
-    public static final long INITIAL_BIG_DATA_REGION_SIZE = 512 * 1024 * 1024; // 500MB
-    public static final long MAX_BIG_DATA_REGION_SIZE = 1024 * 1024 * 1024; // 1G
+    public static final long INITIAL_DATA_REGION_SIZE = 10 * 1024 * 1024L; // 10MB
+    public static final long MAX_DATA_REGION_SIZE = 100 * 1024 * 1024L; // 100MB
+    public static final long INITIAL_BIG_DATA_REGION_SIZE = 2 * 1024 * 1024 * 1024L; // 2G
+    public static final long MAX_BIG_DATA_REGION_SIZE = 3 * 1024 * 1024 * 1024L; // 3G
     public static final int WAL_BUFFER_SIZE = 65 * 1024 * 1024; // 65 MB
     public static final int WAL_SEGMENT_SIZE = 1024 * 1024 * 1024; // 1G
     
@@ -188,6 +189,8 @@ public class IgniteDriver {
             igniteConfig.setDiscoverySpi(discoveryConfig);
             igniteConfig.setFailureDetectionTimeout(FAILURE_DETECTION_TIMEOUT);
             
+            igniteConfig.setClientConnectorConfiguration(getClientConnectorConfig());
+            
             // work dir
             if(this.workPath == null) {
                 this.workPath = new File(ResourceUtils.getStargateRoot(), WORK_PATH);
@@ -223,13 +226,6 @@ public class IgniteDriver {
         }
         
         this.initCount++;
-    }
-    
-    private int[] mergeArray(int[] arr1, int[] arr2) {
-        int[] newArr = new int[arr1.length + arr2.length];
-        System.arraycopy(arr1, 0, newArr, 0, arr1.length);
-        System.arraycopy(arr2, 0, newArr, arr1.length, arr2.length);
-        return newArr;
     }
     
     private void runChecker() throws IOException {
@@ -396,6 +392,13 @@ public class IgniteDriver {
         
         discoSpi.setIpFinder(tdif);
         return discoSpi;
+    }
+    
+    private ClientConnectorConfiguration getClientConnectorConfig() {
+        ClientConnectorConfiguration connConfig = new ClientConnectorConfiguration();
+        connConfig.setHost("127.0.0.1");
+        connConfig.setPort(10800);
+        return connConfig;
     }
     
     private CollisionSpi getQueueConfig() {

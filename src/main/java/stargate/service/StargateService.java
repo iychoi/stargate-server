@@ -17,6 +17,7 @@ package stargate.service;
 
 import java.io.IOException;
 import java.util.ArrayList;
+import java.util.Iterator;
 import java.util.List;
 import org.apache.commons.logging.Log;
 import org.apache.commons.logging.LogFactory;
@@ -68,6 +69,7 @@ public class StargateService extends AbstractService {
     private DataExportUpdateEventHandler dataExportUpdateEventHandler;
     
     private List<AbstractEventHandler> eventHandlers = new ArrayList<AbstractEventHandler>();
+    private List<Runnable> postManagerStartTasks = new ArrayList<Runnable>();
     
     public static StargateService getInstance(StargateServiceConfig config) throws ServiceNotStartedException {
         synchronized (DataStoreManager.class) {
@@ -168,6 +170,12 @@ public class StargateService extends AbstractService {
         this.started = true;
         
         LOG.info("Service is started...");
+        
+        LOG.info("Running post-start tasks");
+        for(Runnable postStartTask : this.postManagerStartTasks) {
+            postStartTask.run();
+        }
+        LOG.info("Post-start tasks are completed");
     }
     
     @Override
@@ -307,5 +315,10 @@ public class StargateService extends AbstractService {
         for(AbstractEventHandler handler : this.eventHandlers) {
             this.eventManager.addEventHandler(handler);
         }
+    }
+
+    @Override
+    public void addPostStartTask(Runnable task) {
+        this.postManagerStartTasks.add(task);
     }
 }

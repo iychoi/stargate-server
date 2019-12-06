@@ -16,7 +16,6 @@
 package stargate.managers.transport;
 
 import java.io.IOException;
-import java.util.ArrayList;
 import java.util.Iterator;
 import java.util.List;
 import java.util.Map;
@@ -48,8 +47,10 @@ public class TransferScheduler {
     private boolean schedulerRun = true;
     private PriorityBlockingQueue<AbstractTransferTask> priorityTaskQueue;
     private Map<String, AbstractTransferTask> inTransferTasks = new ConcurrentHashMap<String, AbstractTransferTask>();
+    private Map<String, Boolean> queuedTasksMap = new ConcurrentHashMap<String, Boolean>();
     private Semaphore taskIngestLock;
     private Map<String, List<PrefetchTask>> pendingPrefetchTasks;
+    private Map<String, Boolean> pendingPrefetchTasksMap = new ConcurrentHashMap<String, Boolean>();
     
     private int numPendingPrefetchTasks = 0;
     private int numQueuedTasks = 0;
@@ -106,6 +107,8 @@ public class TransferScheduler {
                                         inTransferTasks.remove(hash);
                                         numInTransferTasks--;
                                         
+                                        queuedTasksMap.remove(hash);
+                                        
                                         taskIngestLock.release();
                                         
                                         printCurrentStates();
@@ -147,6 +150,9 @@ public class TransferScheduler {
         this.transferPoolExecutor.shutdownNow();
         this.priorityTaskQueue.clear();
         this.inTransferTasks.clear();
+        this.pendingPrefetchTasks.clear();
+        this.pendingPrefetchTasksMap.clear();
+        this.queuedTasksMap.clear();
         
         LOG.debug("Transfer scheduler finished");
     }
@@ -166,27 +172,34 @@ public class TransferScheduler {
             throw new IllegalArgumentException("task is null");
         }
         
-        LOG.debug("Putting an on-demand transfer into a queue");
-        task.setScheduledTime(DateTimeUtils.getTimestamp());
-        this.priorityTaskQueue.add(task);
-        this.numQueuedTasks++;
+        if(!this.queuedTasksMap.containsKey(task.getHash())) {
+            LOG.debug("Putting an on-demand transfer into a queue");
+            task.setScheduledTime(DateTimeUtils.getTimestamp());
+            this.priorityTaskQueue.add(task);
+            this.queuedTasksMap.put(task.getHash(), Boolean.TRUE);
+            this.numQueuedTasks++;
+        }
         
         // remove prefetch tasks scheduled
-        String uriString = task.getDataObjectURI().toUri().toASCIIString();
-        List<PrefetchTask> prefetchTasks = this.pendingPrefetchTasks.get(uriString);
-        if(prefetchTasks != null) {
-            Iterator<PrefetchTask> iterator = prefetchTasks.iterator();
-            while(iterator.hasNext()) {
-                PrefetchTask prefetchTask = iterator.next();
-                if(prefetchTask.getHash().equals(task.getHash())) {
-                    // remove
-                    iterator.remove();
-                    this.numPendingPrefetchTasks--;
+        if(this.pendingPrefetchTasksMap.containsKey(task.getHash())) {
+            String uriString = task.getDataObjectURI().toUri().toASCIIString();
+            List<PrefetchTask> prefetchTasks = this.pendingPrefetchTasks.get(uriString);
+            if(prefetchTasks != null) {
+                Iterator<PrefetchTask> iterator = prefetchTasks.iterator();
+                while(iterator.hasNext()) {
+                    PrefetchTask prefetchTask = iterator.next();
+                    if(prefetchTask.getHash().equals(task.getHash())) {
+                        // remove
+                        iterator.remove();
+                        this.numPendingPrefetchTasks--;
+                        
+                        this.pendingPrefetchTasksMap.remove(task.getHash());
+                    }
                 }
-            }
 
-            if(prefetchTasks.isEmpty()) {
-                this.pendingPrefetchTasks.remove(uriString);
+                if(prefetchTasks.isEmpty()) {
+                    this.pendingPrefetchTasks.remove(uriString);
+                }
             }
         }
         
@@ -198,27 +211,14 @@ public class TransferScheduler {
             throw new IllegalArgumentException("task is null");
         }
         
-        String uriString = task.getDataObjectURI().toUri().toASCIIString();
-        List<PrefetchTask> prefetchTasks = this.pendingPrefetchTasks.get(uriString);
-        boolean taskExists = false;
-
-        if(prefetchTasks == null) {
-            prefetchTasks = new ArrayList<PrefetchTask>();
-        } else {
-            for(PrefetchTask prefetchTask : prefetchTasks) {
-                if(prefetchTask.getHash().equals(task.getHash())) {
-                    // has
-                    taskExists = true;
-                    break;
-                }
-            }
-        }
-
-        if(!taskExists) {
+        if(!this.pendingPrefetchTasksMap.containsKey(task.getHash())) {
+            String uriString = task.getDataObjectURI().toUri().toASCIIString();
+            List<PrefetchTask> prefetchTasks = this.pendingPrefetchTasks.get(uriString);
             prefetchTasks.add(task);
             this.numPendingPrefetchTasks++;
 
             this.pendingPrefetchTasks.put(uriString, prefetchTasks);
+            this.pendingPrefetchTasksMap.put(task.getHash(), Boolean.TRUE);
         }
         
         printCurrentStates();
@@ -254,12 +254,17 @@ public class TransferScheduler {
                 PrefetchTask prefetchTask = iterator.next();
                 long offset = prefetchTask.getOffset();
                 if(offset >= startOffset && offset < endOffset) {
-                    prefetchTask.setScheduledTime(DateTimeUtils.getTimestamp());
-                    this.priorityTaskQueue.add(prefetchTask);
-                    this.numQueuedTasks++;
-
+                    if(!this.queuedTasksMap.containsKey(prefetchTask.getHash())) {
+                        prefetchTask.setScheduledTime(DateTimeUtils.getTimestamp());
+                        this.priorityTaskQueue.add(prefetchTask);
+                        this.queuedTasksMap.put(prefetchTask.getHash(), Boolean.TRUE);
+                        this.numQueuedTasks++;
+                    }
+                    
                     iterator.remove();
                     this.numPendingPrefetchTasks--;
+                    
+                    this.pendingPrefetchTasksMap.remove(prefetchTask.getHash());
                 }
             }
 
@@ -313,13 +318,18 @@ public class TransferScheduler {
                 PrefetchTask prefetchTask = iterator.next();
                 long offset = prefetchTask.getOffset();
                 if(offset >= startOffset && offset < endOffset) {
-                    prefetchTask.setScheduledTime(DateTimeUtils.getTimestamp());
-                    this.priorityTaskQueue.add(prefetchTask);
-                    this.numQueuedTasks++;
+                    if(!this.queuedTasksMap.containsKey(prefetchTask.getHash())) {
+                        prefetchTask.setScheduledTime(DateTimeUtils.getTimestamp());
+                        this.priorityTaskQueue.add(prefetchTask);
+                        this.queuedTasksMap.put(prefetchTask.getHash(), Boolean.TRUE);
+                        this.numQueuedTasks++;
+                    }
 
                     iterator.remove();
                     this.numPendingPrefetchTasks--;
 
+                    this.pendingPrefetchTasksMap.remove(prefetchTask.getHash());
+                    
                     remaining--;
 
                     if(remaining <= 0) {

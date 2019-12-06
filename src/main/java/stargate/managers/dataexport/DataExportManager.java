@@ -93,6 +93,21 @@ public class DataExportManager extends AbstractManager<NullDriver> {
         super.start();
         
         setEventHandler();
+        
+        this.getService().addPostStartTask(new Runnable() {
+            @Override
+            public void run() {
+                try {
+                    postStart();
+                } catch (IOException ex) {
+                    LOG.error("Cannot execute postStart", ex);
+                }
+            }
+        });
+    }
+    
+    private synchronized void postStart() throws IOException {
+        safeInitDataExportEntryStore();
     }
     
     @Override

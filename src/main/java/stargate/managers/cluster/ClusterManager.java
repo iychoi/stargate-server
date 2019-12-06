@@ -144,6 +144,22 @@ public class ClusterManager extends AbstractManager<AbstractClusterDriver> {
         super.start();
         
         setEventHandler();
+        
+        this.getService().addPostStartTask(new Runnable() {
+            @Override
+            public void run() {
+                try {
+                    postStart();
+                } catch (IOException ex) {
+                    LOG.error("Cannot execute postStart", ex);
+                }
+            }
+        });
+    }
+    
+    private synchronized void postStart() throws IOException {
+        this.safeInitLocalCluster();
+        this.safeInitRemoteClusterStore();
     }
     
     @Override

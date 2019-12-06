@@ -29,7 +29,6 @@ import org.apache.commons.logging.Log;
 import org.apache.commons.logging.LogFactory;
 import org.codehaus.jackson.annotate.JsonIgnore;
 import org.codehaus.jackson.annotate.JsonProperty;
-import stargate.commons.datastore.BigKeyValueStoreMetadata;
 import stargate.commons.utils.HexUtils;
 import stargate.commons.utils.JsonSerializer;
 
@@ -43,7 +42,8 @@ public class DataChunkCacheMetadata {
     
     private DataChunkCacheType type;
     private String hash;
-    private long version; // incremental
+    private int size;
+    private int version; // incremental
     private String transferNode;
     private Set<String> waitingNodes = new HashSet<String>();
     
@@ -66,13 +66,17 @@ public class DataChunkCacheMetadata {
     DataChunkCacheMetadata() {
     }
     
-    public DataChunkCacheMetadata(DataChunkCacheType type, String hash, long version) {
+    public DataChunkCacheMetadata(DataChunkCacheType type, String hash, int size, int version) {
         if(type == null) {
             throw new IllegalArgumentException("type is null");
         }
         
         if(hash == null || hash.isEmpty()) {
             throw new IllegalArgumentException("hash is null or empty");
+        }
+        
+        if(size < 0) {
+            throw new IllegalArgumentException("size is negative");
         }
         
         if(version <= 0) {
@@ -81,17 +85,22 @@ public class DataChunkCacheMetadata {
         
         this.type = type;
         this.hash = hash;
+        this.size = size;
         this.transferNode = null;
         this.version = version;
     }
     
-    public DataChunkCacheMetadata(DataChunkCacheType type, String hash, long version, String transferNode) {
+    public DataChunkCacheMetadata(DataChunkCacheType type, String hash, int size, int version, String transferNode) {
         if(type == null) {
             throw new IllegalArgumentException("type is null");
         }
         
         if(hash == null || hash.isEmpty()) {
             throw new IllegalArgumentException("hash is null or empty");
+        }
+        
+        if(size < 0) {
+            throw new IllegalArgumentException("size is negative");
         }
         
         if(version <= 0) {
@@ -104,17 +113,22 @@ public class DataChunkCacheMetadata {
         
         this.type = type;
         this.hash = hash;
+        this.size = size;
         this.transferNode = transferNode;
         this.version = version;
     }
     
-    public DataChunkCacheMetadata(DataChunkCacheType type, String hash, long version, String transferNode, Collection<String> waitingNodes) {
+    public DataChunkCacheMetadata(DataChunkCacheType type, String hash, int size, int version, String transferNode, Collection<String> waitingNodes) {
         if(type == null) {
             throw new IllegalArgumentException("type is null");
         }
         
         if(hash == null || hash.isEmpty()) {
             throw new IllegalArgumentException("hash is null or empty");
+        }
+        
+        if(size < 0) {
+            throw new IllegalArgumentException("size is negative");
         }
         
         if(version <= 0) {
@@ -135,6 +149,7 @@ public class DataChunkCacheMetadata {
         
         this.type = type;
         this.hash = hash;
+        this.size = size;
         this.version = version;
         this.transferNode = transferNode;
         if(waitingNodes != null) {
@@ -170,13 +185,27 @@ public class DataChunkCacheMetadata {
         this.hash = hash;
     }
     
+    @JsonProperty("size")
+    public int getSize() {
+        return this.size;
+    }
+    
+    @JsonProperty("size")
+    public void setSize(int size) {
+        if(size < 0) {
+            throw new IllegalArgumentException("size is negative");
+        }
+        
+        this.size = size;
+    }
+    
     @JsonProperty("version")
-    public long getVersion() {
+    public int getVersion() {
         return this.version;
     }
     
     @JsonProperty("version")
-    public void setVersion(long version) {
+    public void setVersion(int version) {
         if(version <= 0) {
             throw new IllegalArgumentException("version is negative");
         }
@@ -264,7 +293,8 @@ public class DataChunkCacheMetadata {
         oos.writeInt(hashBytes.length);
         oos.write(hashBytes);
         
-        oos.writeLong(this.version);
+        oos.writeInt(this.size);
+        oos.writeInt(this.version);
         
         if(this.transferNode == null) {
             oos.writeInt(0);
@@ -300,7 +330,8 @@ public class DataChunkCacheMetadata {
         ois.readFully(hashBytes, 0, hashBytesLen);
         String hash = HexUtils.toHexString(hashBytes).toLowerCase();
         
-        long version = ois.readLong();
+        int size = ois.readInt();
+        int version = ois.readInt();
         
         String transferNode = null;
         int transferNodeBytesLen = ois.readInt();
@@ -323,39 +354,18 @@ public class DataChunkCacheMetadata {
         ois.close();
         input.close();
         
-        return new DataChunkCacheMetadata(type, hash, version, transferNode, waitingNodes);
+        return new DataChunkCacheMetadata(type, hash, size, version, transferNode, waitingNodes);
     }
     
     @Override
     @JsonIgnore
     public String toString() {
-        return "DataChunkCache{" + "type=" + type + ", hash=" + hash + ", version=" + version + ", transferNode=" + transferNode + ", waitingNodes=" + waitingNodes + '}';
+        return "DataChunkCache{" + "type=" + type + ", hash=" + hash + ", size=" + size + ", version=" + version + ", transferNode=" + transferNode + ", waitingNodes=" + waitingNodes + '}';
     }
     
     @JsonIgnore
     public String toJson() throws IOException {
         return JsonSerializer.toJson(this);
-    }
-    
-    @JsonIgnore
-    public BigKeyValueStoreMetadata toBigKeyValueStoreMetadata() throws IOException {
-        BigKeyValueStoreMetadata kvMetadata = new BigKeyValueStoreMetadata(this.hash);
-        kvMetadata.setExtra(this.toBytes());
-        return kvMetadata;
-    }
-    
-    @JsonIgnore
-    public static DataChunkCacheMetadata fromBigKeyValueStoreMetadata(BigKeyValueStoreMetadata metadata) throws IOException {
-        if(metadata == null) {
-            throw new IllegalArgumentException("metadata is null");
-        }
-        
-        byte[] extra = metadata.getExtra();
-        if(extra == null) {
-            return null;
-        }
-        
-        return DataChunkCacheMetadata.fromBytes(extra);
     }
     
     @JsonIgnore

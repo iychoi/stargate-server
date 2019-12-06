@@ -20,6 +20,8 @@ import java.io.InputStream;
 import java.io.OutputStream;
 import javax.ws.rs.WebApplicationException;
 import javax.ws.rs.core.StreamingOutput;
+import org.apache.commons.logging.Log;
+import org.apache.commons.logging.LogFactory;
 
 /**
  *
@@ -27,6 +29,8 @@ import javax.ws.rs.core.StreamingOutput;
  */
 public class StreamingOutputData implements StreamingOutput {
 
+    private static final Log LOG = LogFactory.getLog(StreamingOutputData.class);
+    
     private static final int BUFFER_SIZE = 64*1024; // 64k
     private InputStream is;
     private byte[] buffer;
@@ -48,11 +52,13 @@ public class StreamingOutputData implements StreamingOutput {
 
         try {
             int read = 0;
-            while ((read = this.is.read(this.buffer)) > 0) {
+            while ((read = this.is.read(this.buffer)) >= 0) {
                 out.write(this.buffer, 0, read);
             }
+            out.flush();
             this.is.close();
         } catch (Exception ex) {
+            LOG.error("streaming error occurred", ex);
             throw new WebApplicationException(ex);
         }
     }

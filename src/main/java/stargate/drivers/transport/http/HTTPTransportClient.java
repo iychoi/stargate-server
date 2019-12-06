@@ -21,6 +21,8 @@ import java.io.InputStream;
 import java.net.URI;
 import java.util.Arrays;
 import java.util.Collection;
+import org.apache.commons.logging.Log;
+import org.apache.commons.logging.LogFactory;
 import stargate.commons.cluster.Cluster;
 import stargate.commons.dataobject.DataObjectMetadata;
 import stargate.commons.dataobject.DataObjectURI;
@@ -39,6 +41,8 @@ import stargate.commons.utils.PathUtils;
  */
 public class HTTPTransportClient extends AbstractTransportClient {
 
+    private static final Log LOG = LogFactory.getLog(HTTPTransportClient.class);
+    
     private URI serviceUri;
     private String username;
     private String password;
@@ -68,6 +72,7 @@ public class HTTPTransportClient extends AbstractTransportClient {
             this.connectionEstablishedTime = DateTimeUtils.getTimestamp();
             this.lastActiveTime = this.connectionEstablishedTime;
             this.connected = true;
+            LOG.debug("Connected to " + this.serviceUri.toString());
         }
     }
     
@@ -76,12 +81,8 @@ public class HTTPTransportClient extends AbstractTransportClient {
         if(this.connected) {
             this.restfulClient.close();
             this.connected = false;
+            LOG.debug("Disconnected to " + this.serviceUri.toString());
         }
-    }
-    
-    @Override
-    public URI getServiceURI() {
-        return this.serviceUri;
     }
     
     @Override
@@ -96,6 +97,11 @@ public class HTTPTransportClient extends AbstractTransportClient {
     private String makeAPIPath(String path1, String path2) {
         String api_path = PathUtils.concatPath(HTTPTransportRestfulConstants.API_PATH, path1);
         return PathUtils.concatPath(api_path, path2);
+    }
+    
+    @Override
+    public URI getServiceURI() {
+        return this.serviceUri;
     }
     
     @Override
@@ -238,8 +244,8 @@ public class HTTPTransportClient extends AbstractTransportClient {
         
         // URL pattern = http://xxx.xxx.xxx.xxx/api/data/hash
         String url = makeAPIPath(HTTPTransportRestfulConstants.API_GET_DATA_CHUNK_PATH, hash);
+        
         InputStream is = this.restfulClient.download(url);
-
         updateLastActivetime();
         return is;
     }

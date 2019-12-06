@@ -29,6 +29,7 @@ import org.apache.commons.logging.LogFactory;
 import org.apache.ignite.Ignite;
 import org.apache.ignite.IgniteMessaging;
 import org.apache.ignite.lang.IgniteBiPredicate;
+import stargate.commons.cluster.Node;
 import stargate.commons.driver.AbstractDriverConfig;
 import stargate.commons.driver.DriverNotInitializedException;
 import stargate.commons.event.AbstractEventDriver;
@@ -37,7 +38,10 @@ import stargate.commons.event.AbstractEventHandler;
 import stargate.commons.event.BulkStargateEvent;
 import stargate.commons.event.StargateEvent;
 import stargate.commons.event.StargateEventType;
+import stargate.commons.manager.ManagerNotInstantiatedException;
 import stargate.drivers.ignite.IgniteDriver;
+import stargate.managers.cluster.ClusterManager;
+import stargate.service.StargateService;
 
 /**
  *
@@ -309,6 +313,31 @@ public class IgniteEventDriver extends AbstractEventDriver {
         
         if(!isStarted()) {
             throw new DriverNotInitializedException("driver is not initialized");
+        }
+        
+        if(event.getReceiverNodeCount() == 1) {
+            Collection<String> receiverNodeNames = event.getReceiverNodeNames();
+            String localNodeName = this.igniteDriver.getLocalNodeName();
+            
+            String receiver = receiverNodeNames.iterator().next();
+            if(localNodeName.equals(receiver)) {
+                // same node
+                LOG.debug(String.format("Raise an event : %s", event.getEventType().toString()));
+
+                Runnable r = new Runnable() {
+                    @Override
+                    public void run() {
+                        try {
+                            processEvent(event);
+                        } catch (IOException ex) {
+                            LOG.error("IOException", ex);
+                        }
+                    }
+                };
+
+                eventHandlerThreadPool.execute(r);
+                return;
+            }
         }
         
         Runnable r = new Runnable() {

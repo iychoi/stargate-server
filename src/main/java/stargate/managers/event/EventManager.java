@@ -15,7 +15,6 @@
 */
 package stargate.managers.event;
 
-import stargate.commons.event.AbstractEventHandler;
 import stargate.commons.event.StargateEvent;
 import java.io.IOException;
 import java.util.ArrayList;
@@ -27,6 +26,7 @@ import stargate.commons.driver.AbstractDriver;
 import stargate.commons.driver.DriverFailedToLoadException;
 import stargate.commons.driver.DriverNotInitializedException;
 import stargate.commons.event.AbstractEventDriver;
+import stargate.commons.event.AbstractEventHandler;
 import stargate.commons.manager.AbstractManager;
 import stargate.commons.manager.ManagerConfig;
 import stargate.commons.manager.ManagerNotInstantiatedException;

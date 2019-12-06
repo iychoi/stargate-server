@@ -13,4 +13,5 @@ then
     exit 1
 else
     tmux kill-session -t ${TMUX_SESSION_NAME}
+    kill -9 $(ps aux | grep -e stargate | awk '{ print $2 }')
 fi

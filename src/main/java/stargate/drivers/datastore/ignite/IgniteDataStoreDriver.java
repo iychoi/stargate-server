@@ -41,6 +41,7 @@ public class IgniteDataStoreDriver extends AbstractDataStoreDriver {
     
     private IgniteDataStoreDriverConfig config;
     private IgniteDriver igniteDriver;
+    private int partSize;
     private Map<String, AbstractKeyValueStore> kvStores = new HashMap<String, AbstractKeyValueStore>();
     private Map<String, AbstractBigKeyValueStore> bigKVStores = new HashMap<String, AbstractBigKeyValueStore>();
     private Map<String, IgniteQueue> queueStores = new HashMap<String, IgniteQueue>();
@@ -56,6 +57,7 @@ public class IgniteDataStoreDriver extends AbstractDataStoreDriver {
         }
         
         this.config = (IgniteDataStoreDriverConfig) config;
+        this.partSize = this.config.getPartSize();
     }
     
     public IgniteDataStoreDriver(AbstractDataStoreDriverConfig config) {
@@ -68,6 +70,7 @@ public class IgniteDataStoreDriver extends AbstractDataStoreDriver {
         }
         
         this.config = (IgniteDataStoreDriverConfig) config;
+        this.partSize = this.config.getPartSize();
     }
     
     public IgniteDataStoreDriver(IgniteDataStoreDriverConfig config) {
@@ -76,6 +79,7 @@ public class IgniteDataStoreDriver extends AbstractDataStoreDriver {
         }
         
         this.config = config;
+        this.partSize = this.config.getPartSize();
     }
     
     @Override
@@ -99,6 +103,11 @@ public class IgniteDataStoreDriver extends AbstractDataStoreDriver {
         }
         
         super.uninit();
+    }
+    
+    @Override
+    public int getPartSize() {
+        return this.partSize;
     }
     
     @Override
