@@ -30,6 +30,7 @@ import stargate.commons.dataobject.DataObjectMetadata;
 import stargate.commons.dataobject.DataObjectURI;
 import stargate.commons.recipe.Recipe;
 import stargate.commons.recipe.RecipeChunk;
+import stargate.commons.userinterface.DataChunkStatus;
 import stargate.commons.utils.IPUtils;
 
 /**
@@ -40,30 +41,15 @@ public class HTTPChunkInputStream extends FSInputStream {
 
     private static final Log LOG = LogFactory.getLog(HTTPChunkInputStream.class);
         
-    public static final String DEFAULT_NODE_NAME = "DEFAULT_NODE";
-    public static final String LOCAL_NODE_NAME = "LOCAL_NODE";
-     
     // node-name to client mapping
     private Map<String, HTTPUserInterfaceClient> clients = new HashMap<String, HTTPUserInterfaceClient>();
+    private String localNodeName;
+    private HTTPUserInterfaceClient localClient;
+    private Map<String, DataChunkStatus> initializedChunkMap = new HashMap<String, DataChunkStatus>();
     private Recipe recipe;
     private long offset;
     private long size;
     private ChunkDataInputStream chunkDataInputStream;
-    
-    public HTTPChunkInputStream(HTTPUserInterfaceClient client, Recipe recipe) {
-        if(client == null) {
-            throw new IllegalArgumentException("client is null");
-        }
-        
-        if(recipe == null) {
-            throw new IllegalArgumentException("recipe is null");
-        }
-        
-        Map<String, HTTPUserInterfaceClient> clients = new HashMap<String, HTTPUserInterfaceClient>();
-        clients.put(DEFAULT_NODE_NAME, client);
-        
-        initialize(clients, recipe);
-    }
     
     public HTTPChunkInputStream(Map<String, HTTPUserInterfaceClient> clients, Recipe recipe) {
         if(clients == null) {
@@ -95,14 +81,15 @@ public class HTTPChunkInputStream extends FSInputStream {
     }
     
     private void setLocalClient() {
-        if(!this.clients.containsKey(LOCAL_NODE_NAME)) {
+        if(this.localClient == null || this.localNodeName == null) {
             Set<Map.Entry<String, HTTPUserInterfaceClient>> entrySet = this.clients.entrySet();
             for(Map.Entry<String, HTTPUserInterfaceClient> entry : entrySet) {
                 HTTPUserInterfaceClient client = entry.getValue();
                 URI serviceURI = client.getServiceURI();
                 try {
                     if(IPUtils.isLocalIPAddress(serviceURI.getHost())) {
-                        this.clients.put(LOCAL_NODE_NAME, client);
+                        this.localNodeName = entry.getKey();
+                        this.localClient = client;
                         break;
                     }
                 } catch (IOException ex) {
@@ -175,52 +162,25 @@ public class HTTPChunkInputStream extends FSInputStream {
     
     private HTTPUserInterfaceClient getClient(RecipeChunk chunk) throws IOException {
         HTTPUserInterfaceClient client = null;
-
-        if (this.clients.size() == 1) {
-            // no other choice
-            Collection<HTTPUserInterfaceClient> values = this.clients.values();
-            for(HTTPUserInterfaceClient value : values) {
-                client = value;
-                break;
-            }
-        } else if (this.clients.size() >= 2) {
-            HTTPUserInterfaceClient localClient = this.clients.get(LOCAL_NODE_NAME);
         
-            Collection<Integer> nodeIDs = chunk.getNodeIDs();
-            Collection<String> nodeNames = this.recipe.getNodeNames(nodeIDs);
+        Collection<Integer> nodeIDs = chunk.getNodeIDs();
+        Collection<String> nodeNames = this.recipe.getNodeNames(nodeIDs);
         
-            
-            // Step1. check if local node has the block
-            if(localClient != null) {
-                URI localServiceURI = localClient.getServiceURI();
-
-                for(String nodeName : nodeNames) {
-                    HTTPUserInterfaceClient candidateClient = this.clients.get(nodeName);
-                    if(candidateClient != null) {
-                        URI candidateServiceURI = candidateClient.getServiceURI();
-                        if(candidateServiceURI.equals(localServiceURI)) {
-                            // we found
-                            client = candidateClient;
-                            break;
-                        }
-                    }
-                }
+        // Step1. check if local node has the block
+        if(this.localNodeName != null && this.localClient != null) {
+            if(nodeNames.contains(this.localNodeName)) {
+                client = this.localClient;
             }
+        }
 
-            // Step2. use any of nodes having the block
-            if(client == null) {
-                for(String nodeName : nodeNames) {
-                    client = this.clients.get(nodeName);
-                    if(client != null) {
-                        // we found
-                        break;
-                    }
+        // Step2. use any of nodes having the block
+        if(client == null) {
+            for(String nodeName : nodeNames) {
+                client = this.clients.get(nodeName);
+                if(client != null) {
+                    // we found
+                    break;
                 }
-            }
-
-            // Step3. use wild card
-            if(client == null) {
-                client = this.clients.get(DEFAULT_NODE_NAME);
             }
         }
 
@@ -260,8 +220,15 @@ public class HTTPChunkInputStream extends FSInputStream {
         
         HTTPUserInterfaceClient client = getClient(chunk);
         
+        if(!this.initializedChunkMap.containsKey(hash)) {
+            DataChunkStatus dataChunkStatus = client.requestDataChunk(uri, hash);
+            this.initializedChunkMap.put(hash, dataChunkStatus);
+        }
+        
         if(this.chunkDataInputStream == null) {
-            InputStream dataChunkIS = client.getDataChunk(uri, hash);
+            DataChunkStatus dataChunkStatus = this.initializedChunkMap.get(hash);
+            InputStream dataChunkIS = client.getDataChunk(uri, hash, dataChunkStatus);
+            
             this.chunkDataInputStream = new ChunkDataInputStream(dataChunkIS, chunk.getOffset(), chunk.getLength());
             long seek = this.offset - chunk.getOffset();
             this.chunkDataInputStream.seek(seek);
@@ -315,7 +282,7 @@ public class HTTPChunkInputStream extends FSInputStream {
             throw new IOException("Cannot read chunk data");
         }
         
-        int chunkRemaining = Math.min(this.chunkDataInputStream.getChunkSize() - this.chunkDataInputStream.getOffset(), remaining);
+        int chunkRemaining = (int) Math.min(this.chunkDataInputStream.getChunkSize() - this.chunkDataInputStream.getOffset(), remaining);
         int read = this.chunkDataInputStream.read(bytes, off, chunkRemaining);
         if(read >= 0) {
             this.offset += read;
@@ -326,13 +293,16 @@ public class HTTPChunkInputStream extends FSInputStream {
     @Override
     public synchronized void close() throws IOException {
         if(this.clients != null) {
-            Collection<HTTPUserInterfaceClient> clients = this.clients.values();
+            //Collection<HTTPUserInterfaceClient> clients = this.clients.values();
             // do not disconnect these
             //for(HTTPUserInterfaceClient client : clients) {
             //    client.disconnect();
             //}
             this.clients.clear();
         }
+        
+        this.localClient = null;
+        this.localNodeName = null;
         
         this.recipe = null;
         this.offset = 0;
@@ -342,6 +312,8 @@ public class HTTPChunkInputStream extends FSInputStream {
             this.chunkDataInputStream.close();
             this.chunkDataInputStream = null;
         }
+        
+        this.initializedChunkMap.clear();
     }
     
     @Override

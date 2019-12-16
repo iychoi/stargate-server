@@ -29,7 +29,6 @@ import org.apache.commons.logging.LogFactory;
 import org.apache.ignite.Ignite;
 import org.apache.ignite.IgniteMessaging;
 import org.apache.ignite.lang.IgniteBiPredicate;
-import stargate.commons.cluster.Node;
 import stargate.commons.driver.AbstractDriverConfig;
 import stargate.commons.driver.DriverNotInitializedException;
 import stargate.commons.event.AbstractEventDriver;
@@ -38,10 +37,7 @@ import stargate.commons.event.AbstractEventHandler;
 import stargate.commons.event.BulkStargateEvent;
 import stargate.commons.event.StargateEvent;
 import stargate.commons.event.StargateEventType;
-import stargate.commons.manager.ManagerNotInstantiatedException;
 import stargate.drivers.ignite.IgniteDriver;
-import stargate.managers.cluster.ClusterManager;
-import stargate.service.StargateService;
 
 /**
  *

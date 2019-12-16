@@ -21,13 +21,18 @@ import java.io.FileOutputStream;
 import java.io.IOException;
 import java.net.URI;
 import java.util.Collection;
+import java.util.HashMap;
+import java.util.Map;
 import org.apache.commons.logging.Log;
 import org.apache.commons.logging.LogFactory;
 import stargate.commons.cluster.Cluster;
+import stargate.commons.cluster.Node;
 import stargate.commons.dataobject.DataObjectMetadata;
 import stargate.commons.dataobject.DataObjectURI;
 import stargate.commons.recipe.Recipe;
 import stargate.commons.service.FSServiceInfo;
+import stargate.commons.userinterface.UserInterfaceInitialDataPack;
+import stargate.commons.userinterface.UserInterfaceServiceInfo;
 import stargate.commons.utils.DateTimeUtils;
 import stargate.commons.utils.JsonSerializer;
 import stargate.commons.utils.PathUtils;
@@ -142,13 +147,26 @@ public class FileSystem {
         try {
             HTTPUserInterfaceClient client = HTTPUIClient.getClient(serviceURI);
             client.connect();
-            FSServiceInfo info = client.getFSServiceInfo();
+            UserInterfaceInitialDataPack initialDataPack = client.getInitialDataPack();
+            
+            System.out.println("= FSServiceInfo =");
+            FSServiceInfo info = initialDataPack.getFSServiceInfo();
             if(info == null) {
                 System.out.println("<EMPTY!>");
             } else {
                 String json = JsonSerializer.formatPretty(info.toJson());
                 System.out.println(json);
             }
+            
+            System.out.println("= LocalCluster =");
+            Cluster localCluster = initialDataPack.getLocalCluster();
+            if(localCluster == null) {
+                System.out.println("<EMPTY!>");
+            } else {
+                String json = JsonSerializer.formatPretty(localCluster.toJson());
+                System.out.println(json);
+            }
+            
             String dateTimeString = DateTimeUtils.getDateTimeString(client.getLastActiveTime());
             System.out.println(String.format("<Request processed %s>", dateTimeString));
             client.disconnect();
@@ -279,6 +297,8 @@ public class FileSystem {
         try {
             HTTPUserInterfaceClient client = HTTPUIClient.getClient(serviceURI);
             client.connect();
+            Cluster localCluster = client.getLocalCluster();
+            
             try {
                 DataObjectMetadata metadata = client.getDataObjectMetadata(uri);
                 if(metadata == null) {
@@ -292,7 +312,23 @@ public class FileSystem {
                         System.out.println("<Recipe does not exist!>");
                     } else {
                         LOG.debug(String.format("Downloading a file %s", stargatePath));
-   
+                        
+                        // create connections
+                        Map<String, HTTPUserInterfaceClient> clients = new HashMap<String, HTTPUserInterfaceClient>();
+                        
+                        Collection<String> nodeNames = recipe.getNodeNames();
+                        for(String nodeName : nodeNames) {
+                            Node node = localCluster.getNode(nodeName);
+                            UserInterfaceServiceInfo userInterfaceServiceInfo = node.getUserInterfaceServiceInfo();
+                            URI nodeServiceURI = userInterfaceServiceInfo.getServiceURI();
+                            if(!client.getServiceURI().equals(nodeServiceURI)) {
+                                HTTPUserInterfaceClient newClient = HTTPUIClient.getClient(nodeServiceURI);
+                                clients.put(nodeName, newClient);
+                            } else {
+                                clients.put(nodeName, client);
+                            }
+                        }
+                        
                         File f = (new File(targetPath)).getAbsoluteFile();
                         if(f.isDirectory()) {
                             f = new File(f, PathUtils.getFileName(stargatePath));
@@ -302,10 +338,12 @@ public class FileSystem {
                         LOG.debug(String.format("start copy - %d", startTimeC));
                         
                         FileOutputStream fos = new FileOutputStream(f);
+                        fos.getChannel().truncate(0);
+                        
                         int bufferlen = 1024*1024;
                         byte[] buffer = new byte[bufferlen];
                         
-                        HTTPChunkInputStream cis = new HTTPChunkInputStream(client, recipe);
+                        HTTPChunkInputStream cis = new HTTPChunkInputStream(clients, recipe);
                         int readLen = 0;
                         while((readLen = cis.read(buffer, 0, bufferlen)) > 0) {
                             fos.write(buffer, 0, readLen);
@@ -315,6 +353,10 @@ public class FileSystem {
                         LOG.debug(String.format("copy took - %d ms", endTimeC - startTimeC));
                         
                         fos.close();
+                        
+                        for(HTTPUserInterfaceClient newClient : clients.values()) {
+                            newClient.disconnect();
+                        }
                     }
                 }
             } catch (FileNotFoundException ex) {

@@ -55,7 +55,7 @@ import stargate.managers.datasource.DataSourceManager;
 import stargate.managers.datastore.DataStoreManager;
 import stargate.managers.recipe.RecipeManager;
 import stargate.commons.transport.TransferAssignment;
-import stargate.commons.userinterface.DataChunkSourceType;
+import stargate.commons.userinterface.DataChunkSource;
 import stargate.commons.userinterface.DataChunkStatus;
 import stargate.managers.transport.PendingPrefetchSchedule;
 import stargate.managers.transport.PendingPrefetchScheduleComparator;
@@ -502,71 +502,110 @@ public class VolumeManager extends AbstractManager<NullDriver> {
             try {
                 StargateService service = getStargateService();
                 TransportManager transportManager = service.getTransportManager();
-                ClusterManager clusterManager = service.getClusterManager();
                 
-                Cluster localCluster = clusterManager.getLocalCluster();
-                
-                Recipe remoteRecipe = getRemoteRecipe(absPath);
-                Recipe newRecipe = new Recipe(remoteRecipe.getMetadata(), remoteRecipe.getHashAlgorithm(), remoteRecipe.getChunkSize(), localCluster.getNodeNames());
-                
-                Collection<RecipeChunk> recipeChunks = remoteRecipe.getChunks();
-                Map<RecipeChunk, Exception> streamExMap = new ConcurrentHashMap<RecipeChunk, Exception>();
-                Queue<PendingPrefetchSchedule> pendingPrefetchSchedules = new ConcurrentLinkedQueue<PendingPrefetchSchedule>();
-                
-                recipeChunks.parallelStream().forEach(new Consumer<RecipeChunk>() {
-                    @Override
-                    public void accept(RecipeChunk chunk) {
-                        try {
-                            RecipeChunk newChunk = new RecipeChunk(chunk.getOffset(), chunk.getLength(), chunk.getHash());
-                            
-                            PendingPrefetchSchedule pendingPrefetchSchedule = transportManager.prefetchDataChunk2(localCluster, remoteRecipe, chunk.getHash());
-                            TransferAssignment assignment = pendingPrefetchSchedule.getTransferAssignment();
-                            
-                            String assignedNodeName = assignment.getTransferNode();
-                            int assignedNodeID = newRecipe.getNodeID(assignedNodeName);
-                            newChunk.addNodeID(assignedNodeID);
-                            
-                            Collection<String> accessNodeNames = assignment.getAccessNodes();
-                            for(String accessNodeName : accessNodeNames) {
-                                int accessNodeID = newRecipe.getNodeID(accessNodeName);
-                                if(accessNodeID != assignedNodeID) {
-                                    newChunk.addNodeID(accessNodeID);
-                                }
-                            }
-                            
-                            newRecipe.addChunk(newChunk);
-                            
-                            if(pendingPrefetchSchedule.hasDataChunkCacheMetadata()) {
-                                pendingPrefetchSchedules.add(pendingPrefetchSchedule);
-                            }
-                        } catch (IOException ex) {
-                            streamExMap.put(chunk, ex);
-                        } catch (DriverNotInitializedException ex) {
-                            streamExMap.put(chunk, ex);
-                        }
-                    }
-                });
-                
-                // process pending prefetch schedules
-                if(!pendingPrefetchSchedules.isEmpty()) {
-                    List<PendingPrefetchSchedule> sortedPendingPrefetchSchedules = new ArrayList<PendingPrefetchSchedule>();
-                    sortedPendingPrefetchSchedules.addAll(pendingPrefetchSchedules);
-                    Collections.sort(sortedPendingPrefetchSchedules, new PendingPrefetchScheduleComparator());
-                    
-                    transportManager.processPendingPrefetchSchedulesAsync(sortedPendingPrefetchSchedules);
-                }
-                
-                if(!streamExMap.isEmpty()) {
-                    Collection<Exception> values = streamExMap.values();
-                    Exception ex = values.iterator().next();
-                    throw new IOException(ex);
-                }
-                
-                return newRecipe;
+                return transportManager.getRemoteRecipeWithTransferSchedule(absPath);
             } catch (ManagerNotInstantiatedException ex) {
                 LOG.error("Manager is not instantiated", ex);
                 throw new IOException(ex);
             }
+        }
+    }
+    
+    public DataChunkStatus requestDataChunk(DataObjectURI uri, String hash) throws IOException, FileNotFoundException, DriverNotInitializedException {
+        if(uri == null) {
+            throw new IllegalArgumentException("uri is null or empty");
+        }
+        
+        if(hash == null || hash.isEmpty()) {
+            throw new IllegalArgumentException("hash is null or empty");
+        }
+        
+        if(!this.started) {
+            throw new IllegalStateException("Manager is not started");
+        }
+        
+        if(this.isLocalDataObject(uri)) {
+            // local
+            try {
+                StargateService service = getStargateService();
+                RecipeManager recipeManager = service.getRecipeManager();
+                TransportManager transportManager = service.getTransportManager();
+                Recipe recipe = recipeManager.getRecipeByHash(hash);
+                
+                if(recipe == null) {
+                    throw new FileNotFoundException(String.format("cannot find a recipe for hash - %s", hash));
+                }
+                
+                RecipeChunk chunk = recipe.getChunk(hash);
+                if(chunk == null) {
+                    throw new IOException(String.format("cannot find a chunk for hash %s", hash));
+                }
+                
+                int partSize = transportManager.getDataChunkPartSize();
+                return new DataChunkStatus(DataChunkSource.DATA_CHUNK_SOURCE_LOCAL_CLUSTER, chunk.getLength(), partSize, null, null);
+            } catch (ManagerNotInstantiatedException ex) {
+                LOG.error("Manager is not instantiated", ex);
+                throw new IOException(ex);
+            }
+        } else {
+            // remote
+            try {
+                StargateService service = getStargateService();
+                TransportManager transportManager = service.getTransportManager();
+                
+                return transportManager.requestDataChunk(uri, hash);
+            } catch (ManagerNotInstantiatedException ex) {
+                LOG.error("Manager is not instantiated", ex);
+                throw new IOException(ex);
+            }
+        }
+    }
+    
+    public InputStream getDataChunk(DataObjectURI uri, String hash) throws IOException, FileNotFoundException, DriverNotInitializedException {
+        if(uri == null) {
+            throw new IllegalArgumentException("uri is null or empty");
+        }
+        
+        if(hash == null || hash.isEmpty()) {
+            throw new IllegalArgumentException("hash is null or empty");
+        }
+        
+        if(!this.started) {
+            throw new IllegalStateException("Manager is not started");
+        }
+        
+        if(this.isLocalDataObject(uri)) {
+            // local
+            return getLocalDataChunk(uri, hash);
+        } else {
+            // remote
+            return getRemoteDataChunk(uri, hash);
+        }
+    }
+    
+    public InputStream getDataChunkPart(DataObjectURI uri, String hash, int partNo) throws IOException, FileNotFoundException, DriverNotInitializedException {
+        if(uri == null) {
+            throw new IllegalArgumentException("uri is null or empty");
+        }
+        
+        if(hash == null || hash.isEmpty()) {
+            throw new IllegalArgumentException("hash is null or empty");
+        }
+        
+        if(partNo < 0) {
+            throw new IllegalArgumentException("partNo is negative");
+        }
+        
+        if(!this.started) {
+            throw new IllegalStateException("Manager is not started");
+        }
+        
+        if(this.isLocalDataObject(uri)) {
+            // local
+            return getLocalDataChunkPart(uri, hash, partNo);
+        } else {
+            // remote
+            return getRemoteDataChunkPart(uri, hash, partNo);
         }
     }
     
@@ -588,34 +627,6 @@ public class VolumeManager extends AbstractManager<NullDriver> {
             }
             
             return getLocalDataChunk(recipe, hash);
-        } catch (ManagerNotInstantiatedException ex) {
-            LOG.error("Manager is not instantiated", ex);
-            throw new IOException(ex);
-        }
-    }
-    
-    public InputStream getLocalDataChunkPart(String hash, int partNo) throws IOException, FileNotFoundException, DriverNotInitializedException {
-        if(hash == null || hash.isEmpty()) {
-            throw new IllegalArgumentException("hash is null or empty");
-        }
-        
-        if(partNo < 0) {
-            throw new IllegalArgumentException("partNo is negative");
-        }
-        
-        if(!this.started) {
-            throw new IllegalStateException("Manager is not started");
-        }
-        
-        try {
-            StargateService service = getStargateService();
-            RecipeManager recipeManager = service.getRecipeManager();
-            Recipe recipe = recipeManager.getRecipeByHash(hash);
-            if(recipe == null) {
-                throw new FileNotFoundException(String.format("cannot find a recipe for hash - %s", hash));
-            }
-            
-            return getLocalDataChunkPart(recipe, hash, partNo);
         } catch (ManagerNotInstantiatedException ex) {
             LOG.error("Manager is not instantiated", ex);
             throw new IOException(ex);
@@ -644,38 +655,6 @@ public class VolumeManager extends AbstractManager<NullDriver> {
             }
             
             return getLocalDataChunk(recipe, hash);
-        } catch (ManagerNotInstantiatedException ex) {
-            LOG.error("Manager is not instantiated", ex);
-            throw new IOException(ex);
-        }
-    }
-    
-    public InputStream getLocalDataChunkPart(DataObjectURI uri, String hash, int partNo) throws IOException, FileNotFoundException, DriverNotInitializedException {
-        if(uri == null) {
-            throw new IllegalArgumentException("uri is null");
-        }
-        
-        if(hash == null || hash.isEmpty()) {
-            throw new IllegalArgumentException("hash is null or empty");
-        }
-        
-        if(partNo < 0) {
-            throw new IllegalArgumentException("partNo is negative");
-        }
-        
-        if(!this.started) {
-            throw new IllegalStateException("Manager is not started");
-        }
-        
-        try {
-            StargateService service = getStargateService();
-            RecipeManager recipeManager = service.getRecipeManager();
-            Recipe recipe = recipeManager.getRecipe(uri.getPath());
-            if(recipe == null) {
-                throw new FileNotFoundException(String.format("cannot find a recipe %s", uri.getPath()));
-            }
-            
-            return getLocalDataChunkPart(recipe, hash, partNo);
         } catch (ManagerNotInstantiatedException ex) {
             LOG.error("Manager is not instantiated", ex);
             throw new IOException(ex);
@@ -725,6 +704,66 @@ public class VolumeManager extends AbstractManager<NullDriver> {
             
             // access the file
             return dataSourceDriver.openFile(sourceMetadata.getURI(), chunk.getOffset(), chunk.getLength());
+        } catch (ManagerNotInstantiatedException ex) {
+            LOG.error("Manager is not instantiated", ex);
+            throw new IOException(ex);
+        }
+    }
+    
+    public InputStream getLocalDataChunkPart(String hash, int partNo) throws IOException, FileNotFoundException, DriverNotInitializedException {
+        if(hash == null || hash.isEmpty()) {
+            throw new IllegalArgumentException("hash is null or empty");
+        }
+        
+        if(partNo < 0) {
+            throw new IllegalArgumentException("partNo is negative");
+        }
+        
+        if(!this.started) {
+            throw new IllegalStateException("Manager is not started");
+        }
+        
+        try {
+            StargateService service = getStargateService();
+            RecipeManager recipeManager = service.getRecipeManager();
+            Recipe recipe = recipeManager.getRecipeByHash(hash);
+            if(recipe == null) {
+                throw new FileNotFoundException(String.format("cannot find a recipe for hash - %s", hash));
+            }
+            
+            return getLocalDataChunkPart(recipe, hash, partNo);
+        } catch (ManagerNotInstantiatedException ex) {
+            LOG.error("Manager is not instantiated", ex);
+            throw new IOException(ex);
+        }
+    }
+    
+    public InputStream getLocalDataChunkPart(DataObjectURI uri, String hash, int partNo) throws IOException, FileNotFoundException, DriverNotInitializedException {
+        if(uri == null) {
+            throw new IllegalArgumentException("uri is null");
+        }
+        
+        if(hash == null || hash.isEmpty()) {
+            throw new IllegalArgumentException("hash is null or empty");
+        }
+        
+        if(partNo < 0) {
+            throw new IllegalArgumentException("partNo is negative");
+        }
+        
+        if(!this.started) {
+            throw new IllegalStateException("Manager is not started");
+        }
+        
+        try {
+            StargateService service = getStargateService();
+            RecipeManager recipeManager = service.getRecipeManager();
+            Recipe recipe = recipeManager.getRecipe(uri.getPath());
+            if(recipe == null) {
+                throw new FileNotFoundException(String.format("cannot find a recipe %s", uri.getPath()));
+            }
+            
+            return getLocalDataChunkPart(recipe, hash, partNo);
         } catch (ManagerNotInstantiatedException ex) {
             LOG.error("Manager is not instantiated", ex);
             throw new IOException(ex);
@@ -809,18 +848,6 @@ public class VolumeManager extends AbstractManager<NullDriver> {
         }
     }
     
-    private void initRemoteDataChunkPart(DataObjectURI uri, String hash) throws IOException, FileNotFoundException, DriverNotInitializedException {
-        try {
-            StargateService service = getStargateService();
-            TransportManager transportManager = service.getTransportManager();
-
-            transportManager.initDataChunkPart(uri, hash);
-        } catch (ManagerNotInstantiatedException ex) {
-            LOG.error("Manager is not instantiated", ex);
-            throw new IOException(ex);
-        }
-    }
-    
     private InputStream getRemoteDataChunkPart(DataObjectURI uri, String hash, int partNo) throws IOException, FileNotFoundException, DriverNotInitializedException {
         try {
             StargateService service = getStargateService();
@@ -834,78 +861,6 @@ public class VolumeManager extends AbstractManager<NullDriver> {
         } catch (ManagerNotInstantiatedException ex) {
             LOG.error("Manager is not instantiated", ex);
             throw new IOException(ex);
-        }
-    }
-    
-    public InputStream getDataChunk(DataObjectURI uri, String hash) throws IOException, FileNotFoundException, DriverNotInitializedException {
-        if(uri == null) {
-            throw new IllegalArgumentException("uri is null or empty");
-        }
-        
-        if(hash == null || hash.isEmpty()) {
-            throw new IllegalArgumentException("hash is null or empty");
-        }
-        
-        if(!this.started) {
-            throw new IllegalStateException("Manager is not started");
-        }
-        
-        if(this.isLocalDataObject(uri)) {
-            // local
-            return getLocalDataChunk(uri, hash);
-        } else {
-            // remote
-            return getRemoteDataChunk(uri, hash);
-        }
-    }
-    
-    public DataChunkStatus initDataChunkPart(DataObjectURI uri, String hash) throws IOException, FileNotFoundException, DriverNotInitializedException {
-        if(uri == null) {
-            throw new IllegalArgumentException("uri is null or empty");
-        }
-        
-        if(hash == null || hash.isEmpty()) {
-            throw new IllegalArgumentException("hash is null or empty");
-        }
-        
-        if(!this.started) {
-            throw new IllegalStateException("Manager is not started");
-        }
-        
-        if(this.isLocalDataObject(uri)) {
-            // local
-            // do nothing
-            return new DataChunkStatus(DataChunkSourceType.DATA_CHUNK_SOURCE_LOCAL);
-        } else {
-            // remote
-            initRemoteDataChunkPart(uri, hash);
-            return new DataChunkStatus(DataChunkSourceType.DATA_CHUNK_SOURCE_REMOTE);
-        }
-    }
-    
-    public InputStream getDataChunkPart(DataObjectURI uri, String hash, int partNo) throws IOException, FileNotFoundException, DriverNotInitializedException {
-        if(uri == null) {
-            throw new IllegalArgumentException("uri is null or empty");
-        }
-        
-        if(hash == null || hash.isEmpty()) {
-            throw new IllegalArgumentException("hash is null or empty");
-        }
-        
-        if(partNo < 0) {
-            throw new IllegalArgumentException("partNo is negative");
-        }
-        
-        if(!this.started) {
-            throw new IllegalStateException("Manager is not started");
-        }
-        
-        if(this.isLocalDataObject(uri)) {
-            // local
-            return getLocalDataChunkPart(uri, hash, partNo);
-        } else {
-            // remote
-            return getRemoteDataChunkPart(uri, hash, partNo);
         }
     }
     

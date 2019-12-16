@@ -20,6 +20,8 @@ import java.util.Collection;
 import java.util.HashSet;
 import java.util.Iterator;
 import java.util.Set;
+import java.util.logging.Level;
+import java.util.logging.Logger;
 import javax.cache.Cache;
 import org.apache.commons.logging.Log;
 import org.apache.commons.logging.LogFactory;
@@ -28,6 +30,7 @@ import org.apache.ignite.IgniteCache;
 import org.apache.ignite.IgniteCluster;
 import org.apache.ignite.cache.CacheAtomicityMode;
 import org.apache.ignite.cache.CacheMode;
+import org.apache.ignite.cache.CachePeekMode;
 import org.apache.ignite.cache.CacheWriteSynchronizationMode;
 import org.apache.ignite.cluster.ClusterGroup;
 import org.apache.ignite.cluster.ClusterNode;
@@ -175,13 +178,12 @@ public class IgniteClusterDriver extends AbstractClusterDriver {
             Ignite ignite = this.igniteDriver.getIgnite();
             CacheConfiguration<String, String> cc = new CacheConfiguration<String, String>();
             cc.setCacheMode(CacheMode.REPLICATED);
-            cc.setWriteSynchronizationMode(CacheWriteSynchronizationMode.FULL_SYNC);
+            cc.setDataRegionName(IgniteDriver.PERSISTENT_REGION_NAME);
+            cc.setWriteSynchronizationMode(CacheWriteSynchronizationMode.PRIMARY_SYNC);
             cc.setAtomicityMode(CacheAtomicityMode.ATOMIC);
-            cc.setEvictionPolicy(null);
             cc.setCopyOnRead(false);
-            cc.setOnheapCacheEnabled(true);
             cc.setReadFromBackup(true);
-            cc.setDataRegionName(IgniteDriver.VOLATILE_REGION_NAME);
+            cc.setOnheapCacheEnabled(true);
             cc.setName(LOCAL_CLUSTER_NODE_STORE);
 
             this.nodes = ignite.getOrCreateCache(cc);
@@ -300,6 +302,15 @@ public class IgniteClusterDriver extends AbstractClusterDriver {
         }
         
         safeInitNodeStore();
+        
+        try {
+            while(this.igniteDriver.getClusterNodeNum() > this.nodes.size(CachePeekMode.PRIMARY)) {
+                Thread.sleep(1000);
+            }
+        } catch (InterruptedException ex) {
+            LOG.error(ex);
+            throw new IOException(ex);
+        }
         
         String clusterName = this.config.getClusterName();
         Cluster stargateCluster = new Cluster(clusterName);

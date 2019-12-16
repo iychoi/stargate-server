@@ -64,12 +64,12 @@ public class IgniteDriver {
     public static final String VOLATILE_REGION_NAME = "VOLATILE_REGION";
     
     public static final long FAILURE_DETECTION_TIMEOUT = 30000; // 30 sec
-    public static final long INITIAL_DATA_REGION_SIZE = 10 * 1024 * 1024L; // 10MB
-    public static final long MAX_DATA_REGION_SIZE = 100 * 1024 * 1024L; // 100MB
-    public static final long INITIAL_BIG_DATA_REGION_SIZE = 2 * 1024 * 1024 * 1024L; // 2G
-    public static final long MAX_BIG_DATA_REGION_SIZE = 3 * 1024 * 1024 * 1024L; // 3G
+    public static final long INITIAL_DATA_REGION_SIZE = 10 * 1024 * 1024L; // 10 MB
+    public static final long MAX_DATA_REGION_SIZE = 100 * 1024 * 1024L; // 100 MB
+    public static final long INITIAL_BIG_DATA_REGION_SIZE = 10 * 1024 * 1024L; // 10 MB
+    public static final long MAX_BIG_DATA_REGION_SIZE = 100 * 1024 * 1024L; // 100 MB
     public static final int WAL_BUFFER_SIZE = 65 * 1024 * 1024; // 65 MB
-    public static final int WAL_SEGMENT_SIZE = 1024 * 1024 * 1024; // 1G
+    public static final int WAL_SEGMENT_SIZE = 1024 * 1024 * 1024; // 1 GB
     
     public static final String STORAGE_PATH = "storage";
     public static final String WAL_PATH = "wal";
@@ -116,12 +116,20 @@ public class IgniteDriver {
         storageRootPath = path;
     }
     
+    public File getStorageRootPath() {
+        return storageRootPath;
+    }
+    
     public static void setWorkPath(File path) {
         if(path == null) {
             throw new IllegalArgumentException("path is null");
         }
         
         workPath = path;
+    }
+    
+    public File getWorkPath() {
+        return workPath;
     }
     
     public static void addClusterNodes(Collection<String> nodes) {
@@ -192,11 +200,11 @@ public class IgniteDriver {
             igniteConfig.setClientConnectorConfiguration(getClientConnectorConfig());
             
             // work dir
-            if(this.workPath == null) {
-                this.workPath = new File(ResourceUtils.getStargateRoot(), WORK_PATH);
+            if(workPath == null) {
+                workPath = new File(ResourceUtils.getStargateRoot(), WORK_PATH);
             }
 
-            igniteConfig.setWorkDirectory(this.workPath.getAbsolutePath());
+            igniteConfig.setWorkDirectory(workPath.getAbsolutePath());
             
             // datastore
             DataStorageConfiguration dataStoreConfig = getDataStoreConfig();
@@ -205,7 +213,7 @@ public class IgniteDriver {
             // task ordering
             CollisionSpi colConfig = getQueueConfig();
             igniteConfig.setCollisionSpi(colConfig);
-            
+    
             // enable events
             // we don't use this yet
             //igniteConfig.setIncludeEventTypes(EventType.EVTS_DISCOVERY);
@@ -423,6 +431,10 @@ public class IgniteDriver {
         return igniteCluster.localNode();
     }
     
+    public boolean isLocalNode(ClusterNode node) {
+        return node.isLocal();
+    }
+    
     public Collection<String> getLocalNodeHostNames() {
         IgniteCluster igniteCluster = this.igniteInstance.cluster();
         ClusterNode localNode = igniteCluster.localNode();
@@ -437,7 +449,7 @@ public class IgniteDriver {
         }
         
         IgniteCluster igniteCluster = this.igniteInstance.cluster();
-        ClusterNode node = igniteCluster.node(nodeId);
+        ClusterNode node = igniteCluster.forServers().node(nodeId);
         return getNodeNameFromClusterNode(node);
     }
     
@@ -466,7 +478,7 @@ public class IgniteDriver {
             return null;
         }
         
-        return igniteCluster.node(nodeId);
+        return igniteCluster.forServers().node(nodeId);
     }
     
     public UUID getClusterNodeIDFromName(String nodeName) {
@@ -478,7 +490,7 @@ public class IgniteDriver {
         
         UUID nodeId = this.clusterNodeNameIDMappings.get(nodeName);
         if(nodeId == null) {
-            Collection<ClusterNode> nodes = igniteCluster.nodes();
+            Collection<ClusterNode> nodes = igniteCluster.forServers().nodes();
             for(ClusterNode node : nodes) {
                 String nodeName2 = node.consistentId().toString();
                 
@@ -489,5 +501,10 @@ public class IgniteDriver {
         }
         
         return this.clusterNodeNameIDMappings.get(nodeName);
+    }
+
+    public int getClusterNodeNum() {
+        IgniteCluster igniteCluster = this.igniteInstance.cluster();
+        return igniteCluster.forServers().nodes().size();
     }
 }

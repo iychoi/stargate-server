@@ -117,7 +117,6 @@ public class StaticTransferLayoutAlgorithm extends AbstractTransferLayoutAlgorit
             throw new IllegalArgumentException("hash is null");
         }
         
-        // at this point there must be a pending cache
         // use always the master
         String primaryNodeName = this.dataCacheStore.getPrimaryNodeForData(hash);
         Node node = cluster.getNode(primaryNodeName);

@@ -15,6 +15,7 @@
 */
 package stargate.drivers.userinterface.http;
 
+import stargate.commons.datastore.DirectCacheFileInputStream;
 import java.io.FileNotFoundException;
 import java.io.IOException;
 import java.io.InputStream;
@@ -28,6 +29,8 @@ import stargate.commons.cluster.Node;
 import stargate.commons.dataobject.DataObjectMetadata;
 import stargate.commons.dataobject.DataObjectURI;
 import stargate.commons.datasource.DataExportEntry;
+import stargate.commons.datastore.BigKeyValueStoreUtils;
+import stargate.commons.io.AbstractSeekableInputStream;
 import stargate.commons.recipe.Recipe;
 import stargate.commons.restful.RestfulClient;
 import stargate.commons.service.FSServiceInfo;
@@ -35,7 +38,6 @@ import stargate.commons.statistics.StatisticsEntry;
 import stargate.commons.statistics.StatisticsType;
 import stargate.commons.transport.TransferAssignment;
 import stargate.commons.userinterface.AbstractUserInterfaceClient;
-import stargate.commons.userinterface.DataChunkSourceType;
 import stargate.commons.userinterface.DataChunkStatus;
 import stargate.commons.userinterface.UserInterfaceInitialDataPack;
 import stargate.commons.utils.DateTimeUtils;
@@ -49,15 +51,20 @@ public class HTTPUserInterfaceClient extends AbstractUserInterfaceClient {
 
     private static final Log LOG = LogFactory.getLog(HTTPUserInterfaceClient.class);
     
+    private static String clientNodeName;
+    private static Cluster localCluster;
+    
     private URI serviceUri;
     private String username;
     private String password;
     private RestfulClient restfulClient;
-    private IgniteCacheClient igniteCacheClient;
     private long connectionEstablishedTime;
     private long lastActiveTime;
     private boolean connected = false;
-    private boolean useDirectIgniteAccess = false;
+    
+    public static void setClientNodeName(String clientNodeName) {
+        HTTPUserInterfaceClient.clientNodeName = clientNodeName;
+    }
     
     public HTTPUserInterfaceClient(URI serviceURI, String username, String password) throws IOException {
         if(serviceURI == null) {
@@ -70,37 +77,15 @@ public class HTTPUserInterfaceClient extends AbstractUserInterfaceClient {
         this.username = username;
         this.password = password;
         this.connected = false;
-        this.useDirectIgniteAccess = false;
-    }
-    
-    public HTTPUserInterfaceClient(URI serviceURI, String username, String password, boolean useDirectIgniteAccess) throws IOException {
-        if(serviceURI == null) {
-            throw new IllegalArgumentException("serviceURI is null");
-        }
-        
-        // username and password can be null
-        
-        this.serviceUri = serviceURI;
-        this.username = username;
-        this.password = password;
-        this.connected = false;
-        this.useDirectIgniteAccess = useDirectIgniteAccess;
     }
     
     @Override
     public synchronized void connect() throws IOException {
         if(!this.connected) {
             this.restfulClient = new RestfulClient(this.serviceUri, this.username, this.password);
-
             this.connectionEstablishedTime = DateTimeUtils.getTimestamp();
             this.lastActiveTime = this.connectionEstablishedTime;
             this.connected = true;
-            
-            // ignite
-            if(this.useDirectIgniteAccess) {
-                this.igniteCacheClient = new IgniteCacheClient();
-                this.igniteCacheClient.connect();
-            }
             
             LOG.debug("Connected to " + this.serviceUri.toString());
         }
@@ -109,12 +94,6 @@ public class HTTPUserInterfaceClient extends AbstractUserInterfaceClient {
     @Override
     public synchronized void disconnect() {
         if(this.connected) {
-            // ignite
-            if(this.igniteCacheClient != null) {
-                this.igniteCacheClient.disconnect();
-                this.igniteCacheClient = null;
-            }
-            
             if(this.restfulClient != null) {
                 this.restfulClient.close();
                 this.restfulClient = null;
@@ -137,6 +116,43 @@ public class HTTPUserInterfaceClient extends AbstractUserInterfaceClient {
     private String makeAPIPath(String path1, String path2) {
         String api_path = PathUtils.concatPath(HTTPUserInterfaceRestfulConstants.API_PATH, path1);
         return PathUtils.concatPath(api_path, path2);
+    }
+    
+    private void tryDetectClientNode(Cluster cluster) throws IOException {
+        if(clientNodeName == null) {
+            for(Node node : cluster.getNodes()) {
+                if(node.isLocal()) {
+                    clientNodeName = node.getName();
+                    break;
+                }
+            }
+        }
+    }
+    
+    private void tryDetectClientNode(Node node) throws IOException {
+        if(clientNodeName == null) {
+            if(node.isLocal()) {
+                clientNodeName = node.getName();
+            }
+        }
+    }
+    
+    private void detectClientNode() throws IOException {
+        if(clientNodeName == null) {
+            if(localCluster == null) {
+                this.getLocalCluster();
+            }
+            
+            for(Node node : localCluster.getNodes()) {
+                if(node.isLocal()) {
+                    clientNodeName = node.getName();
+                    break;
+                }
+            }
+            if(clientNodeName == null) {
+                clientNodeName = "UNKNOWN";
+            }
+        }
     }
     
     @Override
@@ -211,6 +227,10 @@ public class HTTPUserInterfaceClient extends AbstractUserInterfaceClient {
         UserInterfaceInitialDataPack dataPack = (UserInterfaceInitialDataPack) this.restfulClient.get(url);
 
         updateLastActivetime();
+        
+        // update
+        localCluster = dataPack.getLocalCluster();
+        
         return dataPack;
     }
 
@@ -229,6 +249,9 @@ public class HTTPUserInterfaceClient extends AbstractUserInterfaceClient {
         Cluster cluster = (Cluster) this.restfulClient.get(url);
 
         updateLastActivetime();
+        
+        tryDetectClientNode(cluster);
+        
         return cluster;
     }
     
@@ -243,6 +266,10 @@ public class HTTPUserInterfaceClient extends AbstractUserInterfaceClient {
         Cluster cluster = (Cluster) this.restfulClient.get(url);
 
         updateLastActivetime();
+        
+        // update
+        localCluster = cluster;
+        
         return cluster;
     }
     
@@ -285,6 +312,9 @@ public class HTTPUserInterfaceClient extends AbstractUserInterfaceClient {
         Node node = (Node) this.restfulClient.get(url);
 
         updateLastActivetime();
+        
+        tryDetectClientNode(node);
+        
         return node;
     }
     
@@ -299,6 +329,9 @@ public class HTTPUserInterfaceClient extends AbstractUserInterfaceClient {
         Node node = (Node) this.restfulClient.get(url);
 
         updateLastActivetime();
+        
+        tryDetectClientNode(node);
+        
         return node;
     }
     
@@ -497,32 +530,16 @@ public class HTTPUserInterfaceClient extends AbstractUserInterfaceClient {
         updateLastActivetime();
     }
 
-    @Override
-    public InputStream getDataChunk(DataObjectURI uri, String hash) throws IOException {
-        if(!this.connected) {
-            throw new IOException("Client is not connected");
+    private boolean canDirectAccessCacheFile(DataChunkStatus status) throws IOException {
+        detectClientNode();
+        if(status.getCacheNodeName() != null && status.getLocalCachePath() != null && status.getCacheNodeName().equals(clientNodeName)) {
+            return true;
         }
-        
-        if(uri == null) {
-            throw new IllegalArgumentException("uri is null");
-        }
-        
-        if(hash == null || hash.isEmpty()) {
-            throw new IllegalArgumentException("hash is null or empty");
-        }
-        
-        // URL pattern = http://xxx.xxx.xxx.xxx/api/data/path/hash
-        String path = PathUtils.concatPath(uri.getClusterName(), uri.getPath());
-        String pathHash = PathUtils.concatPath(path, hash);
-        String url = makeAPIPath(HTTPUserInterfaceRestfulConstants.API_GET_DATA_CHUNK_PATH, pathHash);
-
-        InputStream is = this.restfulClient.download(url);
-        updateLastActivetime();
-        return is;
+        return false;
     }
     
     @Override
-    public DataChunkStatus initDataChunkPart(DataObjectURI uri, String hash) throws IOException {
+    public DataChunkStatus requestDataChunk(DataObjectURI uri, String hash) throws IOException {
         if(!this.connected) {
             throw new IOException("Client is not connected");
         }
@@ -538,12 +555,82 @@ public class HTTPUserInterfaceClient extends AbstractUserInterfaceClient {
         // URL pattern = http://xxx.xxx.xxx.xxx/api/datapart/path/hash
         String path = PathUtils.concatPath(uri.getClusterName(), uri.getPath());
         String pathHash = PathUtils.concatPath(path, hash);
-        String url = makeAPIPath(HTTPUserInterfaceRestfulConstants.API_INIT_DATA_CHUNK_PART_PATH, pathHash);
+        String url = makeAPIPath(HTTPUserInterfaceRestfulConstants.API_REQUEST_DATA_CHUNK_PATH, pathHash);
 
         DataChunkStatus status = (DataChunkStatus) this.restfulClient.get(url);
 
         updateLastActivetime();
         return status;
+    }
+    
+    @Override
+    public InputStream getDataChunk(DataObjectURI uri, String hash) throws IOException {
+        if(!this.connected) {
+            throw new IOException("Client is not connected");
+        }
+        
+        if(uri == null) {
+            throw new IllegalArgumentException("uri is null");
+        }
+        
+        if(hash == null || hash.isEmpty()) {
+            throw new IllegalArgumentException("hash is null or empty");
+        }
+        
+        InputStream is = getDataChunkRest(uri, hash);
+        updateLastActivetime();
+        return is;
+    }
+    
+    public InputStream getDataChunk(DataObjectURI uri, String hash, DataChunkStatus status) throws IOException {
+        if(!this.connected) {
+            throw new IOException("Client is not connected");
+        }
+        
+        if(uri == null) {
+            throw new IllegalArgumentException("uri is null");
+        }
+        
+        if(hash == null || hash.isEmpty()) {
+            throw new IllegalArgumentException("hash is null or empty");
+        }
+        
+        if(status == null) {
+            throw new IllegalArgumentException("status is null");
+        }
+        
+        InputStream is = null;
+        switch (status.getSource()) {
+            case DATA_CHUNK_SOURCE_LOCAL_CLUSTER:
+                is = getDataChunkRest(uri, hash);
+                break;
+            case DATA_CHUNK_SOURCE_REMOTE_CLUSTER:
+                if(canDirectAccessCacheFile(status)) {
+                    // file cache
+                    is = getDataChunkDirectCacheAccess(status);
+                } else {
+                    is = getDataChunkRest(uri, hash);
+                }
+                break;
+            default:
+                throw new IOException("unknown data chunk source");
+        }
+        
+        updateLastActivetime();
+        return is;
+    }
+    
+    private InputStream getDataChunkRest(DataObjectURI uri, String hash) throws IOException {
+        // URL pattern = http://xxx.xxx.xxx.xxx/api/data/path/hash
+        String path = PathUtils.concatPath(uri.getClusterName(), uri.getPath());
+        String pathHash = PathUtils.concatPath(path, hash);
+        String url = makeAPIPath(HTTPUserInterfaceRestfulConstants.API_GET_DATA_CHUNK_PATH, pathHash);
+
+        return this.restfulClient.download(url);
+    }
+    
+    private AbstractSeekableInputStream getDataChunkDirectCacheAccess(DataChunkStatus status) throws IOException {
+        return new DirectCacheFileInputStream(status.getLocalCachePath(), 0, status.getChunkSize());
     }
     
     @Override
@@ -565,7 +652,7 @@ public class HTTPUserInterfaceClient extends AbstractUserInterfaceClient {
         return is;
     }
     
-    public InputStream getDataChunkPart(DataObjectURI uri, String hash, int partNo, DataChunkSourceType sourceType) throws IOException {
+    public InputStream getDataChunkPart(DataObjectURI uri, String hash, int partNo, DataChunkStatus status) throws IOException {
         if(!this.connected) {
             throw new IOException("Client is not connected");
         }
@@ -578,20 +665,25 @@ public class HTTPUserInterfaceClient extends AbstractUserInterfaceClient {
             throw new IllegalArgumentException("hash is null or empty");
         }
         
+        if(status == null) {
+            throw new IllegalArgumentException("status is null");
+        }
+        
         InputStream is = null;
-        if(this.useDirectIgniteAccess) {
-            switch(sourceType) {
-                case DATA_CHUNK_SOURCE_LOCAL:
+        switch (status.getSource()) {
+            case DATA_CHUNK_SOURCE_LOCAL_CLUSTER:
+                is = getDataChunkPartRest(uri, hash, partNo);
+                break;
+            case DATA_CHUNK_SOURCE_REMOTE_CLUSTER:
+                if(canDirectAccessCacheFile(status)) {
+                    // file cache
+                    is = getDataChunkPartDirectCacheAccess(status, partNo);
+                } else {
                     is = getDataChunkPartRest(uri, hash, partNo);
-                    break;
-                case DATA_CHUNK_SOURCE_REMOTE:
-                    is = getDataChunkPartIgnite(uri, hash, partNo);
-                    break;
-                default:
-                    throw new IOException("Unknown source type");
-            }
-        } else {
-            is = getDataChunkPartRest(uri, hash, partNo);
+                }
+                break;
+            default:
+                throw new IOException("unknown data chunk source");
         }
         
         updateLastActivetime();
@@ -608,8 +700,10 @@ public class HTTPUserInterfaceClient extends AbstractUserInterfaceClient {
         return this.restfulClient.download(url);
     }
     
-    private InputStream getDataChunkPartIgnite(DataObjectURI uri, String hash, int partNo) throws IOException {
-        return this.igniteCacheClient.getDataChunkPart(hash, partNo);
+    private AbstractSeekableInputStream getDataChunkPartDirectCacheAccess(DataChunkStatus status, int partNo) throws IOException {
+        long partStartOffset = BigKeyValueStoreUtils.getPartStartOffset(status.getPartSize(), partNo);
+        int partSize = BigKeyValueStoreUtils.getPartSize(status.getChunkSize(), status.getPartSize(), partNo);
+        return new DirectCacheFileInputStream(status.getLocalCachePath(), partStartOffset, partSize);
     }
     
     @Override

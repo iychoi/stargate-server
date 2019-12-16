@@ -27,13 +27,13 @@ import stargate.commons.datastore.AbstractDataStoreDriverConfig;
  */
 public class IgniteDataStoreDriverConfig extends AbstractDataStoreDriverConfig {
     
-    private static final int DEFAULT_PART_SIZE = 512 * 1024; // 512 KB
+    private static final int DEFAULT_PART_SIZE = 1024 * 1024; // 1 MB
     private static final long DEFAULT_PART_WAIT_TIMEOUT_SEC = 300; // 300 seconds
-    private static final long DEFAULT_PART_WAIT_SLEEP_MILLISEC = 500; // 500 msec
+    private static final long DEFAULT_PART_WAIT_POLLING_INTERVAL_MILLISEC = 100; // 100 msec
     
     private int partSize = DEFAULT_PART_SIZE;
     private long partWaitTimeoutSec = DEFAULT_PART_WAIT_TIMEOUT_SEC;
-    private long partWaitSleepMsec = DEFAULT_PART_WAIT_SLEEP_MILLISEC;
+    private long partWaitPollingIntervalMsec = DEFAULT_PART_WAIT_POLLING_INTERVAL_MILLISEC;
     
     public static IgniteDataStoreDriverConfig createInstance(File file) throws IOException {
         if(file == null) {
@@ -82,23 +82,23 @@ public class IgniteDataStoreDriverConfig extends AbstractDataStoreDriverConfig {
     }
     
     @JsonProperty("part_wait_timeout_sec")
-    public long getPartWaitTimeoutSec() {
+    public long getDataWaitTimeoutSec() {
         return this.partWaitTimeoutSec;
     }
     
-    @JsonProperty("part_wait_sleep_msec")
-    public void setPartWaitSleepMsec(long partWaitSleepMsec) {
+    @JsonProperty("part_wait_polling_interval_msec")
+    public void setPartWaitPollingIntervalMsec(long partWaitPollingIntervalMsec) {
         super.checkMutableAndRaiseException();
         
-        if(partWaitSleepMsec < 0) {
-            this.partWaitSleepMsec = DEFAULT_PART_WAIT_SLEEP_MILLISEC;
+        if(partWaitPollingIntervalMsec < 0) {
+            this.partWaitPollingIntervalMsec = DEFAULT_PART_WAIT_POLLING_INTERVAL_MILLISEC;
         } else {
-            this.partWaitSleepMsec = partWaitSleepMsec;
+            this.partWaitPollingIntervalMsec = partWaitPollingIntervalMsec;
         }
     }
     
-    @JsonProperty("part_wait_sleep_msec")
-    public long getPartWaitSleepMsec() {
-        return this.partWaitSleepMsec;
+    @JsonProperty("part_wait_polling_interval_msec")
+    public long getDataWaitPollingIntervalMsec() {
+        return this.partWaitPollingIntervalMsec;
     }
 }

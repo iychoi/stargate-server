@@ -16,6 +16,7 @@
 package stargate.managers.transport;
 
 import java.io.IOException;
+import java.util.ArrayList;
 import java.util.Iterator;
 import java.util.List;
 import java.util.Map;
@@ -214,6 +215,10 @@ public class TransferScheduler {
         if(!this.pendingPrefetchTasksMap.containsKey(task.getHash())) {
             String uriString = task.getDataObjectURI().toUri().toASCIIString();
             List<PrefetchTask> prefetchTasks = this.pendingPrefetchTasks.get(uriString);
+            if(prefetchTasks == null) {
+                prefetchTasks = new ArrayList<PrefetchTask>();
+            }
+            
             prefetchTasks.add(task);
             this.numPendingPrefetchTasks++;
 

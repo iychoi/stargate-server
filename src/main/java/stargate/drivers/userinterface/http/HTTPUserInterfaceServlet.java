@@ -1166,6 +1166,68 @@ public class HTTPUserInterfaceServlet extends AbstractUserInterfaceServer {
     }
     
     @GET
+    @Path(HTTPUserInterfaceRestfulConstants.API_PATH + "/" + HTTPUserInterfaceRestfulConstants.API_REQUEST_DATA_CHUNK_PATH + "/{path:.*}/{hash:.*}")
+    @Produces(MediaType.APPLICATION_JSON)
+    public Response requestDataChunkRestful(
+            @DefaultValue("") @PathParam("path") String path,
+            @DefaultValue("") @PathParam("hash") String hash) throws IOException {
+        if(path == null || path.isEmpty()) {
+            throw new IllegalArgumentException("path is null or empty");
+        }
+        
+        if(hash == null || hash.isEmpty()) {
+            throw new IllegalArgumentException("hash is null or empty");
+        }
+        
+        LOG.info(String.format("REQ - requestDataChunkRestful - %s (%s)", path, hash));
+        
+        try {
+            DataObjectURI objectUri = new DataObjectURI(PathUtils.makeAbsolutePath(path));
+            DataChunkStatus dataChunkStatus = requestDataChunk(objectUri, hash);
+            
+            RestfulResponse rres = new RestfulResponse(dataChunkStatus);
+            Response res = Response.status(Response.Status.OK).entity(rres).build();
+            
+            LOG.info(String.format("RES - requestDataChunkRestful - %s (%s)", path, hash));
+            
+            return res;
+        } catch (Exception ex) {
+            RestfulResponse rres = new RestfulResponse(ex);
+            Response res = Response.status(Response.Status.INTERNAL_SERVER_ERROR).entity(rres).build();
+            
+            LOG.info(String.format("RES (ERR) - requestDataChunkRestful - %s (%s)", path, hash), ex);
+            
+            return res;
+        }
+    }
+    
+    @Override
+    public DataChunkStatus requestDataChunk(DataObjectURI uri, String hash) throws IOException {
+        if(uri == null) {
+            throw new IllegalArgumentException("uri is null");
+        }
+        
+        if(hash == null || hash.isEmpty()) {
+            throw new IllegalArgumentException("hash is null or empty");
+        }
+        
+        try {
+            StargateService service = getStargateService();
+            VolumeManager volumeManager = service.getVolumeManager();
+            return volumeManager.requestDataChunk(uri, hash);
+        } catch (ManagerNotInstantiatedException ex) {
+            LOG.error("Manager is not instantiated", ex);
+            throw new IOException(ex);
+        } catch (DriverNotInitializedException ex) {
+            LOG.error("Driver is not initialized", ex);
+            throw new IOException(ex);
+        } catch (Exception ex) {
+            LOG.error("Unknown exception", ex);
+            throw new IOException(ex);
+        }
+    }
+    
+    @GET
     @Path(HTTPUserInterfaceRestfulConstants.API_PATH + "/" + HTTPUserInterfaceRestfulConstants.API_GET_DATA_CHUNK_PATH + "/{path:.*}/{hash:.*}")
     @Produces({MediaType.APPLICATION_OCTET_STREAM, MediaType.APPLICATION_JSON})
     public Response getDataChunkRestful(
@@ -1219,68 +1281,6 @@ public class HTTPUserInterfaceServlet extends AbstractUserInterfaceServer {
             StargateService service = getStargateService();
             VolumeManager volumeManager = service.getVolumeManager();
             return volumeManager.getDataChunk(uri, hash);
-        } catch (ManagerNotInstantiatedException ex) {
-            LOG.error("Manager is not instantiated", ex);
-            throw new IOException(ex);
-        } catch (DriverNotInitializedException ex) {
-            LOG.error("Driver is not initialized", ex);
-            throw new IOException(ex);
-        } catch (Exception ex) {
-            LOG.error("Unknown exception", ex);
-            throw new IOException(ex);
-        }
-    }
-    
-    @GET
-    @Path(HTTPUserInterfaceRestfulConstants.API_PATH + "/" + HTTPUserInterfaceRestfulConstants.API_INIT_DATA_CHUNK_PART_PATH + "/{path:.*}/{hash:.*}")
-    @Produces(MediaType.APPLICATION_JSON)
-    public Response initDataChunkPartRestful(
-            @DefaultValue("") @PathParam("path") String path,
-            @DefaultValue("") @PathParam("hash") String hash) throws IOException {
-        if(path == null || path.isEmpty()) {
-            throw new IllegalArgumentException("path is null or empty");
-        }
-        
-        if(hash == null || hash.isEmpty()) {
-            throw new IllegalArgumentException("hash is null or empty");
-        }
-        
-        LOG.info(String.format("REQ - initDataChunkPartRestful - %s (%s)", path, hash));
-        
-        try {
-            DataObjectURI objectUri = new DataObjectURI(PathUtils.makeAbsolutePath(path));
-            DataChunkStatus dataChunkStatus = initDataChunkPart(objectUri, hash);
-            
-            RestfulResponse rres = new RestfulResponse(dataChunkStatus);
-            Response res = Response.status(Response.Status.OK).entity(rres).build();
-            
-            LOG.info(String.format("RES - initDataChunkPartRestful - %s (%s)", path, hash));
-            
-            return res;
-        } catch (Exception ex) {
-            RestfulResponse rres = new RestfulResponse(ex);
-            Response res = Response.status(Response.Status.INTERNAL_SERVER_ERROR).entity(rres).build();
-            
-            LOG.info(String.format("RES (ERR) - initDataChunkPartRestful - %s (%s)", path, hash), ex);
-            
-            return res;
-        }
-    }
-    
-    @Override
-    public DataChunkStatus initDataChunkPart(DataObjectURI uri, String hash) throws IOException {
-        if(uri == null) {
-            throw new IllegalArgumentException("uri is null");
-        }
-        
-        if(hash == null || hash.isEmpty()) {
-            throw new IllegalArgumentException("hash is null or empty");
-        }
-        
-        try {
-            StargateService service = getStargateService();
-            VolumeManager volumeManager = service.getVolumeManager();
-            return volumeManager.initDataChunkPart(uri, hash);
         } catch (ManagerNotInstantiatedException ex) {
             LOG.error("Manager is not instantiated", ex);
             throw new IOException(ex);

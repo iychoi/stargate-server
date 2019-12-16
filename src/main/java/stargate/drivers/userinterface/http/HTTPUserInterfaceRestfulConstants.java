@@ -26,8 +26,8 @@ public abstract class HTTPUserInterfaceRestfulConstants {
     public static final String API_GET_METADATA_PATH = "metadata";
     public static final String API_LIST_METADATA_PATH = "lmetadata";
     public static final String API_GET_RECIPE_PATH = "recipe";
+    public static final String API_REQUEST_DATA_CHUNK_PATH = "reqdata";
     public static final String API_GET_DATA_CHUNK_PATH = "data";
-    public static final String API_INIT_DATA_CHUNK_PART_PATH = "idatapart";
     public static final String API_GET_DATA_CHUNK_PART_PATH = "datapart";
     public static final String API_CHECK_LIVE_PATH = "live";
     public static final String API_GET_SERVICE_CONFIG_PATH = "svcconfig";

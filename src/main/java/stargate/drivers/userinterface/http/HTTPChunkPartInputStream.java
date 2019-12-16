@@ -15,6 +15,7 @@
 */
 package stargate.drivers.userinterface.http;
 
+import stargate.commons.io.ChunkDataPartInputStream;
 import java.io.IOException;
 import java.io.InputStream;
 import java.net.URI;
@@ -22,14 +23,12 @@ import java.util.Collection;
 import java.util.HashMap;
 import java.util.Map;
 import java.util.Set;
-import java.util.concurrent.ExecutorService;
-import java.util.concurrent.Executors;
 import org.apache.commons.logging.Log;
 import org.apache.commons.logging.LogFactory;
 import org.apache.hadoop.fs.FSInputStream;
 import stargate.commons.dataobject.DataObjectMetadata;
 import stargate.commons.dataobject.DataObjectURI;
-import stargate.commons.io.ChunkDataPartInputStream;
+import stargate.commons.datastore.BigKeyValueStoreUtils;
 import stargate.commons.recipe.Recipe;
 import stargate.commons.recipe.RecipeChunk;
 import stargate.commons.userinterface.DataChunkStatus;
@@ -43,39 +42,16 @@ public class HTTPChunkPartInputStream extends FSInputStream {
 
     private static final Log LOG = LogFactory.getLog(HTTPChunkPartInputStream.class);
         
-    public static final String DEFAULT_NODE_NAME = "DEFAULT_NODE";
-    public static final String LOCAL_NODE_NAME = "LOCAL_NODE";
-     
     // node-name to client mapping
     private Map<String, HTTPUserInterfaceClient> clients = new HashMap<String, HTTPUserInterfaceClient>();
+    private String localNodeName;
+    private HTTPUserInterfaceClient localClient;
     private Map<String, DataChunkStatus> initializedChunkMap = new HashMap<String, DataChunkStatus>();
     private Recipe recipe;
     private long offset;
     private long size;
     private int partSize;
     private ChunkDataPartInputStream chunkDataPartInputStream;
-    private ChunkDataPartInputStream nextChunkDataPartInputStream;
-    private Object nextChunkDataPartInputStreamSyncObj = new Object();
-    private ExecutorService prefetchExecutor;
-    
-    public HTTPChunkPartInputStream(HTTPUserInterfaceClient client, Recipe recipe, int partSize) {
-        if(client == null) {
-            throw new IllegalArgumentException("client is null");
-        }
-        
-        if(recipe == null) {
-            throw new IllegalArgumentException("recipe is null");
-        }
-        
-        if(partSize <= 0) {
-            throw new IllegalArgumentException("parSize is negative");
-        }
-        
-        Map<String, HTTPUserInterfaceClient> clients = new HashMap<String, HTTPUserInterfaceClient>();
-        clients.put(DEFAULT_NODE_NAME, client);
-        
-        initialize(clients, recipe, partSize);
-    }
     
     public HTTPChunkPartInputStream(Map<String, HTTPUserInterfaceClient> clients, Recipe recipe, int partSize) {
         if(clients == null) {
@@ -113,19 +89,18 @@ public class HTTPChunkPartInputStream extends FSInputStream {
         this.offset = 0;
         this.size = recipe.getMetadata().getSize();
         this.partSize = partSize;
-        
-        this.prefetchExecutor = Executors.newSingleThreadExecutor();
     }
     
     private void setLocalClient() {
-        if(!this.clients.containsKey(LOCAL_NODE_NAME)) {
+        if(this.localClient == null || this.localNodeName == null) {
             Set<Map.Entry<String, HTTPUserInterfaceClient>> entrySet = this.clients.entrySet();
             for(Map.Entry<String, HTTPUserInterfaceClient> entry : entrySet) {
                 HTTPUserInterfaceClient client = entry.getValue();
                 URI serviceURI = client.getServiceURI();
                 try {
                     if(IPUtils.isLocalIPAddress(serviceURI.getHost())) {
-                        this.clients.put(LOCAL_NODE_NAME, client);
+                        this.localNodeName = entry.getKey();
+                        this.localClient = client;
                         break;
                     }
                 } catch (IOException ex) {
@@ -142,7 +117,13 @@ public class HTTPChunkPartInputStream extends FSInputStream {
     @Override
     public synchronized int available() throws IOException {
         if(this.chunkDataPartInputStream != null && this.chunkDataPartInputStream.containsOffset(this.offset)) {
-            return this.chunkDataPartInputStream.available();
+            if((this.chunkDataPartInputStream.getOffset() + this.chunkDataPartInputStream.getChunkStartOffset() + this.chunkDataPartInputStream.getPartStartOffsetInChunk()) > this.offset) {
+                // backward
+                return 0;
+            } else {
+                // forward
+                return this.chunkDataPartInputStream.available();
+            }
         }
         
         return 0;
@@ -192,52 +173,25 @@ public class HTTPChunkPartInputStream extends FSInputStream {
     
     private HTTPUserInterfaceClient getClient(RecipeChunk chunk) throws IOException {
         HTTPUserInterfaceClient client = null;
-
-        if (this.clients.size() == 1) {
-            // no other choice
-            Collection<HTTPUserInterfaceClient> values = this.clients.values();
-            for(HTTPUserInterfaceClient value : values) {
-                client = value;
-                break;
-            }
-        } else if (this.clients.size() >= 2) {
-            HTTPUserInterfaceClient localClient = this.clients.get(LOCAL_NODE_NAME);
         
-            Collection<Integer> nodeIDs = chunk.getNodeIDs();
-            Collection<String> nodeNames = this.recipe.getNodeNames(nodeIDs);
+        Collection<Integer> nodeIDs = chunk.getNodeIDs();
+        Collection<String> nodeNames = this.recipe.getNodeNames(nodeIDs);
         
-            
-            // Step1. check if local node has the block
-            if(localClient != null) {
-                URI localServiceURI = localClient.getServiceURI();
-
-                for(String nodeName : nodeNames) {
-                    HTTPUserInterfaceClient candidateClient = this.clients.get(nodeName);
-                    if(candidateClient != null) {
-                        URI candidateServiceURI = candidateClient.getServiceURI();
-                        if(candidateServiceURI.equals(localServiceURI)) {
-                            // we found
-                            client = candidateClient;
-                            break;
-                        }
-                    }
-                }
+        // Step1. check if local node has the block
+        if(this.localNodeName != null && this.localClient != null) {
+            if(nodeNames.contains(this.localNodeName)) {
+                client = this.localClient;
             }
+        }
 
-            // Step2. use any of nodes having the block
-            if(client == null) {
-                for(String nodeName : nodeNames) {
-                    client = this.clients.get(nodeName);
-                    if(client != null) {
-                        // we found
-                        break;
-                    }
+        // Step2. use any of nodes having the block
+        if(client == null) {
+            for(String nodeName : nodeNames) {
+                client = this.clients.get(nodeName);
+                if(client != null) {
+                    // we found
+                    break;
                 }
-            }
-
-            // Step3. use wild card
-            if(client == null) {
-                client = this.clients.get(DEFAULT_NODE_NAME);
             }
         }
 
@@ -260,24 +214,12 @@ public class HTTPChunkPartInputStream extends FSInputStream {
         if(this.chunkDataPartInputStream != null) {
             if(this.chunkDataPartInputStream.containsOffset(this.offset)) {
                 // safe to reuse
-                long seek = this.offset - this.chunkDataPartInputStream.getChunkPartStartOffset();
+                long seek = this.offset - (this.chunkDataPartInputStream.getChunkStartOffset() + this.chunkDataPartInputStream.getPartStartOffsetInChunk());
                 this.chunkDataPartInputStream.seek(seek);
                 return;
             } else {
                 this.chunkDataPartInputStream.close();
                 this.chunkDataPartInputStream = null;
-            }
-        }
-        
-        synchronized(this.nextChunkDataPartInputStreamSyncObj) {
-            if(this.nextChunkDataPartInputStream != null && this.nextChunkDataPartInputStream.containsOffset(this.offset)) {
-                // swap
-                this.chunkDataPartInputStream = this.nextChunkDataPartInputStream;
-                this.nextChunkDataPartInputStream = null;
-                
-                // safe to reuse
-                long seek = this.offset - this.chunkDataPartInputStream.getChunkPartStartOffset();
-                this.chunkDataPartInputStream.seek(seek);
             }
         }
         
@@ -290,49 +232,18 @@ public class HTTPChunkPartInputStream extends FSInputStream {
         HTTPUserInterfaceClient client = getClient(chunk);
         
         if(!this.initializedChunkMap.containsKey(hash)) {
-            DataChunkStatus dataChunkStatus = client.initDataChunkPart(uri, hash);
+            DataChunkStatus dataChunkStatus = client.requestDataChunk(uri, hash);
             this.initializedChunkMap.put(hash, dataChunkStatus);
         }
         
-        int partNo = (int) ((this.offset - chunk.getOffset()) / this.partSize);
-        
         if(this.chunkDataPartInputStream == null) {
+            int partNo = BigKeyValueStoreUtils.getPartNo(this.offset - chunk.getOffset(), this.partSize);
             DataChunkStatus dataChunkStatus = this.initializedChunkMap.get(hash);
-            InputStream dataChunkIS = client.getDataChunkPart(uri, hash, partNo, dataChunkStatus.getSourceType());
+            InputStream dataChunkIS = client.getDataChunkPart(uri, hash, partNo, dataChunkStatus);
             
             this.chunkDataPartInputStream = new ChunkDataPartInputStream(dataChunkIS, chunk.getOffset(), chunk.getLength(), partNo, this.partSize);
-            long seek = this.offset - this.chunkDataPartInputStream.getChunkPartStartOffset();
+            long seek = this.offset - (this.chunkDataPartInputStream.getChunkStartOffset() + this.chunkDataPartInputStream.getPartStartOffsetInChunk());
             this.chunkDataPartInputStream.seek(seek);
-        }
-        
-        synchronized(this.nextChunkDataPartInputStreamSyncObj) {
-            int newPartNo = partNo + 1;
-            
-            if(this.nextChunkDataPartInputStream != null) {
-                if(this.nextChunkDataPartInputStream.getChunkPartNo() != newPartNo) {
-                   this.nextChunkDataPartInputStream.close();
-                   this.nextChunkDataPartInputStream = null;
-                }
-            }
-            
-            if(this.nextChunkDataPartInputStream == null) {
-                if(chunk.getOffset() + (newPartNo * this.partSize) < this.size) {
-                    this.prefetchExecutor.submit(new Runnable() {
-                        @Override
-                        public void run() {
-                            try {
-                                synchronized(nextChunkDataPartInputStreamSyncObj) {
-                                    DataChunkStatus dataChunkStatus = initializedChunkMap.get(hash);
-                                    InputStream dataChunkIS = client.getDataChunkPart(uri, hash, newPartNo, dataChunkStatus.getSourceType());
-                                    nextChunkDataPartInputStream = new ChunkDataPartInputStream(dataChunkIS, chunk.getOffset(), chunk.getLength(), newPartNo, partSize);
-                                }
-                            } catch(Exception ex) {
-                                LOG.error(ex);
-                            }
-                        }
-                    });
-                }
-            }
         }
     }
     
@@ -383,7 +294,7 @@ public class HTTPChunkPartInputStream extends FSInputStream {
             throw new IOException("Cannot read chunk part data");
         }
         
-        int chunkRemaining = Math.min(this.chunkDataPartInputStream.getChunkPartSizeActual() - this.chunkDataPartInputStream.getOffset(), remaining);
+        int chunkRemaining = (int) Math.min(this.chunkDataPartInputStream.getActualChunkPartSize() - this.chunkDataPartInputStream.getOffset(), remaining);
         int read = this.chunkDataPartInputStream.read(bytes, off, chunkRemaining);
         if(read >= 0) {
             this.offset += read;
@@ -393,9 +304,6 @@ public class HTTPChunkPartInputStream extends FSInputStream {
     
     @Override
     public synchronized void close() throws IOException {
-        
-        this.prefetchExecutor.shutdown();
-        
         if(this.clients != null) {
             //Collection<HTTPUserInterfaceClient> clients = this.clients.values();
             // do not disconnect these
@@ -405,6 +313,9 @@ public class HTTPChunkPartInputStream extends FSInputStream {
             this.clients.clear();
         }
         
+        this.localClient = null;
+        this.localNodeName = null;
+        
         this.recipe = null;
         this.offset = 0;
         this.size = 0;
@@ -413,11 +324,6 @@ public class HTTPChunkPartInputStream extends FSInputStream {
         if(this.chunkDataPartInputStream != null) {
             this.chunkDataPartInputStream.close();
             this.chunkDataPartInputStream = null;
-        }
-        
-        if(this.nextChunkDataPartInputStream != null) {
-            this.nextChunkDataPartInputStream.close();
-            this.nextChunkDataPartInputStream = null;
         }
         
         this.initializedChunkMap.clear();

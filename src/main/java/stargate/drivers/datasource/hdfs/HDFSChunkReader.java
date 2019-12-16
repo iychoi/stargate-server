@@ -255,10 +255,6 @@ public class HDFSChunkReader extends InputStream {
     @Override
     public void reset() throws IOException {
         this.is.reset();
-        long skip = this.is.skip(this.offset);
-        if(skip != this.offset) {
-            throw new IOException("failed to move offset to " + skip);
-        }
     }
 
     @Override

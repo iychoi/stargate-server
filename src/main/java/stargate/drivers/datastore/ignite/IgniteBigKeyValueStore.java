@@ -15,15 +15,19 @@
 */
 package stargate.drivers.datastore.ignite;
 
+import java.io.BufferedInputStream;
+import java.io.BufferedOutputStream;
+import java.io.File;
+import java.io.FileOutputStream;
 import java.io.IOException;
 import java.io.InputStream;
 import java.util.Collection;
 import java.util.List;
 import java.util.ArrayList;
+import java.util.HashMap;
+import java.util.Iterator;
 import java.util.Map;
 import java.util.concurrent.ConcurrentHashMap;
-import java.util.concurrent.ExecutorService;
-import java.util.concurrent.Executors;
 import java.util.concurrent.TimeUnit;
 import javax.cache.expiry.CreatedExpiryPolicy;
 import javax.cache.expiry.Duration;
@@ -31,7 +35,6 @@ import org.apache.commons.logging.Log;
 import org.apache.commons.logging.LogFactory;
 import org.apache.ignite.Ignite;
 import org.apache.ignite.IgniteCache;
-import org.apache.ignite.IgniteCluster;
 import org.apache.ignite.cache.CacheAtomicityMode;
 import org.apache.ignite.cache.CacheMode;
 import org.apache.ignite.cache.CacheWriteSynchronizationMode;
@@ -40,9 +43,10 @@ import org.apache.ignite.cluster.ClusterNode;
 import org.apache.ignite.configuration.CacheConfiguration;
 import stargate.commons.datastore.AbstractBigKeyValueStore;
 import stargate.commons.datastore.BigKeyValueStoreMetadata;
+import stargate.commons.datastore.BigKeyValueStoreUtils;
 import stargate.commons.datastore.DataStoreProperties;
+import stargate.commons.io.AbstractSeekableInputStream;
 import stargate.commons.utils.ByteArray;
-import stargate.commons.utils.IOUtils;
 import stargate.drivers.ignite.IgniteDriver;
 
 /**
@@ -58,36 +62,14 @@ public class IgniteBigKeyValueStore extends AbstractBigKeyValueStore {
     private IgniteDriver igniteDriver;
     private Ignite ignite;
     private String name;
+    private List<String> dataNodeNames = new ArrayList<String>();
     private DataStoreProperties properties;
     private IgniteCache<String, ByteArray> store;
     private Affinity<String> affinity;
     private Map<String, Thread> putThreads = new ConcurrentHashMap<String, Thread>();
-    private Map<String, IgniteCacheInputStream> openedInputStreams = new ConcurrentHashMap<String, IgniteCacheInputStream>();
-    private Map<String, IgniteCachePartInputStream> openedPartInputStreams = new ConcurrentHashMap<String, IgniteCachePartInputStream>();
+    private Map<String, List<IgniteCacheInputStream>> openedInputStreams = new HashMap<String, List<IgniteCacheInputStream>>();
     
-    public static String makePartkey(String key, int part) {
-        return key + ":" + part;
-    }
-    
-    public static String getPartitionKey(String partkey) {
-        int index = partkey.indexOf(":");
-        if(index > 0) {
-            // ignore parts after ':'
-            return partkey.substring(0, index);
-        } else {
-            return partkey;
-        }
-    }
-    
-    public static boolean isPartKey(String key) {
-        int index = key.indexOf(":");
-        if(index > 0) {
-            return true;
-        }
-        return false;
-    }
-    
-    public IgniteBigKeyValueStore(IgniteDataStoreDriver driver, IgniteDataStoreDriverConfig config, IgniteDriver igniteDriver, String name, DataStoreProperties properties) throws IOException {
+    public IgniteBigKeyValueStore(IgniteDataStoreDriver driver, IgniteDataStoreDriverConfig config, IgniteDriver igniteDriver, String name, Collection<String> dataNodeNames, DataStoreProperties properties) throws IOException {
         if(driver == null) {
             throw new IllegalArgumentException("driver is null");
         }
@@ -104,6 +86,10 @@ public class IgniteBigKeyValueStore extends AbstractBigKeyValueStore {
             throw new IllegalArgumentException("name is null or empty");
         }
         
+        if(dataNodeNames == null || dataNodeNames.isEmpty()) {
+            throw new IllegalArgumentException("dataNodeNames is null or empty");
+        }
+        
         if(properties == null) {
             throw new IllegalArgumentException("property is null");
         }
@@ -113,6 +99,7 @@ public class IgniteBigKeyValueStore extends AbstractBigKeyValueStore {
         this.igniteDriver = igniteDriver;
         this.ignite = igniteDriver.getIgnite();
         this.name = name;
+        this.dataNodeNames.addAll(dataNodeNames);
         this.properties = properties;
         
         CacheConfiguration<String, ByteArray> cc = new CacheConfiguration<String, ByteArray>();
@@ -125,21 +112,6 @@ public class IgniteBigKeyValueStore extends AbstractBigKeyValueStore {
             cc.setCacheMode(CacheMode.REPLICATED);
         }
             
-        IgniteAffinityFunction affinityFunction = new IgniteAffinityFunction();
-
-        // remove non-data node from affinity
-        IgniteCluster igniteCluster = this.ignite.cluster();
-        Collection<String> nonDataNodes = properties.getNonDataNodes();
-
-        for(ClusterNode node : igniteCluster.nodes()) {
-            String nodeName = igniteDriver.getNodeNameFromClusterNode(node);
-            if(nonDataNodes.contains(nodeName)) {
-                affinityFunction.execludeNode(node);
-            }
-        }
-
-        cc.setAffinity(affinityFunction);
-        
         if(properties.isPersistent()) {
             cc.setDataRegionName(IgniteDriver.PERSISTENT_BIG_REGION_NAME);
         } else {
@@ -152,6 +124,7 @@ public class IgniteBigKeyValueStore extends AbstractBigKeyValueStore {
         cc.setCopyOnRead(false);
         cc.setReadFromBackup(true);
         cc.setName(name);
+        cc.setNodeFilter(new IgniteDataNodeFilter(this.dataNodeNames));
         
         this.store = this.ignite.getOrCreateCache(cc);
         
@@ -185,6 +158,11 @@ public class IgniteBigKeyValueStore extends AbstractBigKeyValueStore {
     }
     
     @Override
+    public int getPartSize() {
+        return this.driver.getPartSize();
+    }
+    
+    @Override
     public boolean containsKey(String key) {
         if(key == null || key.isEmpty()) {
             throw new IllegalArgumentException("key is null or empty");
@@ -208,23 +186,38 @@ public class IgniteBigKeyValueStore extends AbstractBigKeyValueStore {
     }
     
     @Override
-    public InputStream getData(String key) throws IOException {
+    public AbstractSeekableInputStream getData(String key) throws IOException {
         if(key == null || key.isEmpty()) {
             throw new IllegalArgumentException("key is null or empty");
         }
         
-        LOG.info(String.format("getData: retrieve metadata - %s", key));
-        ByteArray bytes = this.store.get(key);
-        if(bytes == null) {
-            return null;
+        ClusterNode keyNode = this.affinity.mapKeyToNode(key);
+        if(this.igniteDriver.isLocalNode(keyNode)) {
+            // local
+            LOG.info(String.format("getData: retrieve metadata - %s", key));
+            ByteArray bytes = this.store.get(key);
+            if(bytes == null) {
+                return null;
+            }
+
+            BigKeyValueStoreMetadata metadata = BigKeyValueStoreMetadata.fromBytes(bytes.getArray());
+
+            LOG.info(String.format("getData: return data - %s", key));
+            IgniteCacheInputStream inputStream = new IgniteCacheInputStream(this, this.config, metadata);
+            synchronized(this.openedInputStreams) {
+                List<IgniteCacheInputStream> inputStreams = this.openedInputStreams.get(key);
+                if(inputStreams == null) {
+                    inputStreams = new ArrayList<IgniteCacheInputStream>();
+                }
+                inputStreams.add(inputStream);
+                this.openedInputStreams.put(key, inputStreams);
+            }
+
+            return inputStream;
+        } else {
+            // remote
+            throw new IOException("cannot access data from remote node");
         }
-        
-        BigKeyValueStoreMetadata metadata = BigKeyValueStoreMetadata.fromBytes(bytes.getArray());
-        
-        LOG.info(String.format("getData: return data - %s", key));
-        IgniteCacheInputStream inputStream = new IgniteCacheInputStream(this, this.config, this.store, metadata);
-        this.openedInputStreams.put(key, inputStream);
-        return inputStream;
     }
     
     @Override
@@ -248,7 +241,7 @@ public class IgniteBigKeyValueStore extends AbstractBigKeyValueStore {
     }
     
     @Override
-    public InputStream getDataPart(String key, int partNo) throws IOException {
+    public AbstractSeekableInputStream getDataPart(String key, int partNo) throws IOException {
         if(key == null || key.isEmpty()) {
             throw new IllegalArgumentException("key is null or empty");
         }
@@ -257,74 +250,113 @@ public class IgniteBigKeyValueStore extends AbstractBigKeyValueStore {
             throw new IllegalArgumentException("partNo is negative");
         }
         
-        LOG.info(String.format("getDataPart: retrieve metadata - %s", key));
-        ByteArray bytes = this.store.get(key);
-        if(bytes == null) {
-            return null;
+        ClusterNode keyNode = this.affinity.mapKeyToNode(key);
+        if(this.igniteDriver.isLocalNode(keyNode)) {
+            // local
+            LOG.info(String.format("getDataPart: retrieve metadata - %s", key));
+            ByteArray bytes = this.store.get(key);
+            if(bytes == null) {
+                return null;
+            }
+
+            BigKeyValueStoreMetadata metadata = BigKeyValueStoreMetadata.fromBytes(bytes.getArray());
+
+            LOG.info(String.format("getDataPart: return data - %s, %d", key, partNo));
+            int partSize = this.driver.getPartSize();
+            IgniteCacheInputStream inputStream = new IgniteCacheInputStream(this, this.config, metadata, BigKeyValueStoreUtils.getPartStartOffset(partSize, partNo), BigKeyValueStoreUtils.getPartSize(metadata.getEntrySize(), partSize, partNo));
+            synchronized(this.openedInputStreams) {
+                List<IgniteCacheInputStream> partInputStreams = this.openedInputStreams.get(key);
+                if(partInputStreams == null) {
+                    partInputStreams = new ArrayList<IgniteCacheInputStream>();
+                }
+                partInputStreams.add(inputStream);
+                this.openedInputStreams.put(key, partInputStreams);
+            }
+
+            return inputStream;
+        } else {
+            // remote
+            throw new IOException("cannot access data from remote node");
+        }
+    }
+    
+    public void notifyInputStreamClosed(String key, IgniteCacheInputStream is) {
+        synchronized(this.openedInputStreams) {
+            List<IgniteCacheInputStream> inputStreams = this.openedInputStreams.get(key);
+            if(inputStreams != null) {
+                inputStreams.remove(is);
+                this.openedInputStreams.put(key, inputStreams);
+            }
+        }
+    }
+    
+    private File makeCacheFilePath(String key) {
+        return new File(this.igniteDriver.getStorageRootPath(), key);
+    }
+    
+    private void putAsync(String key, InputStream dataIS, long size) throws IOException {
+        if(!this.affinity.isPrimary(this.igniteDriver.getLocalNode(), key)) {
+            throw new IOException("Writing a data cache is only available via a primary node");
         }
         
-        BigKeyValueStoreMetadata metadata = BigKeyValueStoreMetadata.fromBytes(bytes.getArray());
-        
-        LOG.info(String.format("getDataPart: return data - %s, %d", key, partNo));
-        IgniteCachePartInputStream inputStream = new IgniteCachePartInputStream(this, this.config, this.store, metadata, partNo);
-        String partKey = IgniteBigKeyValueStore.makePartkey(key, partNo);
-        this.openedPartInputStreams.put(partKey, inputStream);
-        return inputStream;
-    }
-    
-    public void notifyInputStreamClosed(String key) {
-        this.openedInputStreams.remove(key);
-    }
-    
-    public void notifyPartInputStreamClosed(String key, int partNo) {
-        String partKey = IgniteBigKeyValueStore.makePartkey(key, partNo);
-        this.openedPartInputStreams.remove(partKey);
-    }
-    
-    private void putAsync(String key, InputStream dataIS, long size) {
         int partSize = this.driver.getPartSize();
-        int parts = (int) (size / partSize);
-        if(size % partSize != 0) {
-            parts++;
-        }
+        int parts = BigKeyValueStoreUtils.getPartNum(size, partSize);
         
         final int partNum = parts;
+        File cacheFilePath = getCacheFilePath(key);
+        cacheFilePath.createNewFile();
         
         Thread thread = new Thread(new Runnable() {
             @Override
             public void run() {
+                FileOutputStream os = null;
+                BufferedInputStream bis = new BufferedInputStream(dataIS);
                 try {
                     LOG.info(String.format("Run async data block put - %s, %d", key, partNum));
-                    byte[] buffer = new byte[partSize];
-
+                    os = new FileOutputStream(cacheFilePath, true);
+                    os.getChannel().truncate(0);
+                    
+                    byte[] buffer = new byte[4096];
+                    long readOffset = 0;
                     for(int partNo=0;partNo<partNum;partNo++) {
-                        String partkey = IgniteBigKeyValueStore.makePartkey(key, partNo);
-
-                        int toRead = (int) Math.min(size - (partNo * partSize), partSize);
-                        int readLen = IOUtils.toByteArray(dataIS, buffer, toRead);
-                        
-                        if(readLen > 0) {
-                            store.put(partkey, new ByteArray(buffer, readLen));
-                            
-                            // notify
-                            IgniteCacheInputStream inputStream = openedInputStreams.get(key);
-                            if(inputStream != null) {
-                                inputStream.notifyPartCompletion(partNo);
+                        int toRead = BigKeyValueStoreUtils.getPartSize(size, partSize, partNo);
+                        while(toRead > 0) {
+                            int readLen = bis.read(buffer, 0, Math.min(toRead, buffer.length));
+                            if(readLen < 0) {
+                                //EOF
+                                throw new IOException("EOF found");
                             }
                             
-                            IgniteCachePartInputStream partInputStream = openedPartInputStreams.get(partkey);
-                            if(partInputStream != null) {
-                                partInputStream.notifyPartCompletion();
+                            readOffset += readLen;
+                            os.write(buffer, 0, readLen);
+                            toRead -= readLen;
+                            
+                            // notify
+                            synchronized(openedInputStreams) {
+                                List<IgniteCacheInputStream> inputStreams = openedInputStreams.get(key);
+                                if(inputStreams != null) {
+                                    os.flush();
+                                    for(IgniteCacheInputStream is : inputStreams) {
+                                        is.notifyDataAvailability(readOffset);
+                                    }
+                                }
                             }
                         }
                     }
                     
-                    dataIS.close();
+                    os.close();
+                } catch (IOException ex) {
+                    LOG.error(String.format("An error occurred while putting a data block %s", key), ex);
+                } catch (Exception ex) {
+                    LOG.error(String.format("An error occurred while putting a data block %s", key), ex);
+                } finally {
+                    try {
+                        dataIS.close();
+                    } catch (IOException ex) {
+                    }
                     
                     putThreads.remove(key);
                     LOG.info(String.format("Finished async data block put - %s, %d", key, partNum));
-                } catch (Exception ex) {
-                    LOG.error(String.format("An error occurred while putting a data block %s", key), ex);
                 }
             }
         });
@@ -353,10 +385,7 @@ public class IgniteBigKeyValueStore extends AbstractBigKeyValueStore {
         //}
         
         int partSize = this.driver.getPartSize();
-        int parts = (int) (size / partSize);
-        if(size % partSize != 0) {
-            parts++;
-        }
+        int parts = BigKeyValueStoreUtils.getPartNum(size, partSize);
         
         if(dataIS != null) {
             putAsync(key, dataIS, size);
@@ -386,10 +415,7 @@ public class IgniteBigKeyValueStore extends AbstractBigKeyValueStore {
         //}
         
         int partSize = this.driver.getPartSize();
-        int parts = (int) (size / partSize);
-        if(size % partSize != 0) {
-            parts++;
-        }
+        int parts = BigKeyValueStoreUtils.getPartNum(size, partSize);
         
         boolean result = false;
         if(!this.store.containsKey(key)) {
@@ -431,15 +457,18 @@ public class IgniteBigKeyValueStore extends AbstractBigKeyValueStore {
     @Override
     public String getPrimaryNodeForData(String key) throws IOException {
         ClusterNode primaryNode = this.affinity.mapKeyToNode(key);
-        if(primaryNode == null) {
-            int partitionID = this.affinity.partition(key);
-            LOG.error(String.format("Map key(%s) to partition(%d)", key, partitionID));
-            
-            ClusterNode partitionNode = this.affinity.mapPartitionToNode(partitionID);
-            LOG.error(String.format("Map partition(%d) to node(%s)", partitionID, partitionNode.id()));
-            return null;
-        }
         return this.igniteDriver.getNodeNameFromClusterNode(primaryNode);
+    }
+    
+    @Override
+    public boolean isPrimaryNodeForDataLocal(String key) throws IOException {
+        ClusterNode primaryNode = this.affinity.mapKeyToNode(key);
+        return primaryNode.isLocal();
+    }
+    
+    @Override
+    public File getCacheFilePath(String key) throws IOException {
+        return this.makeCacheFilePath(key);
     }
     
     @Override
@@ -447,36 +476,28 @@ public class IgniteBigKeyValueStore extends AbstractBigKeyValueStore {
         List<String> backupNodes = new ArrayList<String>();
         
         Collection<ClusterNode> primaryAndBackupNodes = this.affinity.mapKeyToPrimaryAndBackups(key);
-        for(ClusterNode node : primaryAndBackupNodes) {
-            if(this.affinity.isBackup(node, key)) {
-                String nodeName = this.igniteDriver.getNodeNameFromClusterNode(node);
-                backupNodes.add(nodeName);
-            }
+        Iterator<ClusterNode> iterator = primaryAndBackupNodes.iterator();
+        // skip master
+        ClusterNode masterNode = iterator.next();
+        while(iterator.hasNext()) {
+            ClusterNode backupNode = iterator.next();
+            String nodeName = this.igniteDriver.getNodeNameFromClusterNode(backupNode);
+            backupNodes.add(nodeName);
         }
         return backupNodes;
     }
     
     @Override
     public Collection<String> getPrimaryAndBackupNodesForData(String key) throws IOException {
-        String primaryNode = null;
         List<String> nodes = new ArrayList<String>();
         
         Collection<ClusterNode> primaryAndBackupNodes = this.affinity.mapKeyToPrimaryAndBackups(key);
-        for(ClusterNode node : primaryAndBackupNodes) {
-            if(this.affinity.isBackup(node, key)) {
-                String nodeName = this.igniteDriver.getNodeNameFromClusterNode(node);
-                nodes.add(nodeName);
-            } else if(this.affinity.isPrimary(node, key)) {
-                String nodeName = this.igniteDriver.getNodeNameFromClusterNode(node);
-                primaryNode = nodeName;
-            }
+        Iterator<ClusterNode> iterator = primaryAndBackupNodes.iterator();
+        while(iterator.hasNext()) {
+            ClusterNode node = iterator.next();
+            String nodeName = this.igniteDriver.getNodeNameFromClusterNode(node);
+            nodes.add(nodeName);
         }
-        
-        // put the primary node to front
-        if(primaryNode != null) {
-            nodes.add(0, primaryNode);
-        }
-        
         return nodes;
     }
 
@@ -491,7 +512,7 @@ public class IgniteBigKeyValueStore extends AbstractBigKeyValueStore {
             BigKeyValueStoreMetadata metadata = BigKeyValueStoreMetadata.fromBytes(bytes.getArray());
 
             for(int partNo=0;partNo<metadata.getPartNum();partNo++) {
-                String partKey = IgniteBigKeyValueStore.makePartkey(key, partNo);
+                String partKey = BigKeyValueStoreUtils.makePartkey(key, partNo);
                 this.store.remove(partKey);
             }
 

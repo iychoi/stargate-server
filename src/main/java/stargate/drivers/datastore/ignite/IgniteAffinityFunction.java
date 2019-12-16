@@ -18,6 +18,7 @@ package stargate.drivers.datastore.ignite;
 import java.io.IOException;
 import java.io.Serializable;
 import java.util.ArrayList;
+import java.util.Collection;
 import java.util.List;
 import java.util.UUID;
 import org.apache.commons.logging.Log;
@@ -27,6 +28,7 @@ import org.apache.ignite.cache.affinity.AffinityFunctionContext;
 import org.apache.ignite.cache.affinity.rendezvous.RendezvousAffinityFunction;
 import org.apache.ignite.cluster.ClusterNode;
 import org.apache.ignite.internal.processors.affinity.AffinityTopologyVersion;
+import stargate.commons.utils.StringUtils;
 import stargate.drivers.ignite.IgniteDriver;
 
 /**
@@ -37,23 +39,21 @@ public class IgniteAffinityFunction implements AffinityFunction, Serializable {
     
     private static final Log LOG = LogFactory.getLog(IgniteAffinityFunction.class);
     
-    private List<String> excludeNodes = new ArrayList<String>();
+    private static List<String> nonDataNodes = new ArrayList<String>(); // IP address or domain name
+    
     private RendezvousAffinityFunction baseAffinityFunction;
     private AffinityTopologyVersion cachedTopologyVersion;
     private List<List<ClusterNode>> cachedPartitions = new ArrayList<List<ClusterNode>>();
     
-    public IgniteAffinityFunction() {
-        this.baseAffinityFunction = new RendezvousAffinityFunction();
+    public static void setNonDataNodes(Collection<String> nodes) {
+        LOG.info(String.format("Set non-data nodes - %s", StringUtils.getCommaSeparatedString(nodes)));
+        
+        nonDataNodes.clear();
+        nonDataNodes.addAll(nodes);
     }
     
-    public void execludeNode(ClusterNode node) throws IOException {
-        LOG.debug(String.format("Execluding a node from affinity - %s", node.id()));
-        IgniteDriver igniteDriver = IgniteDriver.getInstanceIfInitialized();
-        String nodeName = igniteDriver.getNodeNameFromClusterNode(node);
-        this.excludeNodes.add(nodeName);
-        
-        this.cachedTopologyVersion = null;
-        this.cachedPartitions.clear();
+    public IgniteAffinityFunction() {
+        this.baseAffinityFunction = new RendezvousAffinityFunction();
     }
     
     @Override
@@ -67,24 +67,7 @@ public class IgniteAffinityFunction implements AffinityFunction, Serializable {
 
     @Override
     public int partition(Object key) {
-        if(key == null) {
-            throw new IllegalArgumentException("Null key is passed for a partition calculation. " +
-                "Make sure that an affinity key that is used is initialized properly.");
-        }
-        
-        int parts = this.baseAffinityFunction.partitions();
-        
-        if(key.getClass() == String.class) {
-            String skey = (String) key;
-            String partitionkey = IgniteBigKeyValueStore.getPartitionKey(skey);
-            return safeAbs(partitionkey.hashCode() % parts);
-        }
-        return safeAbs(key.hashCode() % parts);
-    }
-    
-    private static int safeAbs(int i) {
-        i = Math.abs(i);
-        return i < 0 ? 0 : i;
+        return this.baseAffinityFunction.partition(key);
     }
 
     @Override
@@ -94,40 +77,43 @@ public class IgniteAffinityFunction implements AffinityFunction, Serializable {
     
     @Override
     public List<List<ClusterNode>> assignPartitions(AffinityFunctionContext affCtx) {
-        int parts = this.baseAffinityFunction.partitions();
-        List<List<ClusterNode>> assignments = new ArrayList<>(parts);
+        IgniteDriver igniteDriver;
+        try {
+            igniteDriver = IgniteDriver.getInstanceIfInitialized();
+            
+            int parts = this.baseAffinityFunction.partitions();
+            List<List<ClusterNode>> assignments = new ArrayList<>(parts);
+            
+            AffinityTopologyVersion currentTopologyVersion = affCtx.currentTopologyVersion();
+            if(this.cachedTopologyVersion != currentTopologyVersion) {
+                this.cachedPartitions.clear();
 
-        AffinityTopologyVersion currentTopologyVersion = affCtx.currentTopologyVersion();
-        
-        if(this.cachedTopologyVersion != currentTopologyVersion) {
-            this.cachedPartitions.clear();
-            
-            List<ClusterNode> nodes = affCtx.currentTopologySnapshot();
-            this.cachedTopologyVersion = affCtx.currentTopologyVersion();
-            
-            List<ClusterNode> new_nodes = new ArrayList<ClusterNode>();
-            try {
-                IgniteDriver igniteDriver = IgniteDriver.getInstanceIfInitialized();
+                List<ClusterNode> nodes = affCtx.currentTopologySnapshot();
+                this.cachedTopologyVersion = affCtx.currentTopologyVersion();
+
+                List<ClusterNode> new_nodes = new ArrayList<ClusterNode>();
                 for(ClusterNode node : nodes) {
                     String nodeName = igniteDriver.getNodeNameFromClusterNode(node);
-                    if(!this.excludeNodes.contains(nodeName)) {
+                    if(!nonDataNodes.contains(nodeName)) {
                         new_nodes.add(node);
+                    } else {
+                        LOG.info(String.format("Ignoring a node from partitioning - %s", nodeName));
                     }
                 }
-            } catch (IOException ex) {
-                LOG.error(ex);
-                new_nodes.addAll(nodes);
+                
+                for (int i = 0; i < parts; i++) {
+                    List<ClusterNode> partAssignment = this.baseAffinityFunction.assignPartition(i, new_nodes, affCtx.backups(), null);
+                    assignments.add(partAssignment);
+                    this.cachedPartitions.add(partAssignment);
+                }
+            } else {
+                assignments.addAll(this.cachedPartitions);
             }
-            
-            for (int i = 0; i < parts; i++) {
-                List<ClusterNode> partAssignment = this.baseAffinityFunction.assignPartition(i, new_nodes, affCtx.backups(), null);
-                assignments.add(partAssignment);
-                this.cachedPartitions.add(partAssignment);
-            }
-        } else {
-            assignments.addAll(this.cachedPartitions);
-        }
 
-        return assignments;
+            return assignments;
+        } catch (IOException ex) {
+            LOG.error(ex);
+            throw new RuntimeException(ex);
+        }
     }
 }
