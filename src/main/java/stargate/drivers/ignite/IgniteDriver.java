@@ -41,8 +41,6 @@ import org.apache.ignite.configuration.IgniteConfiguration;
 import org.apache.ignite.configuration.WALMode;
 import org.apache.ignite.internal.managers.discovery.IgniteDiscoverySpi;
 import org.apache.ignite.logger.log4j.Log4JLogger;
-import org.apache.ignite.spi.collision.CollisionSpi;
-import org.apache.ignite.spi.collision.priorityqueue.PriorityQueueCollisionSpi;
 import org.apache.ignite.spi.discovery.tcp.TcpDiscoverySpi;
 import org.apache.ignite.spi.discovery.tcp.ipfinder.TcpDiscoveryIpFinder;
 import org.apache.ignite.spi.discovery.tcp.ipfinder.multicast.TcpDiscoveryMulticastIpFinder;
@@ -210,10 +208,6 @@ public class IgniteDriver {
             DataStorageConfiguration dataStoreConfig = getDataStoreConfig();
             igniteConfig.setDataStorageConfiguration(dataStoreConfig);
             
-            // task ordering
-            CollisionSpi colConfig = getQueueConfig();
-            igniteConfig.setCollisionSpi(colConfig);
-    
             // enable events
             // we don't use this yet
             //igniteConfig.setIncludeEventTypes(EventType.EVTS_DISCOVERY);
@@ -407,12 +401,6 @@ public class IgniteDriver {
         connConfig.setHost("127.0.0.1");
         connConfig.setPort(10800);
         return connConfig;
-    }
-    
-    private CollisionSpi getQueueConfig() {
-        // PRIORITY ORDERING
-        PriorityQueueCollisionSpi collisionSpi = new PriorityQueueCollisionSpi();
-        return collisionSpi;
     }
     
     public Ignite getIgnite() {

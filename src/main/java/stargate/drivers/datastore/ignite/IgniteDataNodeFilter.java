@@ -36,7 +36,7 @@ public class IgniteDataNodeFilter implements IgnitePredicate<ClusterNode> {
     private List<String> acceptedNodeNames = new ArrayList<String>();
     
     public IgniteDataNodeFilter(Collection<String> dataNodeNames) {
-        acceptedNodeNames.addAll(dataNodeNames);
+        this.acceptedNodeNames.addAll(dataNodeNames);
     }
     
     @Override
@@ -45,8 +45,10 @@ public class IgniteDataNodeFilter implements IgnitePredicate<ClusterNode> {
             IgniteDriver igniteLocalDriver = IgniteDriver.getInstanceIfInitialized();
             String nodeName = igniteLocalDriver.getNodeNameFromClusterNode(clusterNode);
             if(acceptedNodeNames.contains(nodeName)) {
+                LOG.info(String.format("Accept node %s", nodeName));
                 return true;
             }
+            LOG.info(String.format("Filter node %s", nodeName));
             return false;
         } catch (IOException ex) {
             LOG.error(ex);

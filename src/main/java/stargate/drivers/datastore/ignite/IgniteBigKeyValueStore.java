@@ -16,7 +16,6 @@
 package stargate.drivers.datastore.ignite;
 
 import java.io.BufferedInputStream;
-import java.io.BufferedOutputStream;
 import java.io.File;
 import java.io.FileOutputStream;
 import java.io.IOException;
@@ -39,6 +38,7 @@ import org.apache.ignite.cache.CacheAtomicityMode;
 import org.apache.ignite.cache.CacheMode;
 import org.apache.ignite.cache.CacheWriteSynchronizationMode;
 import org.apache.ignite.cache.affinity.Affinity;
+import org.apache.ignite.cache.affinity.rendezvous.RendezvousAffinityFunction;
 import org.apache.ignite.cluster.ClusterNode;
 import org.apache.ignite.configuration.CacheConfiguration;
 import stargate.commons.datastore.AbstractBigKeyValueStore;
@@ -112,6 +112,10 @@ public class IgniteBigKeyValueStore extends AbstractBigKeyValueStore {
             cc.setCacheMode(CacheMode.REPLICATED);
         }
             
+        RendezvousAffinityFunction affinityFunction = new RendezvousAffinityFunction();
+        affinityFunction.setPartitions(2000);
+        cc.setAffinity(affinityFunction);
+        
         if(properties.isPersistent()) {
             cc.setDataRegionName(IgniteDriver.PERSISTENT_BIG_REGION_NAME);
         } else {

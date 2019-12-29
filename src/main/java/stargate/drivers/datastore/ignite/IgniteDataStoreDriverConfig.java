@@ -27,7 +27,7 @@ import stargate.commons.datastore.AbstractDataStoreDriverConfig;
  */
 public class IgniteDataStoreDriverConfig extends AbstractDataStoreDriverConfig {
     
-    private static final int DEFAULT_PART_SIZE = 1024 * 1024; // 1 MB
+    private static final int DEFAULT_PART_SIZE = 512 * 1024; // 512 KB
     private static final long DEFAULT_PART_WAIT_TIMEOUT_SEC = 300; // 300 seconds
     private static final long DEFAULT_PART_WAIT_POLLING_INTERVAL_MILLISEC = 100; // 100 msec
     

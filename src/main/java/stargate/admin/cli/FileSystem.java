@@ -15,14 +15,25 @@
 */
 package stargate.admin.cli;
 
+import java.io.BufferedOutputStream;
 import java.io.File;
 import java.io.FileNotFoundException;
 import java.io.FileOutputStream;
 import java.io.IOException;
+import java.io.InputStream;
 import java.net.URI;
+import java.util.ArrayList;
 import java.util.Collection;
 import java.util.HashMap;
+import java.util.LinkedList;
+import java.util.List;
 import java.util.Map;
+import java.util.Queue;
+import java.util.concurrent.Executors;
+import java.util.concurrent.ThreadPoolExecutor;
+import java.util.function.Consumer;
+import java.util.logging.Level;
+import java.util.logging.Logger;
 import org.apache.commons.logging.Log;
 import org.apache.commons.logging.LogFactory;
 import stargate.commons.cluster.Cluster;
@@ -30,7 +41,9 @@ import stargate.commons.cluster.Node;
 import stargate.commons.dataobject.DataObjectMetadata;
 import stargate.commons.dataobject.DataObjectURI;
 import stargate.commons.recipe.Recipe;
+import stargate.commons.recipe.RecipeChunk;
 import stargate.commons.service.FSServiceInfo;
+import stargate.commons.userinterface.DataChunkStatus;
 import stargate.commons.userinterface.UserInterfaceInitialDataPack;
 import stargate.commons.userinterface.UserInterfaceServiceInfo;
 import stargate.commons.utils.DateTimeUtils;
@@ -45,13 +58,40 @@ import stargate.drivers.userinterface.http.HTTPUserInterfaceClient;
  */
 public class FileSystem {
     private static final Log LOG = LogFactory.getLog(FileSystem.class);
+
+    private static class ChunkDownloadTask {
+
+        private Recipe recipe;
+        private RecipeChunk recipeChunk;
+        private String nodeName;
+        
+        public ChunkDownloadTask(Recipe recipe, RecipeChunk recipeChunk, String nodeName) {
+            this.recipe = recipe;
+            this.recipeChunk = recipeChunk;
+            this.nodeName = nodeName;
+        }
+
+        private Recipe getRecipe() {
+            return this.recipe;
+        }
+        
+        private RecipeChunk getRecipeChunk() {
+            return this.recipeChunk;
+        }
+        
+        private String getNodeName() {
+            return this.nodeName;
+        }
+    }
     
     private enum COMMAND_LV1 {
         CMD_LV1_SHOW_INFO("show_info"),
         CMD_LV1_LIST("ls"),
         CMD_LV1_RECIPE("recipe"),
         CMD_LV1_RECIPE_LOCALIZED("recipe_localized"),
+        CMD_LV1_RECIPE_LOCAL("recipe_local"),
         CMD_LV1_GET("get"),
+        CMD_LV1_GET_CHUNKS_PARALLEL("get_chunks_parallel"),
         CMD_LV1_UNKNOWN("unknown");
         
         private String value;
@@ -98,6 +138,7 @@ public class FileSystem {
                             process_fs_recipe(parser.getServiceURI(), positionalArgs[1]);
                         }
                         break;
+                    case CMD_LV1_RECIPE_LOCAL:
                     case CMD_LV1_RECIPE_LOCALIZED:
                         if(positionalArgs.length >= 2) {
                             process_fs_recipe_localized(parser.getServiceURI(), positionalArgs[1]);
@@ -105,13 +146,33 @@ public class FileSystem {
                         break;
                     case CMD_LV1_GET:
                         if(positionalArgs.length >= 2) {
+                            List<String> sourcePaths = new ArrayList<String>();
                             String targetPath = ".";
                             if(positionalArgs.length >= 3) {
-                                targetPath = positionalArgs[2];
+                                targetPath = positionalArgs[positionalArgs.length - 1];
+                                for(int i=1;i<positionalArgs.length - 1;i++) {
+                                    sourcePaths.add(positionalArgs[i]);
+                                }
+                            } else {
+                                sourcePaths.add(positionalArgs[1]);
                             }
-                            process_fs_get(parser.getServiceURI(), positionalArgs[1], targetPath);
+                            process_fs_get(parser.getServiceURI(), sourcePaths, targetPath);
                         }
                         break;
+                    case CMD_LV1_GET_CHUNKS_PARALLEL:
+                        if(positionalArgs.length >= 2) {
+                            List<String> sourcePaths = new ArrayList<String>();
+                            String targetPath = ".";
+                            if(positionalArgs.length >= 3) {
+                                targetPath = positionalArgs[positionalArgs.length - 1];
+                                for(int i=1;i<positionalArgs.length - 1;i++) {
+                                    sourcePaths.add(positionalArgs[i]);
+                                }
+                            } else {
+                                sourcePaths.add(positionalArgs[1]);
+                            }
+                            process_fs_get_chunks_parallel(parser.getServiceURI(), sourcePaths, targetPath);
+                        }
                     case CMD_LV1_UNKNOWN:
                         throw new UnsupportedOperationException(String.format("Unknown command - %s", cmd_lv1));
                     default:
@@ -291,80 +352,282 @@ public class FileSystem {
         }
     }
     
-    private static void process_fs_get(URI serviceURI, String stargatePath, String targetPath) {
-        DataObjectURI uri = new DataObjectURI(stargatePath);
-        
+    private static void process_fs_get(URI serviceURI, Collection<String> stargatePaths, String targetPath) {
         try {
-            HTTPUserInterfaceClient client = HTTPUIClient.getClient(serviceURI);
-            client.connect();
-            Cluster localCluster = client.getLocalCluster();
+            File fileDir = (new File(targetPath)).getAbsoluteFile();
+            if(!fileDir.exists()) {
+                fileDir.mkdirs();
+            }
             
-            try {
-                DataObjectMetadata metadata = client.getDataObjectMetadata(uri);
-                if(metadata == null) {
-                    System.out.println(String.format("<%s not exist!>", uri.toString()));
-                } else if(metadata.isDirectory()) {
-                    System.out.println(String.format("<%s is a directory!>", uri.toString()));
-                } else {
-                    LOG.debug("Downloading a recipe");
-                    Recipe recipe = client.getRecipe(uri);
-                    if(recipe == null) {
-                        System.out.println("<Recipe does not exist!>");
-                    } else {
-                        LOG.debug(String.format("Downloading a file %s", stargatePath));
-                        
-                        // create connections
-                        Map<String, HTTPUserInterfaceClient> clients = new HashMap<String, HTTPUserInterfaceClient>();
-                        
-                        Collection<String> nodeNames = recipe.getNodeNames();
-                        for(String nodeName : nodeNames) {
-                            Node node = localCluster.getNode(nodeName);
-                            UserInterfaceServiceInfo userInterfaceServiceInfo = node.getUserInterfaceServiceInfo();
-                            URI nodeServiceURI = userInterfaceServiceInfo.getServiceURI();
-                            if(!client.getServiceURI().equals(nodeServiceURI)) {
-                                HTTPUserInterfaceClient newClient = HTTPUIClient.getClient(nodeServiceURI);
-                                clients.put(nodeName, newClient);
+            if(fileDir.isDirectory()) {
+                HTTPUserInterfaceClient client = HTTPUIClient.getClient(serviceURI);
+                client.connect();
+                Cluster cluster = client.getLocalCluster();
+
+                Map<String, HTTPUserInterfaceClient> clients = new HashMap<String, HTTPUserInterfaceClient>();
+                List<Recipe> recipes = new ArrayList<Recipe>();
+
+                for(String stargatePath : stargatePaths) {
+                    DataObjectURI uri = new DataObjectURI(stargatePath);
+
+                    try {
+                        DataObjectMetadata metadata = client.getDataObjectMetadata(uri);
+                        if(metadata == null) {
+                            System.out.println(String.format("<%s not exist!>", uri.toString()));
+                        } else if(metadata.isDirectory()) {
+                            System.out.println(String.format("<%s is a directory!>", uri.toString()));
+                        } else {
+                            LOG.debug(String.format("Downloading a recipe for a file %s", uri.toString()));
+                            Recipe recipe = client.getRecipe(uri);
+                            if(recipe == null) {
+                                System.out.println("<Recipe does not exist!>");
                             } else {
-                                clients.put(nodeName, client);
+                                recipes.add(recipe);
+
+                                // create connections
+                                Collection<String> nodeNames = recipe.getNodeNames();
+                                for(String nodeName : nodeNames) {
+                                    if(!clients.containsKey(nodeName)) {
+                                        Node node = cluster.getNode(nodeName);
+                                        UserInterfaceServiceInfo userInterfaceServiceInfo = node.getUserInterfaceServiceInfo();
+                                        URI nodeServiceURI = userInterfaceServiceInfo.getServiceURI();
+                                        if(!client.getServiceURI().equals(nodeServiceURI)) {
+                                            HTTPUserInterfaceClient newClient = HTTPUIClient.getClient(nodeServiceURI);
+                                            clients.put(nodeName, newClient);
+                                        } else {
+                                            clients.put(nodeName, client);
+                                        }
+                                    }
+                                }
                             }
                         }
-                        
-                        File f = (new File(targetPath)).getAbsoluteFile();
-                        if(f.isDirectory()) {
-                            f = new File(f, PathUtils.getFileName(stargatePath));
-                        }
-
-                        long startTimeC = DateTimeUtils.getTimestamp();
-                        LOG.debug(String.format("start copy - %d", startTimeC));
-                        
-                        FileOutputStream fos = new FileOutputStream(f);
-                        fos.getChannel().truncate(0);
-                        
-                        int bufferlen = 1024*1024;
-                        byte[] buffer = new byte[bufferlen];
-                        
-                        HTTPChunkInputStream cis = new HTTPChunkInputStream(clients, recipe);
-                        int readLen = 0;
-                        while((readLen = cis.read(buffer, 0, bufferlen)) > 0) {
-                            fos.write(buffer, 0, readLen);
-                        }
-                        cis.close();
-                        long endTimeC = DateTimeUtils.getTimestamp();
-                        LOG.debug(String.format("copy took - %d ms", endTimeC - startTimeC));
-                        
-                        fos.close();
-                        
-                        for(HTTPUserInterfaceClient newClient : clients.values()) {
-                            newClient.disconnect();
-                        }
+                    } catch (FileNotFoundException ex) {
+                        System.out.println(String.format("<%s not exist!>", uri.toString()));
                     }
                 }
-            } catch (FileNotFoundException ex) {
-                System.out.println(String.format("<%s not exist!>", uri.toString()));
+            
+                // download
+                for(Recipe recipe : recipes) {
+                    DataObjectURI uri = recipe.getMetadata().getURI();
+
+                    LOG.debug(String.format("Downloading a file %s", uri.toString()));
+
+                    File f = new File(fileDir, PathUtils.getFileName(uri.toString()));
+
+                    long startTimeC = DateTimeUtils.getTimestamp();
+
+                    FileOutputStream fos = new FileOutputStream(f);
+                    fos.getChannel().truncate(0);
+                    BufferedOutputStream bos = new BufferedOutputStream(fos);
+
+                    int bufferlen = 1024*1024;
+                    byte[] buffer = new byte[bufferlen];
+
+                    HTTPChunkInputStream cis = new HTTPChunkInputStream(clients, recipe);
+                    int readLen = 0;
+                    while((readLen = cis.read(buffer, 0, bufferlen)) >= 0) {
+                        fos.write(buffer, 0, readLen);
+                    }
+                    cis.close();
+                    long endTimeC = DateTimeUtils.getTimestamp();
+                    LOG.debug(String.format("Downloading took - %d ms", endTimeC - startTimeC));
+
+                    bos.close();
+                }
+                
+                // close
+                for(HTTPUserInterfaceClient newClient : clients.values()) {
+                    if(newClient != client) {
+                        newClient.disconnect();
+                    }
+                }
+                clients.clear();
+
+                String dateTimeString = DateTimeUtils.getDateTimeString(client.getLastActiveTime());
+                System.out.println(String.format("<Request processed %s>", dateTimeString));
+                client.disconnect();
+            } else {
+                System.out.println(String.format("<Failed to create an output dir %s!>", fileDir.getPath()));
             }
-            String dateTimeString = DateTimeUtils.getDateTimeString(client.getLastActiveTime());
-            System.out.println(String.format("<Request processed %s>", dateTimeString));
-            client.disconnect();
+            
+            System.exit(0);
+        } catch (IOException ex) {
+            ex.printStackTrace();
+            System.exit(1);
+        }
+    }
+    
+    private static void process_fs_get_chunks_parallel(URI serviceURI, Collection<String> stargatePaths, String targetPath) {
+        try {
+            File fileDir = (new File(targetPath)).getAbsoluteFile();
+            if(!fileDir.exists()) {
+                fileDir.mkdirs();
+            }
+            
+            if(fileDir.isDirectory()) {
+                HTTPUserInterfaceClient client = HTTPUIClient.getClient(serviceURI);
+                client.connect();
+                Cluster cluster = client.getLocalCluster();
+
+                Map<String, HTTPUserInterfaceClient> clients = new HashMap<String, HTTPUserInterfaceClient>();
+                List<Recipe> recipes = new ArrayList<Recipe>();
+
+                for(String stargatePath : stargatePaths) {
+                    DataObjectURI uri = new DataObjectURI(stargatePath);
+
+                    try {
+                        DataObjectMetadata metadata = client.getDataObjectMetadata(uri);
+                        if(metadata == null) {
+                            System.out.println(String.format("<%s not exist!>", uri.toString()));
+                        } else if(metadata.isDirectory()) {
+                            System.out.println(String.format("<%s is a directory!>", uri.toString()));
+                        } else {
+                            LOG.debug(String.format("Downloading a recipe for a file %s", uri.toString()));
+                            Recipe recipe = client.getRecipe(uri);
+                            if(recipe == null) {
+                                System.out.println("<Recipe does not exist!>");
+                            } else {
+                                recipes.add(recipe);
+
+                                // create connections
+                                Collection<String> nodeNames = recipe.getNodeNames();
+                                for(String nodeName : nodeNames) {
+                                    if(!clients.containsKey(nodeName)) {
+                                        Node node = cluster.getNode(nodeName);
+                                        UserInterfaceServiceInfo userInterfaceServiceInfo = node.getUserInterfaceServiceInfo();
+                                        URI nodeServiceURI = userInterfaceServiceInfo.getServiceURI();
+                                        if(!client.getServiceURI().equals(nodeServiceURI)) {
+                                            HTTPUserInterfaceClient newClient = HTTPUIClient.getClient(nodeServiceURI);
+                                            clients.put(nodeName, newClient);
+                                        } else {
+                                            clients.put(nodeName, client);
+                                        }
+                                    }
+                                }
+                            }
+                        }
+                    } catch (FileNotFoundException ex) {
+                        System.out.println(String.format("<%s not exist!>", uri.toString()));
+                    }
+                }
+
+                // split
+                Map<String, List<ChunkDownloadTask>> taskMap = new HashMap<String, List<ChunkDownloadTask>>();
+                for(Recipe recipe : recipes) {
+                    Collection<RecipeChunk> chunks = recipe.getChunks();
+
+                    for(RecipeChunk chunk : chunks) {
+                        Collection<Integer> nodeIDs = chunk.getNodeIDs();
+                        String nodeName = recipe.getNodeName(nodeIDs.iterator().next());
+                        List<ChunkDownloadTask> list = taskMap.get(nodeName);
+                        if(list == null) {
+                            list = new ArrayList<ChunkDownloadTask>();
+                            taskMap.put(nodeName, list);
+                        }
+                        list.add(new ChunkDownloadTask(recipe, chunk, nodeName));
+                    }
+                }
+
+                Queue<ChunkDownloadTask> taskQueue = new LinkedList<ChunkDownloadTask>();
+                while(true) {
+                    if(taskMap.size() > 0) {
+                        for(String key : taskMap.keySet()) {
+                            List<ChunkDownloadTask> list = taskMap.get(key);
+                            if(list != null) {
+                                if(list.size() > 0) {
+                                    ChunkDownloadTask t = list.get(0);
+                                    list.remove(0);
+                                    taskQueue.add(t);
+                                }
+
+                                if(list.isEmpty()) {
+                                    taskMap.remove(key);
+                                }
+                            }
+                        }
+                    } else {
+                        break;
+                    }
+                }
+                
+                int threadNum = 16;
+                ThreadPoolExecutor executor = (ThreadPoolExecutor) Executors.newFixedThreadPool(threadNum);
+                long startTimeC = DateTimeUtils.getTimestamp();
+                
+                while(!taskQueue.isEmpty()) {
+                    ChunkDownloadTask t = taskQueue.poll();
+                    executor.execute(new Runnable() {
+                        @Override
+                        public void run() {
+                            Recipe recipe = t.getRecipe();
+                            RecipeChunk recipeChunk = t.getRecipeChunk();
+                            HTTPUserInterfaceClient chunkClient = clients.get(t.getNodeName());
+                            
+                            if(!chunkClient.isConnected()) {
+                                try {
+                                    chunkClient.connect();
+                                } catch (IOException ex) {
+                                    LOG.error(String.format("cannot connect to server to read a chunk %s", recipeChunk.getHash()));
+                                    throw new RuntimeException(String.format("cannot connect to server to read a chunk %s", recipeChunk.getHash()));
+                                }
+                            }
+
+                            DataObjectURI uri = recipe.getMetadata().getURI();
+
+                            LOG.debug(String.format("Downloading a file %s, a chunk %s", uri.toString(), recipeChunk.getHash()));
+                            FileOutputStream fos = null;
+                            try {
+                                File chunkFile = new File(fileDir, PathUtils.getFileName(recipeChunk.getHash()));
+                                fos = new FileOutputStream(chunkFile);
+                                fos.getChannel().truncate(0);
+                                BufferedOutputStream bos = new BufferedOutputStream(fos);
+
+                                int bufferlen = 1024*1024;
+                                byte[] buffer = new byte[bufferlen];
+                                
+                                DataChunkStatus dataChunkStatus = chunkClient.requestDataChunk(uri, recipeChunk.getHash());
+                                InputStream dataChunkIS = client.getDataChunk(uri, recipeChunk.getHash(), dataChunkStatus);
+                                
+                                int remaining = recipeChunk.getLength();
+                                while(remaining > 0) {
+                                    int readLen = dataChunkIS.read(buffer, 0, Math.min(remaining, bufferlen));
+                                    if(readLen < 0) {
+                                        //EOF
+                                        break;
+                                    }
+
+                                    fos.write(buffer, 0, readLen);
+                                    remaining -= readLen;
+                                }
+                                dataChunkIS.close();
+                                bos.close();
+                            } catch (FileNotFoundException ex) {
+                                System.out.println(String.format("<%s not exist!>", fileDir.getPath()));
+                            } catch (IOException ex) {
+                                System.out.println(String.format("<Failed to download a chunk %s!>", recipeChunk.getHash()));
+                            }
+                        }
+                    });
+                }
+
+                long endTimeC = DateTimeUtils.getTimestamp();
+                LOG.debug(String.format("Downloading took - %d ms", endTimeC - startTimeC));
+
+                // close
+                for(HTTPUserInterfaceClient newClient : clients.values()) {
+                    if(newClient != client) {
+                        newClient.disconnect();
+                    }
+                }
+                clients.clear();
+                
+                String dateTimeString = DateTimeUtils.getDateTimeString(client.getLastActiveTime());
+                client.disconnect();
+                System.out.println(String.format("<Request processed %s>", dateTimeString));
+            } else {
+                System.out.println(String.format("<Failed to create an output dir %s!>", fileDir.getPath()));
+            }
+
             System.exit(0);
         } catch (IOException ex) {
             ex.printStackTrace();

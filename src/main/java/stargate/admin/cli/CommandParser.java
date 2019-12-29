@@ -38,7 +38,7 @@ public class CommandParser {
         if(args != null && args.length != 0) {
             for(int i=0;i<args.length;i++) {
                 
-                if(args[i] == "-s") {
+                if("-s".equals(args[i])) {
                     if(args.length > i + 1) {
                         try {
                             this.serviceURI = new URI(args[i+1]);
@@ -47,7 +47,7 @@ public class CommandParser {
                         }
                         i++;
                     }
-                } else if(args[i] == "-d") {
+                } else if("-d".equals(args[i])) {
                     this.debug = true;
                 } else {
                     //positionalArgs
