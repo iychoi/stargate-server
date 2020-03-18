@@ -28,7 +28,7 @@ import stargate.commons.recipe.AbstractRecipeDriverConfig;
 public class FixedSizeChunkRecipeDriverConfig extends AbstractRecipeDriverConfig {
     
     private static final int DEFAULT_CHUNK_SIZE = 16*1024*1024; // 16MB
-    private static final String DEFAULT_HASH_ALGORITHM = "SHA-1";
+    private static final String DEFAULT_HASH_ALGORITHM = "SHA-256";
     private static final int DEFAULT_BUFFER_SIZE = 64*1024; // 64KB
     
     private int chunkSize = DEFAULT_CHUNK_SIZE;
