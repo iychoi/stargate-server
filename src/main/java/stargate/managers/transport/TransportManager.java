@@ -588,7 +588,7 @@ public class TransportManager extends AbstractManager<AbstractTransportDriver> {
             StatisticsManager statisticsManager = service.getStatisticsManager();
             statisticsManager.addDataChunkTransferReceiveStartStatistics(uri.toUri().toASCIIString(), hash);
 
-            LOG.info(String.format("Download a data chunk %s", hash));
+            LOG.info(String.format("INTER_CLUSTER_TRANSFER: Download a data chunk %s (LEN: %d)", hash, recipeChunk.getLength()));
             InputStream dataChunkInputStream = client.getDataChunk(hash);
             
             statisticsManager.addDataChunkTransferReceiveEndStatistics(uri.toUri().toASCIIString(), hash);
@@ -831,7 +831,7 @@ public class TransportManager extends AbstractManager<AbstractTransportDriver> {
                 StatisticsManager statisticsManager = service.getStatisticsManager();
                 statisticsManager.addDataChunkTransferReceiveStartStatistics(uri.toUri().toASCIIString(), hash);
 
-                LOG.info(String.format("Download a data chunk %s", hash));
+                LOG.info(String.format("INTER_CLUSTER_TRANSFER: Download a data chunk %s (LEN: %d)", hash, recipeChunk.getLength()));
                 InputStream dataChunkInputStream = client.getDataChunk(hash);
 
                 statisticsManager.addDataChunkTransferReceiveEndStatistics(uri.toUri().toASCIIString(), hash);

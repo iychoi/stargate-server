@@ -15,6 +15,7 @@
 */
 package stargate.drivers.datastore.ignite;
 
+import java.io.BufferedInputStream;
 import java.io.File;
 import java.io.FileInputStream;
 import java.io.FileNotFoundException;
@@ -33,6 +34,8 @@ public class IgniteCacheInputStream extends AbstractSeekableInputStream {
 
     private static final Log LOG = LogFactory.getLog(IgniteCacheInputStream.class);
     
+    private static final int BUFFER_SIZE = 64 * 1024;
+    
     private IgniteBigKeyValueStore store;
     private IgniteDataStoreDriverConfig config;
     private BigKeyValueStoreMetadata metadata;
@@ -43,7 +46,7 @@ public class IgniteCacheInputStream extends AbstractSeekableInputStream {
     private long lastCacheFileLength;
     private long lastCompletedOffset;
     private long currentWaitingOffset;
-    private FileInputStream cacheInputStream;
+    private BufferedInputStream cacheInputStream;
     private Object waitingObject = new Object();
     
     IgniteCacheInputStream(IgniteBigKeyValueStore store, IgniteDataStoreDriverConfig config, BigKeyValueStoreMetadata metadata) throws IOException {
@@ -110,10 +113,11 @@ public class IgniteCacheInputStream extends AbstractSeekableInputStream {
             waitData(this.beginOffset);
             
             try {
-                this.cacheInputStream = new FileInputStream(this.cacheFile);
+                FileInputStream is = new FileInputStream(this.cacheFile);
                 if(this.beginOffset > 0) {
-                    this.cacheInputStream.getChannel().position(this.beginOffset);
+                    is.getChannel().position(this.beginOffset);
                 }
+                this.cacheInputStream = new BufferedInputStream(is, BUFFER_SIZE);
             } catch (FileNotFoundException ex) {
                 LOG.error(ex);
                 throw new IOException(ex);
@@ -231,12 +235,28 @@ public class IgniteCacheInputStream extends AbstractSeekableInputStream {
             return;
         }
         
+        if(offset == this.offset) {
+            return;
+        }
+        
         safeInitCacheFileInputStream();
         
         long seekable = (int) Math.min(this.size, offset);
+        // wait
         waitData(this.beginOffset + seekable);
         
-        this.cacheInputStream.getChannel().position(this.beginOffset + seekable);
+        if(this.cacheInputStream != null) {
+            this.cacheInputStream.close();
+        
+            try {
+                FileInputStream is = new FileInputStream(this.cacheFile);
+                is.getChannel().position(this.beginOffset + seekable);
+                this.cacheInputStream = new BufferedInputStream(is, BUFFER_SIZE);
+            } catch (FileNotFoundException ex) {
+                LOG.error(ex);
+                throw new IOException(ex);
+            }
+        }
         this.offset = seekable;
     }
     

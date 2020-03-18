@@ -31,9 +31,6 @@ import java.util.Map;
 import java.util.Queue;
 import java.util.concurrent.Executors;
 import java.util.concurrent.ThreadPoolExecutor;
-import java.util.function.Consumer;
-import java.util.logging.Level;
-import java.util.logging.Logger;
 import org.apache.commons.logging.Log;
 import org.apache.commons.logging.LogFactory;
 import stargate.commons.cluster.Cluster;
@@ -91,6 +88,7 @@ public class FileSystem {
         CMD_LV1_RECIPE_LOCALIZED("recipe_localized"),
         CMD_LV1_RECIPE_LOCAL("recipe_local"),
         CMD_LV1_GET("get"),
+        CMD_LV1_READ("read"),
         CMD_LV1_GET_CHUNKS_PARALLEL("get_chunks_parallel"),
         CMD_LV1_UNKNOWN("unknown");
         
@@ -157,6 +155,21 @@ public class FileSystem {
                                 sourcePaths.add(positionalArgs[1]);
                             }
                             process_fs_get(parser.getServiceURI(), sourcePaths, targetPath);
+                        }
+                        break;
+                    case CMD_LV1_READ:
+                        if(positionalArgs.length >= 2) {
+                            String sourcePath = positionalArgs[1];
+                            long offset = 0;
+                            long length = Long.MAX_VALUE;
+                            if(positionalArgs.length >= 3) {
+                                offset = Long.parseLong(positionalArgs[2]);
+                                
+                                if(positionalArgs.length >= 4) {
+                                    length = Long.parseLong(positionalArgs[3]);
+                                }
+                            }
+                            process_fs_read(parser.getServiceURI(), sourcePath, offset, length);
                         }
                         break;
                     case CMD_LV1_GET_CHUNKS_PARALLEL:
@@ -449,6 +462,97 @@ public class FileSystem {
             } else {
                 System.out.println(String.format("<Failed to create an output dir %s!>", fileDir.getPath()));
             }
+            
+            System.exit(0);
+        } catch (IOException ex) {
+            ex.printStackTrace();
+            System.exit(1);
+        }
+    }
+    
+    private static void process_fs_read(URI serviceURI, String stargatePath, long offset, long length) {
+        try {
+            HTTPUserInterfaceClient client = HTTPUIClient.getClient(serviceURI);
+            client.connect();
+            Cluster cluster = client.getLocalCluster();
+
+            Map<String, HTTPUserInterfaceClient> clients = new HashMap<String, HTTPUserInterfaceClient>();
+            DataObjectURI uri = new DataObjectURI(stargatePath);
+
+            try {
+                DataObjectMetadata metadata = client.getDataObjectMetadata(uri);
+                if(metadata == null) {
+                    System.out.println(String.format("<%s not exist!>", uri.toString()));
+                } else if(metadata.isDirectory()) {
+                    System.out.println(String.format("<%s is a directory!>", uri.toString()));
+                } else {
+                    LOG.debug(String.format("Downloading a recipe for a file %s", uri.toString()));
+                    Recipe recipe = client.getRecipe(uri);
+                    if(recipe == null) {
+                        System.out.println("<Recipe does not exist!>");
+                    } else {
+                        // create connections
+                        Collection<String> nodeNames = recipe.getNodeNames();
+                        for(String nodeName : nodeNames) {
+                            if(!clients.containsKey(nodeName)) {
+                                Node node = cluster.getNode(nodeName);
+                                UserInterfaceServiceInfo userInterfaceServiceInfo = node.getUserInterfaceServiceInfo();
+                                URI nodeServiceURI = userInterfaceServiceInfo.getServiceURI();
+                                if(!client.getServiceURI().equals(nodeServiceURI)) {
+                                    HTTPUserInterfaceClient newClient = HTTPUIClient.getClient(nodeServiceURI);
+                                    clients.put(nodeName, newClient);
+                                } else {
+                                    clients.put(nodeName, client);
+                                }
+                            }
+                        }
+                        
+                        // download
+                        LOG.debug(String.format("Reading a file %s, offset %d, length %d", uri.toString(), offset, Math.min(length, metadata.getSize() - offset)));
+
+                        long startTimeC = DateTimeUtils.getTimestamp();
+
+                        int bufferlen = 64*1024;
+                        byte[] buffer = new byte[bufferlen];
+
+                        HTTPChunkInputStream cis = new HTTPChunkInputStream(clients, recipe);
+                        cis.seek(offset);
+                        
+                        int readLen = 0;
+                        long remain = Math.min(length, metadata.getSize() - offset);
+                        while(remain > 0) {
+                            readLen = cis.read(buffer, 0, bufferlen);
+                            if(readLen < 0) {
+                                //EOF
+                                break;
+                            }
+                            
+                            System.out.write(buffer, 0, readLen);
+                            remain -= readLen;
+                        }
+                        cis.close();
+                        long endTimeC = DateTimeUtils.getTimestamp();
+                        LOG.debug(String.format("Reading took - %d ms", endTimeC - startTimeC));
+                    }
+                }
+            } catch (FileNotFoundException ex) {
+                System.out.println(String.format("<%s not exist!>", uri.toString()));
+            }
+
+            
+            
+
+            // close
+            for(HTTPUserInterfaceClient newClient : clients.values()) {
+                if(newClient != client) {
+                    newClient.disconnect();
+                }
+            }
+            clients.clear();
+
+            String dateTimeString = DateTimeUtils.getDateTimeString(client.getLastActiveTime());
+            System.out.println(String.format("<Request processed %s>", dateTimeString));
+            client.disconnect();
             
             System.exit(0);
         } catch (IOException ex) {

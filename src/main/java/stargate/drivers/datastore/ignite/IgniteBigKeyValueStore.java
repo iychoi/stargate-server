@@ -16,10 +16,12 @@
 package stargate.drivers.datastore.ignite;
 
 import java.io.BufferedInputStream;
+import java.io.BufferedOutputStream;
 import java.io.File;
 import java.io.FileOutputStream;
 import java.io.IOException;
 import java.io.InputStream;
+import java.nio.channels.FileChannel;
 import java.util.Collection;
 import java.util.List;
 import java.util.ArrayList;
@@ -56,6 +58,8 @@ import stargate.drivers.ignite.IgniteDriver;
 public class IgniteBigKeyValueStore extends AbstractBigKeyValueStore {
 
     private static final Log LOG = LogFactory.getLog(IgniteBigKeyValueStore.class);
+    
+    private static final int BUFFER_SIZE = 64 * 1024;
     
     private IgniteDataStoreDriver driver;
     private IgniteDataStoreDriverConfig config;
@@ -314,13 +318,15 @@ public class IgniteBigKeyValueStore extends AbstractBigKeyValueStore {
             @Override
             public void run() {
                 FileOutputStream os = null;
+                BufferedOutputStream bos = null;
                 BufferedInputStream bis = new BufferedInputStream(dataIS);
                 try {
                     LOG.info(String.format("Run async data block put - %s, %d", key, partNum));
                     os = new FileOutputStream(cacheFilePath, true);
-                    os.getChannel().truncate(0);
+                    FileChannel channel = os.getChannel();
+                    channel.truncate(0);
                     
-                    byte[] buffer = new byte[4096];
+                    byte[] buffer = new byte[BUFFER_SIZE];
                     long readOffset = 0;
                     for(int partNo=0;partNo<partNum;partNo++) {
                         int toRead = BigKeyValueStoreUtils.getPartSize(size, partSize, partNo);
@@ -347,7 +353,9 @@ public class IgniteBigKeyValueStore extends AbstractBigKeyValueStore {
                             }
                         }
                     }
-                    
+                    os.flush();
+                    channel.force(true);
+                    os.getFD().sync();
                     os.close();
                 } catch (IOException ex) {
                     LOG.error(String.format("An error occurred while putting a data block %s", key), ex);
