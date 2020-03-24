@@ -68,4 +68,5 @@ public abstract class AbstractContactNodeSelectionAlgorithm {
     }
     
     public abstract Node getResponsibleRemoteNode(Cluster localCluster, Node localNode, Cluster remoteCluster) throws IOException;
+    public abstract ResponsibleNodeMapping getResponsibleRemoteNodeMappings(Cluster localCluster, Cluster remoteCluster) throws IOException;
 }

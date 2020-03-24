@@ -18,10 +18,9 @@ package stargate.managers.transport.layout;
 import java.io.IOException;
 import java.util.ArrayList;
 import java.util.Collection;
+import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
-import java.util.concurrent.TimeUnit;
-import org.apache.commons.collections4.map.PassiveExpiringMap;
 import org.apache.commons.logging.Log;
 import org.apache.commons.logging.LogFactory;
 import stargate.commons.cluster.Cluster;
@@ -38,10 +37,7 @@ public class RoundRobinContactNodeSelectionAlgorithm extends AbstractContactNode
     
     private static final Log LOG = LogFactory.getLog(RoundRobinContactNodeSelectionAlgorithm.class);
     
-    private static final long DEFAULT_RESPONSIBLE_NODE_MAPPING_EXPIRATION_TIME_SEC = 5 * 60;
-    
-    private long responsibleNodeMappingExpirationTimeSec = DEFAULT_RESPONSIBLE_NODE_MAPPING_EXPIRATION_TIME_SEC;
-    private Map<String, ResponsibleNodeMapping> responsibleNodeMappings;
+    private Map<String, ResponsibleNodeMapping> responsibleNodeMappings = new HashMap<String, ResponsibleNodeMapping>();
     
     public RoundRobinContactNodeSelectionAlgorithm(AbstractService service, TransportManager manager) {
         if(service == null) {
@@ -66,8 +62,6 @@ public class RoundRobinContactNodeSelectionAlgorithm extends AbstractContactNode
         
         this.service = (StargateService) service;
         this.manager = manager;
-        
-        this.responsibleNodeMappings = new PassiveExpiringMap<String, ResponsibleNodeMapping>(responsibleNodeMappingExpirationTimeSec, TimeUnit.SECONDS);
     }
     
     public RoundRobinContactNodeSelectionAlgorithm(StargateService service, TransportManager manager) {
@@ -89,8 +83,6 @@ public class RoundRobinContactNodeSelectionAlgorithm extends AbstractContactNode
         
         this.service = service;
         this.manager = manager;
-        
-        this.responsibleNodeMappings = new PassiveExpiringMap<String, ResponsibleNodeMapping>(responsibleNodeMappingExpirationTimeSec, TimeUnit.SECONDS);
     }
     
     @Override
@@ -125,7 +117,8 @@ public class RoundRobinContactNodeSelectionAlgorithm extends AbstractContactNode
         throw new IOException("Could not find a responsible remote node");
     }
     
-    private synchronized ResponsibleNodeMapping getResponsibleRemoteNodeMappings(Cluster localCluster, Cluster remoteCluster) throws IOException {
+    @Override
+    public synchronized ResponsibleNodeMapping getResponsibleRemoteNodeMappings(Cluster localCluster, Cluster remoteCluster) throws IOException {
         ResponsibleNodeMapping mappings = this.responsibleNodeMappings.get(remoteCluster.getName());
         if(mappings == null) {
             // make a new mapping

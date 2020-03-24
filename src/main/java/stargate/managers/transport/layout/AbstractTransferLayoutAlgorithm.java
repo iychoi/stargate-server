@@ -16,9 +16,9 @@
 package stargate.managers.transport.layout;
 
 import java.io.IOException;
-import java.util.Collection;
 import stargate.commons.cluster.Cluster;
 import stargate.commons.cluster.Node;
+import stargate.commons.datastore.AbstractBigKeyValueStore;
 import stargate.commons.recipe.Recipe;
 import stargate.commons.service.AbstractService;
 import stargate.managers.transport.TransportManager;
@@ -32,6 +32,8 @@ public abstract class AbstractTransferLayoutAlgorithm {
 
     protected StargateService service;
     protected TransportManager manager;
+    protected AbstractBigKeyValueStore dataCacheStore;
+    protected AbstractContactNodeSelectionAlgorithm contactNodeSelectionAlgorithm;
     
     public void setService(AbstractService service) {
         if(service == null) {
@@ -69,10 +71,33 @@ public abstract class AbstractTransferLayoutAlgorithm {
         return this.manager;
     }
     
+    public void setDataCacheStore(AbstractBigKeyValueStore dataCacheStore) {
+        if(dataCacheStore == null) {
+            throw new IllegalArgumentException("dataCacheStore is null");
+        }
+        
+        this.dataCacheStore = dataCacheStore;
+    }
+    
+    public AbstractBigKeyValueStore getDataCacheStore() {
+        return this.dataCacheStore;
+    }
+    
+    public void setContactNodeAlgorithm(AbstractContactNodeSelectionAlgorithm contactNodeSelectionAlgorithm) {
+        if(contactNodeSelectionAlgorithm == null) {
+            throw new IllegalArgumentException("contactNodeSelectionAlgorithm is null");
+        }
+        
+        this.contactNodeSelectionAlgorithm = contactNodeSelectionAlgorithm;
+    }
+    
+    public AbstractContactNodeSelectionAlgorithm getContactNodeAlgorithm() {
+        return this.contactNodeSelectionAlgorithm;
+    }
+    
     public abstract void increaseNodeWorkload(Cluster cluster, Node node) throws IOException;
     public abstract void decreaseNodeWorkload(Cluster cluster, Node node) throws IOException;
     
     public abstract Node determineLocalNode(Cluster cluster, Recipe recipe, String hash) throws IOException;
-    
-    public abstract Node determineRemoteNode(Cluster remoteCluster, Recipe recipe, String hash) throws IOException;
+    public abstract Node determineRemoteNode(Cluster localCluster, Node localNode, Cluster remoteCluster, Recipe recipe, String hash) throws IOException;
 }

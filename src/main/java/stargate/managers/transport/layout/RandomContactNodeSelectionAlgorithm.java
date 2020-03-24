@@ -18,10 +18,9 @@ package stargate.managers.transport.layout;
 import java.io.IOException;
 import java.util.ArrayList;
 import java.util.Collection;
+import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
-import java.util.concurrent.TimeUnit;
-import org.apache.commons.collections4.map.PassiveExpiringMap;
 import org.apache.commons.logging.Log;
 import org.apache.commons.logging.LogFactory;
 import stargate.commons.cluster.Cluster;
@@ -39,7 +38,7 @@ public class RandomContactNodeSelectionAlgorithm extends AbstractContactNodeSele
     
     private static final Log LOG = LogFactory.getLog(RandomContactNodeSelectionAlgorithm.class);
     
-    private Map<String, ResponsibleNodeMapping> responsibleNodeMappings = new PassiveExpiringMap<String, ResponsibleNodeMapping>(5, TimeUnit.MINUTES);
+    private Map<String, ResponsibleNodeMapping> responsibleNodeMappings = new HashMap<String, ResponsibleNodeMapping>();
     
     public RandomContactNodeSelectionAlgorithm(AbstractService service, TransportManager manager) {
         if(service == null) {
@@ -119,7 +118,8 @@ public class RandomContactNodeSelectionAlgorithm extends AbstractContactNodeSele
         throw new IOException("Could not find a responsible remote node");
     }
     
-    private synchronized ResponsibleNodeMapping getResponsibleRemoteNodeMappings(Cluster localCluster, Cluster remoteCluster) throws IOException {
+    @Override
+    public synchronized ResponsibleNodeMapping getResponsibleRemoteNodeMappings(Cluster localCluster, Cluster remoteCluster) throws IOException {
         ResponsibleNodeMapping mappings = this.responsibleNodeMappings.get(remoteCluster.getName());
         if(mappings == null) {
             // make a new mapping

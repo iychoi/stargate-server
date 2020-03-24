@@ -50,13 +50,12 @@ public class FairTransferLayoutAlgorithm extends AbstractTransferLayoutAlgorithm
     
     private static final int CLUSTER_WORKLOADS_MAX_ENTRY_SIZE = 100;
     
-    private AbstractBigKeyValueStore dataCacheStore;
     private Map<String, ClusterWorkload> clusterWorkloads = new LRUMap<String, ClusterWorkload>(CLUSTER_WORKLOADS_MAX_ENTRY_SIZE);
     private Map<String, ClusterWorkload> clusterWorkloadDelta = new LRUMap<String, ClusterWorkload>(CLUSTER_WORKLOADS_MAX_ENTRY_SIZE);
     
     private static final double WORKLOAD_INCREMENT = 10;
     
-    public FairTransferLayoutAlgorithm(AbstractService service, TransportManager manager, AbstractBigKeyValueStore dataCacheStore) throws IOException {
+    public FairTransferLayoutAlgorithm(AbstractService service, TransportManager manager, AbstractBigKeyValueStore dataCacheStore, AbstractContactNodeSelectionAlgorithm contactNodeSelectionAlgorithm) throws IOException {
         if(service == null) {
             throw new IllegalArgumentException("service is null");
         }
@@ -67,6 +66,10 @@ public class FairTransferLayoutAlgorithm extends AbstractTransferLayoutAlgorithm
         
         if(dataCacheStore == null) {
             throw new IllegalArgumentException("dataCacheStore is null");
+        }
+        
+        if(contactNodeSelectionAlgorithm == null) {
+            throw new IllegalArgumentException("contactNodeSelectionAlgorithm is null");
         }
         
         if(!(service instanceof StargateService)) {
@@ -83,13 +86,13 @@ public class FairTransferLayoutAlgorithm extends AbstractTransferLayoutAlgorithm
         
         this.service = (StargateService) service;
         this.manager = manager;
-        
         this.dataCacheStore = dataCacheStore;
+        this.contactNodeSelectionAlgorithm = contactNodeSelectionAlgorithm;
         
         setEventHandler();
     }
     
-    public FairTransferLayoutAlgorithm(StargateService service, TransportManager manager, AbstractBigKeyValueStore dataCacheStore) throws IOException {
+    public FairTransferLayoutAlgorithm(StargateService service, TransportManager manager, AbstractBigKeyValueStore dataCacheStore, AbstractContactNodeSelectionAlgorithm contactNodeSelectionAlgorithm) throws IOException {
         if(service == null) {
             throw new IllegalArgumentException("service is null");
         }
@@ -102,6 +105,10 @@ public class FairTransferLayoutAlgorithm extends AbstractTransferLayoutAlgorithm
             throw new IllegalArgumentException("dataCacheStore is null");
         }
         
+        if(contactNodeSelectionAlgorithm == null) {
+            throw new IllegalArgumentException("contactNodeSelectionAlgorithm is null");
+        }
+        
         if(!service.isStarted()) {
             throw new IllegalArgumentException("service is not started");
         }
@@ -112,8 +119,8 @@ public class FairTransferLayoutAlgorithm extends AbstractTransferLayoutAlgorithm
         
         this.service = service;
         this.manager = manager;
-        
         this.dataCacheStore = dataCacheStore;
+        this.contactNodeSelectionAlgorithm = contactNodeSelectionAlgorithm;
         
         setEventHandler();
     }
@@ -297,7 +304,15 @@ public class FairTransferLayoutAlgorithm extends AbstractTransferLayoutAlgorithm
     }
     
     @Override
-    public Node determineRemoteNode(Cluster remoteCluster, Recipe recipe, String hash) throws IOException {
+    public Node determineRemoteNode(Cluster localCluster, Node localNode, Cluster remoteCluster, Recipe recipe, String hash) throws IOException {
+        if(localCluster == null) {
+            throw new IllegalArgumentException("localCluster is null");
+        }
+        
+        if(localNode == null) {
+            throw new IllegalArgumentException("localNode is null");
+        }
+        
         if(remoteCluster == null) {
             throw new IllegalArgumentException("remoteCluster is null");
         }

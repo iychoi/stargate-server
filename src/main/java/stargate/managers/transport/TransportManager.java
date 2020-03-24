@@ -18,8 +18,6 @@ package stargate.managers.transport;
 import stargate.commons.utils.Reference;
 import stargate.managers.transport.layout.AbstractContactNodeSelectionAlgorithm;
 import stargate.managers.transport.layout.AbstractTransferLayoutAlgorithm;
-import stargate.managers.transport.layout.RoundRobinContactNodeSelectionAlgorithm;
-import stargate.managers.transport.layout.StaticTransferLayoutAlgorithm;
 import stargate.managers.transport.layout.TransferLayoutAlgorithms;
 import stargate.commons.transport.TransferAssignment;
 import java.io.File;
@@ -77,8 +75,6 @@ import stargate.managers.event.EventManager;
 import stargate.managers.recipe.RecipeManager;
 import stargate.managers.statistics.StatisticsManager;
 import stargate.managers.transport.layout.ContactNodeSelectionAlgorithms;
-import stargate.managers.transport.layout.FairTransferLayoutAlgorithm;
-import stargate.managers.transport.layout.RandomContactNodeSelectionAlgorithm;
 import stargate.service.StargateService;
 
 /**
@@ -399,48 +395,22 @@ public class TransportManager extends AbstractManager<AbstractTransportDriver> {
     private void safeInitLayoutAlgorithm() throws IOException {
         // init algorithms
         safeInitDataChunkCacheStore(); //  chunk cache store must be called before next line is executed
-        if(this.transferLayoutAlgorithm == null) {
-            StargateService stargateService = getStargateService();
-            TransportManagerConfig managerConfig = (TransportManagerConfig) this.config;
-            TransferLayoutAlgorithms transferAlg = managerConfig.getLayoutAlgorithm();
-            if(transferAlg == null) {
-                transferAlg = TransferLayoutAlgorithms.TRANSFER_LAYOUT_ALGORITHM_STATIC;
-            }
-            
-            LOG.info(String.format("safeInitLayoutAlgorithm: Using transfer layout algorithm - %s", transferAlg.name()));
-            
-            switch(transferAlg) {
-                case TRANSFER_LAYOUT_ALGORITHM_STATIC:
-                    this.transferLayoutAlgorithm = new StaticTransferLayoutAlgorithm(stargateService, this, this.dataChunkCacheStore);
-                    break;
-                case TRANSFER_LAYOUT_ALGORITHM_FAIR:
-                    this.transferLayoutAlgorithm = new FairTransferLayoutAlgorithm(stargateService, this, this.dataChunkCacheStore);
-                    break;
-                default:
-                    throw new IOException(String.format("Cannot find transfer algorithm %s", transferAlg.name()));
-            }
-        }
-        
         if(this.contactNodeSelectionAlgorithm == null) {
             StargateService stargateService = getStargateService();
             TransportManagerConfig managerConfig = (TransportManagerConfig) this.config;
             ContactNodeSelectionAlgorithms selectionAlg = managerConfig.getContactNodeSelectionAlgorithm();
-            if(selectionAlg == null) {
-                selectionAlg = ContactNodeSelectionAlgorithms.CONTACT_NODE_SELECTION_ALGORITHM_ROUNDROBIN;
-            }
             
             LOG.info(String.format("safeInitLayoutAlgorithm: Using contact node selection algorithm - %s", selectionAlg.name()));
+            this.contactNodeSelectionAlgorithm = selectionAlg.createInstance(stargateService, this);
+        }
+        
+        if(this.transferLayoutAlgorithm == null) {
+            StargateService stargateService = getStargateService();
+            TransportManagerConfig managerConfig = (TransportManagerConfig) this.config;
+            TransferLayoutAlgorithms transferAlg = managerConfig.getLayoutAlgorithm();
             
-            switch(selectionAlg) {
-                case CONTACT_NODE_SELECTION_ALGORITHM_ROUNDROBIN:
-                    this.contactNodeSelectionAlgorithm = new RoundRobinContactNodeSelectionAlgorithm(stargateService, this);
-                    break;
-                case CONTACT_NODE_SELECTION_ALGORITHM_RANDOM:
-                    this.contactNodeSelectionAlgorithm = new RandomContactNodeSelectionAlgorithm(stargateService, this);
-                    break;
-                default:
-                    throw new IOException(String.format("Cannot find transfer algorithm %s", selectionAlg.name()));
-            }
+            LOG.info(String.format("safeInitLayoutAlgorithm: Using transfer layout algorithm - %s", transferAlg.name()));
+            this.transferLayoutAlgorithm = transferAlg.createInstance(stargateService, this, this.dataChunkCacheStore, this.contactNodeSelectionAlgorithm);
         }
     }
     
@@ -519,6 +489,7 @@ public class TransportManager extends AbstractManager<AbstractTransportDriver> {
             StargateService service = getStargateService();
             
             ClusterManager clusterManager = service.getClusterManager();
+            Cluster localCluster = clusterManager.getLocalCluster();
             Node localNode = clusterManager.getLocalNode();
             
             LOG.debug(String.format("cacheRemoteDataChunk: Checking and putting a pending request for an on-demand transfer for - %s, %s", uri.toUri().toASCIIString(), hash));
@@ -566,7 +537,7 @@ public class TransportManager extends AbstractManager<AbstractTransportDriver> {
                 throw new IOException(String.format("remote cluster %s does not exist", uri.getClusterName()));
             }
 
-            Node remoteNode = this.transferLayoutAlgorithm.determineRemoteNode(remoteCluster, recipe, hash);
+            Node remoteNode = this.transferLayoutAlgorithm.determineRemoteNode(localCluster, localNode, remoteCluster, recipe, hash);
             if(remoteNode == null) {
                 reference.decreaseReference();
                 if(reference.getReferenceCount() <= 0) {
@@ -672,6 +643,7 @@ public class TransportManager extends AbstractManager<AbstractTransportDriver> {
             StargateService service = getStargateService();
             
             ClusterManager clusterManager = service.getClusterManager();
+            Cluster localCluster = clusterManager.getLocalCluster();
             Node localNode = clusterManager.getLocalNode();
             
             LOG.debug(String.format("requestDataChunk: Checking and putting a pending request for an on-demand transfer for - %s, %s", uri.toUri().toASCIIString(), hash));
@@ -809,7 +781,7 @@ public class TransportManager extends AbstractManager<AbstractTransportDriver> {
                     throw new IOException(String.format("remote cluster %s does not exist", uri.getClusterName()));
                 }
                 
-                Node remoteNode = this.transferLayoutAlgorithm.determineRemoteNode(remoteCluster, recipe, hash);
+                Node remoteNode = this.transferLayoutAlgorithm.determineRemoteNode(localCluster, localNode, remoteCluster, recipe, hash);
                 if(remoteNode == null) {
                     reference.decreaseReference();
                     if(reference.getReferenceCount() <= 0) {

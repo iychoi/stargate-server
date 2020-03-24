@@ -40,7 +40,7 @@ public class TransportManagerConfig extends ManagerConfig {
     private static final int DEFAULT_RECIPE_CACHE_TIMEOUT_SEC = 24*60*60; // 1day
     private static final int DEFAULT_DATACHUNK_CACHE_TIMEOUT_SEC = 7*24*60*60; // 7day
     
-    private TransferLayoutAlgorithms layoutAlgorithm = TransferLayoutAlgorithms.TRANSFER_LAYOUT_ALGORITHM_STATIC;
+    private TransferLayoutAlgorithms layoutAlgorithm = TransferLayoutAlgorithms.TRANSFER_LAYOUT_ALGORITHM_MASTER_COPY;
     private ContactNodeSelectionAlgorithms nodeSelectionAlgorithm = ContactNodeSelectionAlgorithms.CONTACT_NODE_SELECTION_ALGORITHM_ROUNDROBIN;
     
     private int transferThreads = DEFAULT_TRANSFER_THREADS;
@@ -96,7 +96,11 @@ public class TransportManagerConfig extends ManagerConfig {
     
     @JsonIgnore
     public TransferLayoutAlgorithms getLayoutAlgorithm() {
-        return this.layoutAlgorithm;
+        if(this.layoutAlgorithm != null) {
+            return this.layoutAlgorithm;
+        } else {
+            return TransferLayoutAlgorithms.TRANSFER_LAYOUT_ALGORITHM_MASTER_COPY;
+        }
     }
     
     @JsonProperty("transfer_layout")
@@ -131,7 +135,11 @@ public class TransportManagerConfig extends ManagerConfig {
     
     @JsonIgnore
     public ContactNodeSelectionAlgorithms getContactNodeSelectionAlgorithm() {
-        return this.nodeSelectionAlgorithm;
+        if(this.nodeSelectionAlgorithm != null) {
+            return this.nodeSelectionAlgorithm;
+        } else {
+            return ContactNodeSelectionAlgorithms.CONTACT_NODE_SELECTION_ALGORITHM_ROUNDROBIN;
+        }
     }
     
     @JsonProperty("contact_node_selection")

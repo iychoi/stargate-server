@@ -16,14 +16,11 @@
 package stargate.managers.transport.layout;
 
 import java.io.IOException;
-import java.util.Collection;
 import stargate.commons.cluster.Cluster;
 import stargate.commons.cluster.Node;
 import stargate.commons.datastore.AbstractBigKeyValueStore;
 import stargate.commons.recipe.Recipe;
-import stargate.commons.recipe.RecipeChunk;
 import stargate.commons.service.AbstractService;
-import stargate.commons.utils.StringUtils;
 import stargate.managers.transport.TransportManager;
 import stargate.service.StargateService;
 
@@ -31,11 +28,9 @@ import stargate.service.StargateService;
  *
  * @author iychoi
  */
-public class StaticTransferLayoutAlgorithm extends AbstractTransferLayoutAlgorithm {
+public class FavoriteAlwaysTransferLayoutAlgorithm extends AbstractTransferLayoutAlgorithm {
     
-    private AbstractBigKeyValueStore dataCacheStore;
-    
-    public StaticTransferLayoutAlgorithm(AbstractService service, TransportManager manager, AbstractBigKeyValueStore dataCacheStore) {
+    public FavoriteAlwaysTransferLayoutAlgorithm(AbstractService service, TransportManager manager, AbstractBigKeyValueStore dataCacheStore, AbstractContactNodeSelectionAlgorithm contactNodeSelectionAlgorithm) {
         if(service == null) {
             throw new IllegalArgumentException("service is null");
         }
@@ -46,6 +41,14 @@ public class StaticTransferLayoutAlgorithm extends AbstractTransferLayoutAlgorit
         
         if(dataCacheStore == null) {
             throw new IllegalArgumentException("dataCacheStore is null");
+        }
+        
+        if(contactNodeSelectionAlgorithm == null) {
+            throw new IllegalArgumentException("contactNodeSelectionAlgorithm is null");
+        }
+        
+        if(contactNodeSelectionAlgorithm == null) {
+            throw new IllegalArgumentException("contactNodeSelectionAlgorithm is null");
         }
         
         if(!(service instanceof StargateService)) {
@@ -62,11 +65,11 @@ public class StaticTransferLayoutAlgorithm extends AbstractTransferLayoutAlgorit
         
         this.service = (StargateService) service;
         this.manager = manager;
-        
         this.dataCacheStore = dataCacheStore;
+        this.contactNodeSelectionAlgorithm = contactNodeSelectionAlgorithm;
     }
     
-    public StaticTransferLayoutAlgorithm(StargateService service, TransportManager manager, AbstractBigKeyValueStore dataCacheStore) {
+    public FavoriteAlwaysTransferLayoutAlgorithm(StargateService service, TransportManager manager, AbstractBigKeyValueStore dataCacheStore, AbstractContactNodeSelectionAlgorithm contactNodeSelectionAlgorithm) {
         if(service == null) {
             throw new IllegalArgumentException("service is null");
         }
@@ -79,6 +82,10 @@ public class StaticTransferLayoutAlgorithm extends AbstractTransferLayoutAlgorit
             throw new IllegalArgumentException("dataCacheStore is null");
         }
         
+        if(contactNodeSelectionAlgorithm == null) {
+            throw new IllegalArgumentException("contactNodeSelectionAlgorithm is null");
+        }
+        
         if(!service.isStarted()) {
             throw new IllegalArgumentException("service is not started");
         }
@@ -89,8 +96,8 @@ public class StaticTransferLayoutAlgorithm extends AbstractTransferLayoutAlgorit
         
         this.service = service;
         this.manager = manager;
-        
         this.dataCacheStore = dataCacheStore;
+        this.contactNodeSelectionAlgorithm = contactNodeSelectionAlgorithm;
     }
     
     @Override
@@ -122,9 +129,21 @@ public class StaticTransferLayoutAlgorithm extends AbstractTransferLayoutAlgorit
         Node node = cluster.getNode(primaryNodeName);
         return node;
     }
+    
+    private Node getFavoriteNode(Cluster localCluster, Node localNode, Cluster remoteCluster) throws IOException {
+        return this.contactNodeSelectionAlgorithm.getResponsibleRemoteNode(localCluster, localNode, remoteCluster);
+    }
 
     @Override
-    public Node determineRemoteNode(Cluster remoteCluster, Recipe recipe, String hash) throws IOException {
+    public Node determineRemoteNode(Cluster localCluster, Node localNode, Cluster remoteCluster, Recipe recipe, String hash) throws IOException {
+        if(localCluster == null) {
+            throw new IllegalArgumentException("localCluster is null");
+        }
+        
+        if(localNode == null) {
+            throw new IllegalArgumentException("localNode is null");
+        }
+        
         if(remoteCluster == null) {
             throw new IllegalArgumentException("remoteCluster is null");
         }
@@ -137,24 +156,7 @@ public class StaticTransferLayoutAlgorithm extends AbstractTransferLayoutAlgorit
             throw new IllegalArgumentException("hash is null or empty");
         }
         
-        RecipeChunk chunk = recipe.getChunk(hash);
-        Collection<Integer> nodeIDs = chunk.getNodeIDs();
-        if(nodeIDs.isEmpty()) {
-            throw new IOException(String.format("There is no node for hash %s", hash));
-        }
-        
-        Collection<String> nodeNames = recipe.getNodeNames(nodeIDs);
-        if(nodeNames.isEmpty()) {
-            throw new IOException(String.format("Cannot get node names for node IDs: %s", StringUtils.getCommaSeparatedString(nodeIDs)));
-        }
-        
-        for(String nodeName : nodeNames) {
-            Node remoteNode = remoteCluster.getNode(nodeName);
-            // we return very first node who has the chunk
-            return remoteNode;
-        }
-        
-        // ERROR
-        throw new IOException(String.format("Cannot determine remote node for hash %s, nodeNames %s", hash, StringUtils.getCommaSeparatedString(nodeNames)));
+        Node favoriteNode = getFavoriteNode(localCluster, localNode, remoteCluster);
+        return favoriteNode;
     }
 }

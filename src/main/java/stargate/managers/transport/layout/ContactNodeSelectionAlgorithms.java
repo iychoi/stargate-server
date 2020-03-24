@@ -15,6 +15,11 @@
 */
 package stargate.managers.transport.layout;
 
+import java.io.IOException;
+import stargate.commons.service.AbstractService;
+import stargate.managers.transport.TransportManager;
+import stargate.service.StargateService;
+
 /**
  *
  * @author iychoi
@@ -40,5 +45,24 @@ public enum ContactNodeSelectionAlgorithms {
             }
         }
         return null;
+    }
+    
+    public AbstractContactNodeSelectionAlgorithm createInstance(AbstractService service, TransportManager manager) throws IOException {
+        if(!(service instanceof StargateService)) {
+            throw new IllegalArgumentException("service is not an instance of StargateService");
+        }
+        
+        return createInstance((StargateService) service, manager);
+    }
+    
+    public AbstractContactNodeSelectionAlgorithm createInstance(StargateService service, TransportManager manager) throws IOException {
+        switch(this) {
+            case CONTACT_NODE_SELECTION_ALGORITHM_ROUNDROBIN:
+                return new RoundRobinContactNodeSelectionAlgorithm(service, manager);
+            case CONTACT_NODE_SELECTION_ALGORITHM_RANDOM:
+                return new RandomContactNodeSelectionAlgorithm(service, manager);
+            default:
+                throw new IOException(String.format("Cannot find node selection algorithm %s", this.name()));
+        }
     }
 }

@@ -15,12 +15,20 @@
 */
 package stargate.managers.transport.layout;
 
+import java.io.IOException;
+import stargate.commons.datastore.AbstractBigKeyValueStore;
+import stargate.commons.service.AbstractService;
+import stargate.managers.transport.TransportManager;
+import stargate.service.StargateService;
+
 /**
  *
  * @author iychoi
  */
 public enum TransferLayoutAlgorithms {
-    TRANSFER_LAYOUT_ALGORITHM_STATIC ("static"),
+    TRANSFER_LAYOUT_ALGORITHM_MASTER_COPY ("mastercopy"),
+    TRANSFER_LAYOUT_ALGORITHM_FAVORITE_ALWAYS ("favorite_always"),
+    TRANSFER_LAYOUT_ALGORITHM_FAVORITE_FIRST ("favorite_first"),
     TRANSFER_LAYOUT_ALGORITHM_FAIR ("fair");
     
     private String strVal;
@@ -38,11 +46,30 @@ public enum TransferLayoutAlgorithms {
             if(type.getStringVal().equalsIgnoreCase(strVal)) {
                 return type;
             }
-            
-            if(type.name().equalsIgnoreCase(strVal)) {
-                return type;
-            }
         }
         return null;
+    }
+    
+    public AbstractTransferLayoutAlgorithm createInstance(AbstractService service, TransportManager manager, AbstractBigKeyValueStore bigKeyValueStore, AbstractContactNodeSelectionAlgorithm contactNodeSelectionAlgorithm) throws IOException {
+        if(!(service instanceof StargateService)) {
+            throw new IllegalArgumentException("service is not an instance of StargateService");
+        }
+        
+        return createInstance((StargateService) service, manager, bigKeyValueStore, contactNodeSelectionAlgorithm);
+    }
+    
+    public AbstractTransferLayoutAlgorithm createInstance(StargateService service, TransportManager manager, AbstractBigKeyValueStore bigKeyValueStore, AbstractContactNodeSelectionAlgorithm contactNodeSelectionAlgorithm) throws IOException {
+        switch(this) {
+            case TRANSFER_LAYOUT_ALGORITHM_MASTER_COPY:
+                return new MasterCopyTransferLayoutAlgorithm(service, manager, bigKeyValueStore, contactNodeSelectionAlgorithm);
+            case TRANSFER_LAYOUT_ALGORITHM_FAVORITE_ALWAYS:
+                return new FavoriteAlwaysTransferLayoutAlgorithm(service, manager, bigKeyValueStore, contactNodeSelectionAlgorithm);
+            case TRANSFER_LAYOUT_ALGORITHM_FAVORITE_FIRST:
+                return new FavoriteFirstTransferLayoutAlgorithm(service, manager, bigKeyValueStore, contactNodeSelectionAlgorithm);
+            case TRANSFER_LAYOUT_ALGORITHM_FAIR:
+                return new FairTransferLayoutAlgorithm(service, manager, bigKeyValueStore, contactNodeSelectionAlgorithm);
+            default:
+                throw new IOException(String.format("Cannot find transfer layout algorithm %s", this.name()));
+        }
     }
 }
