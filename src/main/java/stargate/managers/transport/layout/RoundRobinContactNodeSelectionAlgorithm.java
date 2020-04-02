@@ -25,6 +25,7 @@ import org.apache.commons.logging.Log;
 import org.apache.commons.logging.LogFactory;
 import stargate.commons.cluster.Cluster;
 import stargate.commons.cluster.Node;
+import stargate.commons.cluster.NodeNameComparator;
 import stargate.commons.service.AbstractService;
 import stargate.managers.transport.TransportManager;
 import stargate.service.StargateService;
@@ -107,6 +108,9 @@ public class RoundRobinContactNodeSelectionAlgorithm extends AbstractContactNode
 
         NodeMapping mapping = responsibleRemoteNodeMappings.getNodeMapping(localNode.getName());
         Collection<String> targetNodeNames = mapping.getTargetNodeNames();
+        if(targetNodeNames == null || targetNodeNames.isEmpty()) {
+            throw new IOException(String.format("Could not find responsible remote nodes for : %s", localNode.getName()));
+        }
 
         for(String targetNodeName : targetNodeNames) {
             Node remoteNode = remoteCluster.getNode(targetNodeName);
@@ -126,8 +130,10 @@ public class RoundRobinContactNodeSelectionAlgorithm extends AbstractContactNode
             List<Node> remoteNodes = new ArrayList<Node>();
 
             localNodes.addAll(localCluster.getNodes());
+            localNodes.sort(new NodeNameComparator());
             int localNodeNum = localNodes.size();
             remoteNodes.addAll(remoteCluster.getNodes());
+            remoteNodes.sort(new NodeNameComparator());
             int remoteNodeNum = remoteNodes.size();
 
             // round-robin mapping
