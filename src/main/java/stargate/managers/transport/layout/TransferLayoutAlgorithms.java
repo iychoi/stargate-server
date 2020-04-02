@@ -29,6 +29,7 @@ public enum TransferLayoutAlgorithms {
     TRANSFER_LAYOUT_ALGORITHM_MASTER_COPY ("mastercopy"),
     TRANSFER_LAYOUT_ALGORITHM_FAVORITE_ALWAYS ("favorite_always"),
     TRANSFER_LAYOUT_ALGORITHM_FAVORITE_FIRST ("favorite_first"),
+    TRANSFER_LAYOUT_ALGORITHM_MASTER_NODE ("masternode"),
     TRANSFER_LAYOUT_ALGORITHM_FAIR ("fair");
     
     private String strVal;
@@ -66,6 +67,8 @@ public enum TransferLayoutAlgorithms {
                 return new FavoriteAlwaysTransferLayoutAlgorithm(service, manager, bigKeyValueStore, contactNodeSelectionAlgorithm);
             case TRANSFER_LAYOUT_ALGORITHM_FAVORITE_FIRST:
                 return new FavoriteFirstTransferLayoutAlgorithm(service, manager, bigKeyValueStore, contactNodeSelectionAlgorithm);
+            case TRANSFER_LAYOUT_ALGORITHM_MASTER_NODE:
+                return new MasterNodeTransferLayoutAlgorithm(service, manager, bigKeyValueStore, contactNodeSelectionAlgorithm);
             case TRANSFER_LAYOUT_ALGORITHM_FAIR:
                 return new FairTransferLayoutAlgorithm(service, manager, bigKeyValueStore, contactNodeSelectionAlgorithm);
             default:
