@@ -27,6 +27,7 @@ import java.util.Map;
 import org.apache.commons.logging.Log;
 import org.apache.commons.logging.LogFactory;
 import stargate.commons.cluster.Cluster;
+import stargate.commons.cluster.Node;
 import stargate.commons.dataobject.DataObjectMetadata;
 import stargate.commons.dataobject.DataObjectURI;
 import stargate.commons.dataobject.Directory;
@@ -51,6 +52,7 @@ import stargate.managers.datastore.DataStoreManager;
 import stargate.managers.recipe.RecipeManager;
 import stargate.commons.userinterface.DataChunkSource;
 import stargate.commons.userinterface.DataChunkStatus;
+import stargate.managers.statistics.StatisticsManager;
 import stargate.managers.transport.TransportManager;
 import stargate.service.StargateService;
 
@@ -670,7 +672,9 @@ public class VolumeManager extends AbstractManager<NullDriver> {
             StargateService service = getStargateService();
             DataExportManager dataExportManager = service.getDataExportManager();
             DataSourceManager dataSourceManager = service.getDataSourceManager();
-
+            ClusterManager clusterManager = service.getClusterManager();
+            StatisticsManager statisticsManager = service.getStatisticsManager();
+            
             // find data object metadata
             DataObjectMetadata metadata = recipe.getMetadata();
             
@@ -692,6 +696,19 @@ public class VolumeManager extends AbstractManager<NullDriver> {
             RecipeChunk chunk = recipe.getChunk(hash);
             if(chunk == null) {
                 throw new IOException(String.format("cannot find a chunk for hash %s", hash));
+            }
+            
+            Collection<Integer> nodeIDs = chunk.getNodeIDs();
+            Collection<String> nodeNames = recipe.getNodeNames(nodeIDs);
+            
+            Node localNode = clusterManager.getLocalNode();
+            String localNodeName = localNode.getName();
+            if(nodeNames.contains(localNodeName)) {
+                // local node access
+                statisticsManager.addLocalNodeDataChunkTransferSendStatistics(hash);
+            } else {
+                // remote node access
+                statisticsManager.addRemoteNodeDataChunkTransferSendStatistics(hash);
             }
             
             // access the file

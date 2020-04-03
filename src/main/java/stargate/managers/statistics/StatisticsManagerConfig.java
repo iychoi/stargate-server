@@ -27,7 +27,7 @@ import stargate.commons.manager.ManagerConfig;
  */
 public class StatisticsManagerConfig extends ManagerConfig {
     
-    private static final int DEFAULT_STATISTICS_ENTRY_CAPACITY = 1000;
+    private static final int DEFAULT_STATISTICS_ENTRY_CAPACITY = 10000;
     
     private int entryCapacity = DEFAULT_STATISTICS_ENTRY_CAPACITY;
     

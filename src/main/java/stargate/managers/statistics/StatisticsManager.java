@@ -193,6 +193,16 @@ public class StatisticsManager extends AbstractManager<NullDriver> {
         addStatistics(StatisticsType.STATISTICS_TYPE_DATA_CHUNK_TRANSFER_SEND, format);
     }
     
+    public synchronized void addLocalNodeDataChunkTransferSendStatistics(String hash) throws IOException {
+        String format = String.format("hash(%s)", hash);
+        addStatistics(StatisticsType.STATISTICS_TYPE_LOCAL_NODE_DATA_CHUNK_TRANSFER_SEND, format);
+    }
+    
+    public synchronized void addRemoteNodeDataChunkTransferSendStatistics(String hash) throws IOException {
+        String format = String.format("hash(%s)", hash);
+        addStatistics(StatisticsType.STATISTICS_TYPE_REMOTE_NODE_DATA_CHUNK_TRANSFER_SEND, format);
+    }
+    
     public void clearStatistics(StatisticsType type) throws IOException {
         if(type == null) {
             throw new IllegalStateException("type is null");
