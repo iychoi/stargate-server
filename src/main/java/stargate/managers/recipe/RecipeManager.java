@@ -24,10 +24,13 @@ import java.util.Collections;
 import java.util.Comparator;
 import java.util.Iterator;
 import java.util.List;
+import java.util.logging.Level;
+import java.util.logging.Logger;
 import org.apache.commons.logging.Log;
 import org.apache.commons.logging.LogFactory;
 import stargate.commons.cluster.AbstractClusterDriver;
 import stargate.commons.cluster.Cluster;
+import stargate.commons.cluster.Node;
 import stargate.commons.dataobject.DataObjectMetadata;
 import stargate.commons.dataobject.DataObjectURI;
 import stargate.commons.datasource.AbstractDataSourceDriver;
@@ -395,15 +398,53 @@ public class RecipeManager extends AbstractManager<AbstractRecipeDriver> {
             }
 
             Collection<String> recipeNames = reverseRecipeMapping.getRecipeNames();
-            for(String recipeName : recipeNames) {
-                Recipe recipe = (Recipe) this.recipeStore.get(recipeName);
-                RecipeChunk chunk = recipe.getChunk(hash);
-                if(chunk != null) {
-                    return recipe;
+            if(recipeNames.size() == 1) {
+                for(String recipeName : recipeNames) {
+                    Recipe recipe = (Recipe) this.recipeStore.get(recipeName);
+                    RecipeChunk chunk = recipe.getChunk(hash);
+                    if(chunk != null) {
+                        return recipe;
+                    }
+                }
+                return null;
+            } else {
+                // select recipe that has local block
+                try {
+                    StargateService stargateService = getStargateService();
+
+                    ClusterManager clusterManager = stargateService.getClusterManager();
+                    Node localNode = clusterManager.getLocalNode();
+                    
+                    for(String recipeName : recipeNames) {
+                        Recipe recipe = (Recipe) this.recipeStore.get(recipeName);
+                        int nodeID = recipe.getNodeID(localNode.getName());
+                        
+                        RecipeChunk chunk = recipe.getChunk(hash);
+                        if(chunk != null) {
+                            if(chunk.containsNodeID(nodeID)) {
+                                return recipe;
+                            }
+                        }
+                    }
+                    
+                    // no local node -- return any
+                    for(String recipeName : recipeNames) {
+                        Recipe recipe = (Recipe) this.recipeStore.get(recipeName);
+                        RecipeChunk chunk = recipe.getChunk(hash);
+                        if(chunk != null) {
+                            return recipe;
+                        }
+                    }
+
+                    return null;
+                } catch (ManagerNotInstantiatedException ex) {
+                    LOG.error("Manager is not instantiated", ex);
+                    throw new IOException(ex);
+                } catch (DriverNotInitializedException ex) {
+                    LOG.error("Driver is not initialied", ex);
+                    throw new IOException(ex);
                 }
             }
-
-            return null;
         }
     }
     
