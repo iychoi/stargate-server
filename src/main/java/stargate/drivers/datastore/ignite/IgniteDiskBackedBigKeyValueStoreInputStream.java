@@ -30,13 +30,13 @@ import stargate.commons.utils.DateTimeUtils;
  *
  * @author iychoi
  */
-public class IgniteCacheInputStream extends AbstractSeekableInputStream {
+public class IgniteDiskBackedBigKeyValueStoreInputStream extends AbstractSeekableInputStream {
 
-    private static final Log LOG = LogFactory.getLog(IgniteCacheInputStream.class);
+    private static final Log LOG = LogFactory.getLog(IgniteDiskBackedBigKeyValueStoreInputStream.class);
     
     private static final int BUFFER_SIZE = 64 * 1024;
     
-    private IgniteBigKeyValueStore store;
+    private IgniteDiskBackedBigKeyValueStore store;
     private IgniteDataStoreDriverConfig config;
     private BigKeyValueStoreMetadata metadata;
     private long beginOffset;
@@ -49,7 +49,7 @@ public class IgniteCacheInputStream extends AbstractSeekableInputStream {
     private BufferedInputStream cacheInputStream;
     private Object waitingObject = new Object();
     
-    IgniteCacheInputStream(IgniteBigKeyValueStore store, IgniteDataStoreDriverConfig config, BigKeyValueStoreMetadata metadata) throws IOException {
+    IgniteDiskBackedBigKeyValueStoreInputStream(IgniteDiskBackedBigKeyValueStore store, IgniteDataStoreDriverConfig config, BigKeyValueStoreMetadata metadata) throws IOException {
         if(store == null) {
             throw new IllegalArgumentException("store is null");
         }
@@ -78,7 +78,7 @@ public class IgniteCacheInputStream extends AbstractSeekableInputStream {
         this.cacheInputStream = null;
     }
     
-    IgniteCacheInputStream(IgniteBigKeyValueStore store, IgniteDataStoreDriverConfig config, BigKeyValueStoreMetadata metadata, long beginOffset, long size) throws IOException {
+    IgniteDiskBackedBigKeyValueStoreInputStream(IgniteDiskBackedBigKeyValueStore store, IgniteDataStoreDriverConfig config, BigKeyValueStoreMetadata metadata, long beginOffset, long size) throws IOException {
         if(store == null) {
             throw new IllegalArgumentException("store is null");
         }

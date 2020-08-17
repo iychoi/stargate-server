@@ -170,7 +170,7 @@ public class IgniteDataStoreDriver extends AbstractDataStoreDriver {
                 ClusterManager clusterManager = service.getClusterManager();
                 Cluster localCluster = clusterManager.getLocalCluster();
                 Collection<String> dataNodeNames = localCluster.getDataNodeNames();
-                store = new IgniteBigKeyValueStore(this, this.config, this.igniteDriver, name, dataNodeNames, properties);
+                store = new IgniteDiskBackedBigKeyValueStore(this, this.config, this.igniteDriver, name, dataNodeNames, properties);
                 this.bigKVStores.put(name, store);
             } catch (ManagerNotInstantiatedException ex) {
                 LOG.error("Manager not instantiated");

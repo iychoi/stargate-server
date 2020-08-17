@@ -55,9 +55,9 @@ import stargate.drivers.ignite.IgniteDriver;
  *
  * @author iychoi
  */
-public class IgniteBigKeyValueStore extends AbstractBigKeyValueStore {
+public class IgniteDiskBackedBigKeyValueStore extends AbstractBigKeyValueStore {
 
-    private static final Log LOG = LogFactory.getLog(IgniteBigKeyValueStore.class);
+    private static final Log LOG = LogFactory.getLog(IgniteDiskBackedBigKeyValueStore.class);
     
     private static final int BUFFER_SIZE = 64 * 1024;
     
@@ -71,9 +71,9 @@ public class IgniteBigKeyValueStore extends AbstractBigKeyValueStore {
     private IgniteCache<String, ByteArray> store;
     private Affinity<String> affinity;
     private Map<String, Thread> putThreads = new ConcurrentHashMap<String, Thread>();
-    private Map<String, List<IgniteCacheInputStream>> openedInputStreams = new HashMap<String, List<IgniteCacheInputStream>>();
+    private Map<String, List<IgniteDiskBackedBigKeyValueStoreInputStream>> openedInputStreams = new HashMap<String, List<IgniteDiskBackedBigKeyValueStoreInputStream>>();
     
-    public IgniteBigKeyValueStore(IgniteDataStoreDriver driver, IgniteDataStoreDriverConfig config, IgniteDriver igniteDriver, String name, Collection<String> dataNodeNames, DataStoreProperties properties) throws IOException {
+    public IgniteDiskBackedBigKeyValueStore(IgniteDataStoreDriver driver, IgniteDataStoreDriverConfig config, IgniteDriver igniteDriver, String name, Collection<String> dataNodeNames, DataStoreProperties properties) throws IOException {
         if(driver == null) {
             throw new IllegalArgumentException("driver is null");
         }
@@ -211,11 +211,11 @@ public class IgniteBigKeyValueStore extends AbstractBigKeyValueStore {
             BigKeyValueStoreMetadata metadata = BigKeyValueStoreMetadata.fromBytes(bytes.getArray());
 
             LOG.info(String.format("getData: return data - %s", key));
-            IgniteCacheInputStream inputStream = new IgniteCacheInputStream(this, this.config, metadata);
+            IgniteDiskBackedBigKeyValueStoreInputStream inputStream = new IgniteDiskBackedBigKeyValueStoreInputStream(this, this.config, metadata);
             synchronized(this.openedInputStreams) {
-                List<IgniteCacheInputStream> inputStreams = this.openedInputStreams.get(key);
+                List<IgniteDiskBackedBigKeyValueStoreInputStream> inputStreams = this.openedInputStreams.get(key);
                 if(inputStreams == null) {
-                    inputStreams = new ArrayList<IgniteCacheInputStream>();
+                    inputStreams = new ArrayList<IgniteDiskBackedBigKeyValueStoreInputStream>();
                 }
                 inputStreams.add(inputStream);
                 this.openedInputStreams.put(key, inputStreams);
@@ -271,11 +271,11 @@ public class IgniteBigKeyValueStore extends AbstractBigKeyValueStore {
 
             LOG.info(String.format("getDataPart: return data - %s, %d", key, partNo));
             int partSize = this.driver.getPartSize();
-            IgniteCacheInputStream inputStream = new IgniteCacheInputStream(this, this.config, metadata, BigKeyValueStoreUtils.getPartStartOffset(partSize, partNo), BigKeyValueStoreUtils.getPartSize(metadata.getEntrySize(), partSize, partNo));
+            IgniteDiskBackedBigKeyValueStoreInputStream inputStream = new IgniteDiskBackedBigKeyValueStoreInputStream(this, this.config, metadata, BigKeyValueStoreUtils.getPartStartOffset(partSize, partNo), BigKeyValueStoreUtils.getPartSize(metadata.getEntrySize(), partSize, partNo));
             synchronized(this.openedInputStreams) {
-                List<IgniteCacheInputStream> partInputStreams = this.openedInputStreams.get(key);
+                List<IgniteDiskBackedBigKeyValueStoreInputStream> partInputStreams = this.openedInputStreams.get(key);
                 if(partInputStreams == null) {
-                    partInputStreams = new ArrayList<IgniteCacheInputStream>();
+                    partInputStreams = new ArrayList<IgniteDiskBackedBigKeyValueStoreInputStream>();
                 }
                 partInputStreams.add(inputStream);
                 this.openedInputStreams.put(key, partInputStreams);
@@ -288,9 +288,9 @@ public class IgniteBigKeyValueStore extends AbstractBigKeyValueStore {
         }
     }
     
-    public void notifyInputStreamClosed(String key, IgniteCacheInputStream is) {
+    public void notifyInputStreamClosed(String key, IgniteDiskBackedBigKeyValueStoreInputStream is) {
         synchronized(this.openedInputStreams) {
-            List<IgniteCacheInputStream> inputStreams = this.openedInputStreams.get(key);
+            List<IgniteDiskBackedBigKeyValueStoreInputStream> inputStreams = this.openedInputStreams.get(key);
             if(inputStreams != null) {
                 inputStreams.remove(is);
                 this.openedInputStreams.put(key, inputStreams);
@@ -343,10 +343,10 @@ public class IgniteBigKeyValueStore extends AbstractBigKeyValueStore {
                             
                             // notify
                             synchronized(openedInputStreams) {
-                                List<IgniteCacheInputStream> inputStreams = openedInputStreams.get(key);
+                                List<IgniteDiskBackedBigKeyValueStoreInputStream> inputStreams = openedInputStreams.get(key);
                                 if(inputStreams != null) {
                                     os.flush();
-                                    for(IgniteCacheInputStream is : inputStreams) {
+                                    for(IgniteDiskBackedBigKeyValueStoreInputStream is : inputStreams) {
                                         is.notifyDataAvailability(readOffset);
                                     }
                                 }
