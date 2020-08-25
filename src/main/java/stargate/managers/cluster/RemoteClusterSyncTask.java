@@ -35,8 +35,8 @@ import stargate.managers.transport.TransportManager;
 public class RemoteClusterSyncTask extends TimerTask {
     private static final Log LOG = LogFactory.getLog(RemoteClusterSyncTask.class);
     
-    private static final long DEFAULT_TASK_DELAY_SEC = 60*60;
-    private static final long DEFAULT_TASK_PERIOD_SEC = 60*60;
+    private static final long DEFAULT_TASK_DELAY_SEC = 24*60*60;
+    private static final long DEFAULT_TASK_PERIOD_SEC = 24*60*60;
     
     private long taskDelaySec = DEFAULT_TASK_DELAY_SEC;
     private long taskPeriodSec = DEFAULT_TASK_PERIOD_SEC;

@@ -1229,7 +1229,7 @@ public class HTTPUserInterfaceServlet extends AbstractUserInterfaceServer {
     
     @GET
     @Path(HTTPUserInterfaceRestfulConstants.API_PATH + "/" + HTTPUserInterfaceRestfulConstants.API_GET_DATA_CHUNK_PATH + "/{path:.*}/{hash:.*}")
-    @Produces({MediaType.APPLICATION_OCTET_STREAM, MediaType.APPLICATION_JSON})
+    @Produces(MediaType.APPLICATION_OCTET_STREAM)
     public Response getDataChunkRestful(
             @DefaultValue("") @PathParam("path") String path,
             @DefaultValue("") @PathParam("hash") String hash) throws IOException {
@@ -1258,8 +1258,7 @@ public class HTTPUserInterfaceServlet extends AbstractUserInterfaceServer {
             
             return res;
         } catch (Exception ex) {
-            RestfulResponse rres = new RestfulResponse(ex);
-            Response res = Response.status(Response.Status.INTERNAL_SERVER_ERROR).entity(rres).build();
+            Response res = Response.status(Response.Status.INTERNAL_SERVER_ERROR).build();
             
             LOG.info(String.format("RES (ERR) - getDataChunkRestful - %s (%s)", path, hash), ex);
             
@@ -1295,7 +1294,7 @@ public class HTTPUserInterfaceServlet extends AbstractUserInterfaceServer {
     
     @GET
     @Path(HTTPUserInterfaceRestfulConstants.API_PATH + "/" + HTTPUserInterfaceRestfulConstants.API_GET_DATA_CHUNK_PART_PATH + "/{path:.*}/{hash:.*}/{partNoStr:\\d*}")
-    @Produces({MediaType.APPLICATION_OCTET_STREAM, MediaType.APPLICATION_JSON})
+    @Produces(MediaType.APPLICATION_OCTET_STREAM)
     public Response getDataChunkPartRestful(
             @DefaultValue("") @PathParam("path") String path,
             @DefaultValue("") @PathParam("hash") String hash,
@@ -1334,8 +1333,7 @@ public class HTTPUserInterfaceServlet extends AbstractUserInterfaceServer {
             
             return res;
         } catch (Exception ex) {
-            RestfulResponse rres = new RestfulResponse(ex);
-            Response res = Response.status(Response.Status.INTERNAL_SERVER_ERROR).entity(rres).build();
+            Response res = Response.status(Response.Status.INTERNAL_SERVER_ERROR).build();
             
             LOG.info(String.format("RES (ERR) - getDataChunkPartRestful - %s (%s, %d)", path, hash, partNo), ex);
             

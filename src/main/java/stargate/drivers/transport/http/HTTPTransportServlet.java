@@ -423,7 +423,7 @@ public class HTTPTransportServlet extends AbstractTransportServer {
     
     @GET
     @Path(HTTPTransportRestfulConstants.API_PATH + "/" + HTTPTransportRestfulConstants.API_GET_DATA_CHUNK_PATH + "/{hash:.*}")
-    @Produces({MediaType.APPLICATION_OCTET_STREAM, MediaType.APPLICATION_JSON})
+    @Produces(MediaType.APPLICATION_OCTET_STREAM)
     public Response getDataChunkRestful(
             @DefaultValue("") @PathParam("hash") String hash) throws Exception {
         if(hash == null || hash.isEmpty()) {
@@ -446,8 +446,7 @@ public class HTTPTransportServlet extends AbstractTransportServer {
             
             return res;
         } catch (Exception ex) {
-            RestfulResponse rres = new RestfulResponse(ex);
-            Response res = Response.status(Response.Status.INTERNAL_SERVER_ERROR).entity(rres).build();
+            Response res = Response.status(Response.Status.INTERNAL_SERVER_ERROR).build();
             
             LOG.info(String.format("RES (ERR) - getDataChunkRestful - %s", hash), ex);
             

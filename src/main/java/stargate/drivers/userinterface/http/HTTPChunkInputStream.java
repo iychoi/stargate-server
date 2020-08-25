@@ -28,6 +28,7 @@ import org.apache.commons.logging.LogFactory;
 import org.apache.hadoop.fs.FSInputStream;
 import stargate.commons.dataobject.DataObjectMetadata;
 import stargate.commons.dataobject.DataObjectURI;
+import stargate.commons.io.UnrewindableChunkDataInputStream;
 import stargate.commons.recipe.Recipe;
 import stargate.commons.recipe.RecipeChunk;
 import stargate.commons.userinterface.DataChunkStatus;
@@ -49,7 +50,7 @@ public class HTTPChunkInputStream extends FSInputStream {
     private Recipe recipe;
     private long offset;
     private long size;
-    private ChunkDataInputStream chunkDataInputStream;
+    private UnrewindableChunkDataInputStream chunkDataInputStream;
     
     public HTTPChunkInputStream(Map<String, HTTPUserInterfaceClient> clients, Recipe recipe) {
         if(clients == null) {
@@ -202,10 +203,19 @@ public class HTTPChunkInputStream extends FSInputStream {
         
         if(this.chunkDataInputStream != null) {
             if(this.chunkDataInputStream.containsOffset(this.offset)) {
-                // safe to reuse
+                // contains data
+                
+                // check if target offset is forward
                 long seek = this.offset - this.chunkDataInputStream.getChunkStartOffset();
-                this.chunkDataInputStream.seek(seek);
-                return;
+                if(this.chunkDataInputStream.getOffset() <= seek) {
+                    // safe to reuse
+                    this.chunkDataInputStream.seek(seek);
+                    return;
+                } else {
+                    // backword
+                    this.chunkDataInputStream.close();
+                    this.chunkDataInputStream = null;
+                }
             } else {
                 this.chunkDataInputStream.close();
                 this.chunkDataInputStream = null;
@@ -229,7 +239,7 @@ public class HTTPChunkInputStream extends FSInputStream {
             DataChunkStatus dataChunkStatus = this.initializedChunkMap.get(hash);
             InputStream dataChunkIS = client.getDataChunk(uri, hash, dataChunkStatus);
             
-            this.chunkDataInputStream = new ChunkDataInputStream(dataChunkIS, chunk.getOffset(), chunk.getLength());
+            this.chunkDataInputStream = new UnrewindableChunkDataInputStream(dataChunkIS, chunk.getOffset(), chunk.getLength());
             long seek = this.offset - chunk.getOffset();
             this.chunkDataInputStream.seek(seek);
         }

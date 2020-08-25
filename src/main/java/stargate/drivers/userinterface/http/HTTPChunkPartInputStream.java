@@ -29,6 +29,7 @@ import org.apache.hadoop.fs.FSInputStream;
 import stargate.commons.dataobject.DataObjectMetadata;
 import stargate.commons.dataobject.DataObjectURI;
 import stargate.commons.datastore.BigKeyValueStoreUtils;
+import stargate.commons.io.UnrewindableChunkDataPartInputStream;
 import stargate.commons.recipe.Recipe;
 import stargate.commons.recipe.RecipeChunk;
 import stargate.commons.userinterface.DataChunkStatus;
@@ -51,7 +52,7 @@ public class HTTPChunkPartInputStream extends FSInputStream {
     private long offset;
     private long size;
     private int partSize;
-    private ChunkDataPartInputStream chunkDataPartInputStream;
+    private UnrewindableChunkDataPartInputStream chunkDataPartInputStream;
     
     public HTTPChunkPartInputStream(Map<String, HTTPUserInterfaceClient> clients, Recipe recipe, int partSize) {
         if(clients == null) {
@@ -213,10 +214,19 @@ public class HTTPChunkPartInputStream extends FSInputStream {
         
         if(this.chunkDataPartInputStream != null) {
             if(this.chunkDataPartInputStream.containsOffset(this.offset)) {
-                // safe to reuse
+                // contains data
+                
+                // check if target offset is forward
                 long seek = this.offset - (this.chunkDataPartInputStream.getChunkStartOffset() + this.chunkDataPartInputStream.getPartStartOffsetInChunk());
-                this.chunkDataPartInputStream.seek(seek);
-                return;
+                if(this.chunkDataPartInputStream.getOffset() <= seek) {
+                    // safe to reuse
+                    this.chunkDataPartInputStream.seek(seek);
+                    return;
+                } else {
+                    // backword
+                    this.chunkDataPartInputStream.close();
+                    this.chunkDataPartInputStream = null;
+                }
             } else {
                 this.chunkDataPartInputStream.close();
                 this.chunkDataPartInputStream = null;
@@ -241,7 +251,7 @@ public class HTTPChunkPartInputStream extends FSInputStream {
             DataChunkStatus dataChunkStatus = this.initializedChunkMap.get(hash);
             InputStream dataChunkIS = client.getDataChunkPart(uri, hash, partNo, dataChunkStatus);
             
-            this.chunkDataPartInputStream = new ChunkDataPartInputStream(dataChunkIS, chunk.getOffset(), chunk.getLength(), partNo, this.partSize);
+            this.chunkDataPartInputStream = new UnrewindableChunkDataPartInputStream(dataChunkIS, chunk.getOffset(), chunk.getLength(), partNo, this.partSize);
             long seek = this.offset - (this.chunkDataPartInputStream.getChunkStartOffset() + this.chunkDataPartInputStream.getPartStartOffsetInChunk());
             this.chunkDataPartInputStream.seek(seek);
         }

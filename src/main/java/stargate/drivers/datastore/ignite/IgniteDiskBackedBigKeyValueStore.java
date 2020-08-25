@@ -299,7 +299,16 @@ public class IgniteDiskBackedBigKeyValueStore extends AbstractBigKeyValueStore {
     }
     
     private File makeCacheFilePath(String key) {
-        return new File(this.igniteDriver.getStorageRootPath(), key);
+        File cacheRootPath = this.config.getCachePath();
+        File cachePath;
+        if(cacheRootPath == null) {
+            // use storage root path
+            cachePath = new File(this.igniteDriver.getStorageRootPath(), key);
+        } else {
+            cachePath = new File(cacheRootPath, key);
+        }
+        
+        return cachePath;
     }
     
     private void putAsync(String key, InputStream dataIS, long size) throws IOException {

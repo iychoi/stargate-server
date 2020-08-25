@@ -17,6 +17,7 @@ package stargate.drivers.datastore.ignite;
 
 import java.io.File;
 import java.io.IOException;
+import org.codehaus.jackson.annotate.JsonIgnore;
 import org.codehaus.jackson.annotate.JsonProperty;
 import stargate.commons.utils.JsonSerializer;
 import stargate.commons.datastore.AbstractDataStoreDriverConfig;
@@ -34,6 +35,7 @@ public class IgniteDataStoreDriverConfig extends AbstractDataStoreDriverConfig {
     private int partSize = DEFAULT_PART_SIZE;
     private long partWaitTimeoutSec = DEFAULT_PART_WAIT_TIMEOUT_SEC;
     private long partWaitPollingIntervalMsec = DEFAULT_PART_WAIT_POLLING_INTERVAL_MILLISEC;
+    private File cachePath;
     
     public static IgniteDataStoreDriverConfig createInstance(File file) throws IOException {
         if(file == null) {
@@ -100,5 +102,41 @@ public class IgniteDataStoreDriverConfig extends AbstractDataStoreDriverConfig {
     @JsonProperty("part_wait_polling_interval_msec")
     public long getDataWaitPollingIntervalMsec() {
         return this.partWaitPollingIntervalMsec;
+    }
+    
+    @JsonProperty("cache_path")
+    public void setCachePath(String cachePath) {
+        super.checkMutableAndRaiseException();
+        
+        if(cachePath == null || cachePath.isEmpty()) {
+            this.cachePath = null;
+        } else {
+            this.cachePath = new File(cachePath);
+        }
+    }
+    
+    @JsonIgnore
+    public void setCachePath(File cachePath) {
+        if(cachePath == null) {
+            throw new IllegalArgumentException("cachePath is null");
+        }
+        
+        super.checkMutableAndRaiseException();
+        
+        this.cachePath = cachePath;
+    }
+    
+    @JsonProperty("cache_path")
+    public String getCachePathString() {
+        if(this.cachePath == null) {
+            return null;
+        } else {
+            return this.cachePath.getAbsolutePath();
+        }
+    }
+    
+    @JsonIgnore
+    public File getCachePath() {
+        return this.cachePath;
     }
 }

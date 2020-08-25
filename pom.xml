@@ -19,12 +19,12 @@
         <dependency>
             <groupId>org.codehaus.jackson</groupId>
             <artifactId>jackson-core-asl</artifactId>
-            <version>1.9.6</version>
+            <version>1.9.13</version>
         </dependency>
         <dependency>
             <groupId>org.codehaus.jackson</groupId>
             <artifactId>jackson-mapper-asl</artifactId>
-            <version>1.9.6</version>
+            <version>1.9.13</version>
         </dependency>
         <dependency>
             <groupId>commons-logging</groupId>
@@ -39,7 +39,7 @@
         <dependency>
             <groupId>com.sun.jersey</groupId>
             <artifactId>jersey-json</artifactId>
-            <version>1.18.1</version>
+            <version>1.19.4</version>
         </dependency>
         <dependency>
             <groupId>com.google.guava</groupId>
@@ -49,37 +49,37 @@
         <dependency>
             <groupId>org.eclipse.jetty</groupId>
             <artifactId>jetty-server</artifactId>
-            <version>9.1.5.v20140505</version>
+            <version>9.3.24.v20180605</version>
         </dependency>
         <dependency>
             <groupId>org.eclipse.jetty</groupId>
             <artifactId>jetty-servlet</artifactId>
-            <version>9.1.5.v20140505</version>
+            <version>9.3.24.v20180605</version>
         </dependency>
         <dependency>
             <groupId>org.eclipse.jetty</groupId>
             <artifactId>jetty-servlets</artifactId>
-            <version>9.1.5.v20140505</version>
+            <version>9.3.24.v20180605</version>
         </dependency>
         <dependency>
             <groupId>org.eclipse.jetty</groupId>
             <artifactId>jetty-http</artifactId>
-            <version>9.1.5.v20140505</version>
+            <version>9.3.24.v20180605</version>
         </dependency>
         <dependency>
             <groupId>org.eclipse.jetty</groupId>
             <artifactId>jetty-io</artifactId>
-            <version>9.1.5.v20140505</version>
+            <version>9.3.24.v20180605</version>
         </dependency>
         <dependency>
             <groupId>org.eclipse.jetty</groupId>
             <artifactId>jetty-security</artifactId>
-            <version>9.1.5.v20140505</version>
+            <version>9.3.24.v20180605</version>
         </dependency>
         <dependency>
             <groupId>org.eclipse.jetty</groupId>
             <artifactId>jetty-util</artifactId>
-            <version>9.1.5.v20140505</version>
+            <version>9.3.24.v20180605</version>
         </dependency>
         <dependency>
             <groupId>org.apache.ignite</groupId>
